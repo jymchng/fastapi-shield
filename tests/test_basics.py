@@ -2,7 +2,6 @@ from fastapi import FastAPI, Header, Request
 from fastapi.testclient import TestClient
 from fastapi_shield.shield import (
     Shield,
-    ShieldDepends,
     ShieldedDepends,
     AuthenticationStatus,
 )
@@ -30,8 +29,23 @@ FAKE_DB_DATA = {
 }
 
 
-def get_username(token: str) -> str:
-    return get_user(token).username
+def get_db() -> dict[str, User]:
+    return FAKE_DB_DATA
+
+
+def from_token_to_username(token: str) -> str:
+    if token == "valid_token1":
+        return "authenticated_user1"
+    if token == "valid_token2":
+        return "authenticated_user2"
+    raise ValueError("Invalid token")
+
+
+def get_username(token: str, db: dict[str, User] = ShieldedDepends(get_db)) -> str:
+    print("`get_username::token`: ", token)
+    print("`get_username::db`: ", db)
+    username = from_token_to_username(token)
+    return username
 
 
 def get_user(token: str) -> User:
@@ -74,8 +88,14 @@ def get_auth_status(
 
 
 def allowed_user_roles(roles: list[str]):
-    def decorator(authenticated_user: User = ShieldedDepends(get_user)):
-        print("`allowed_user_roles::authenticated_user`: ", authenticated_user)
+    def decorator(
+        authenticated_username: str = ShieldedDepends(get_username),
+        *,
+        db: dict[str, User] = ShieldedDepends(get_db),
+    ):
+        print("`allowed_user_roles::authenticated_username`: ", authenticated_username)
+        print("`allowed_user_roles::db`: ", db)
+        authenticated_user = db.get(authenticated_username)
         for role in roles:
             if role in authenticated_user.roles:
                 return True, ""

@@ -1,9 +1,7 @@
 from typing_extensions import Doc
 from fastapi import Request, HTTPException, status
 from fastapi.dependencies.utils import get_typed_signature
-from pydantic_core import core_schema
-from pydantic.fields import FieldInfo
-from fastapi.params import Depends, Security
+from fastapi.params import Security
 
 from functools import wraps
 from inspect import signature, Signature, Parameter
