@@ -1,6 +1,9 @@
 from typing_extensions import Doc
 from fastapi import Request, HTTPException, status
 from fastapi.dependencies.utils import get_typed_signature
+from pydantic_core import core_schema
+from pydantic.fields import FieldInfo
+from fastapi.params import Depends, Security
 
 from functools import wraps
 from inspect import signature, Signature, Parameter
@@ -34,11 +37,15 @@ EndPointFunc = Callable[..., Any]
 ShieldFunc = Callable[[T], Tuple[Union[AuthenticationStatus, bool], U]]
 
 
-class ShieldDepends:
+class ShieldDepends(Security):
     def __init__(
         self,
         shielded_dependency: Optional[Callable[..., Any]] = None,
+        *args,
+        **kwargs,
     ):
+        super().__init__(*args, **kwargs)
+        self.dependency = lambda: self
         self.shielded_dependency = shielded_dependency
         self.authenticated = False
 
@@ -49,6 +56,18 @@ class ShieldDepends:
         if self.authenticated:
             return self.shielded_dependency(*args, **kwargs)
         return self
+
+    def __pydantic_core_schema__(self, *_, **__):
+        return core_schema.no_info_after_validator_function(
+            self,
+            core_schema.union_schema(
+                [
+                    core_schema.none_schema(),
+                    core_schema.str_schema(),
+                    core_schema.any_schema(),
+                ],
+            ),
+        )
 
 
 def ShieldedDepends(  # noqa: N802

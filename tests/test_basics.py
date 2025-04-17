@@ -1,6 +1,11 @@
 from fastapi import FastAPI, Header, Request
 from fastapi.testclient import TestClient
-from fastapi_shield.shield import Shield, ShieldedDepends, AuthenticationStatus
+from fastapi_shield.shield import (
+    Shield,
+    ShieldDepends,
+    ShieldedDepends,
+    AuthenticationStatus,
+)
 from fastapi import status
 from pydantic import BaseModel
 from typing import Tuple
@@ -83,12 +88,15 @@ def allowed_user_roles(roles: list[str]):
 app = FastAPI()
 auth_shield: Shield = Shield(get_auth_status)
 auth_api_shield: Shield = Shield(get_auth_status_from_header)
+
+
 def roles_shield(roles: list[str]):
     def decorator(authenticated_user: User = ShieldedDepends(get_user)):
         for role in roles:
             if role in authenticated_user.roles:
                 return True, ""
         return False, ""
+
     return Shield(decorator)
 
 
@@ -104,6 +112,17 @@ async def unprotected_endpoint(user: User = ShieldedDepends(get_user)):
 async def protected_endpoint(request: Request, user: User = ShieldedDepends(get_user)):
     return {
         "user": user,
+        "message": "This is a protected endpoint",
+    }
+
+
+@app.get("/protected-username")
+@auth_shield
+async def protected_username_endpoint(
+    request: Request, username: str = ShieldedDepends(get_username)
+):
+    return {
+        "username": username,
         "message": "This is a protected endpoint",
     }
 
@@ -149,10 +168,17 @@ def test_endpoints():
 
     # Test unprotected endpoint
     response = client.get("/unprotected")
+    print("`response.json()`: ", response.json())
     assert response.status_code == 200
     assert response.json() == {
         "message": "This is an unprotected endpoint",
-        "user": {"authenticated": False, "shielded_dependency": {}},
+        "user": {
+            "dependency": {},
+            "use_cache": True,
+            "scopes": [],
+            "shielded_dependency": {},
+            "authenticated": False,
+        },
     }, response.json()
 
     # Test protected endpoint without token
@@ -235,9 +261,29 @@ def test_endpoints():
         "message": "This is a protected endpoint",
     }, response.json()
 
-    response = client.get("/protected4", headers={"Authorization": "Bear valid_token2"})
+    response = client.get(
+        "/protected4", headers={"Authorization": "Bearer valid_token2"}
+    )
     assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
     assert response.json() == {"detail": "Unauthorized"}, response.json()
+
+    response = client.get(
+        "/protected-username", headers={"Authorization": "Bearer valid_token1"}
+    )
+    assert response.status_code == 200, response.status_code
+    assert response.json() == {
+        "username": "authenticated_user1",
+        "message": "This is a protected endpoint",
+    }, response.json()
+
+    response = client.get(
+        "/protected-username", headers={"Authorization": "Bearer valid_token2"}
+    )
+    assert response.status_code == 200, response.status_code
+    assert response.json() == {
+        "username": "authenticated_user2",
+        "message": "This is a protected endpoint",
+    }, response.json()
 
 
 test_endpoints()
