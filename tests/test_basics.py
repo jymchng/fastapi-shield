@@ -38,6 +38,22 @@ def get_db(
     return db
 
 
+def from_token_get_roles(token: str) -> list[str]:
+    if token == "valid_token1":
+        return ["user", "admin"]
+    if token == "valid_token2":
+        return ["user"]
+    return []
+
+
+def from_token_get_username(token: str) -> Optional[str]:
+    if token == "valid_token1":
+        return "username1"
+    if token == "valid_token2":
+        return "username2"
+    return
+
+
 def get_username(token: str) -> Optional[str]:
     if token == "valid_token1":
         return "username1"
@@ -102,14 +118,14 @@ auth_api_shield: Shield = Shield(get_auth_status_from_header)
 
 def roles_shield(roles: list[str]):
     def decorator(
-        username: str = ShieldedDepends(get_username),
-        db: dict[str, User] = ShieldedDepends(get_db),
+        username: str = ShieldedDepends(from_token_get_username),
+        user_roles: list[str] = ShieldedDepends(from_token_get_roles),
     ):
-        user = db.get(username)
-        print("`allowed_user_roles::user`: ", user)
-        for role in roles:
-            if role in user.roles:
-                return True, ""
+        print("`allowed_user_roles::username`: ", username)
+        print("`allowed_user_roles::roles`: ", roles)
+        for role in user_roles:
+            if role in roles:
+                return True, username
         return False, ""
 
     return Shield(decorator)
@@ -146,7 +162,9 @@ async def protected_username_endpoint(
 @app.get("/protected4")
 @auth_shield
 @roles_shield(["admin"])
-async def protected_endpoint4(request: Request, user: User = ShieldedDepends(get_user)):
+async def protected_endpoint4(
+    request: Request, user: User = ShieldedDepends(get_user_with_db)
+):
     return {
         "user": user,
         "message": "This is a protected endpoint",
@@ -266,7 +284,7 @@ def test_endpoints():
     response = client.get(
         "/protected4", headers={"Authorization": "Bearer valid_token1"}
     )
-    assert response.status_code == 200, response.status_code
+    assert response.status_code == 200, (response.status_code, response.json())
     assert response.json() == {
         "user": {
             "username": "authenticated_user1",

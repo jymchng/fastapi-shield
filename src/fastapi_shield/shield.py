@@ -299,6 +299,7 @@ async def inject_authenticated_entities_into_args_kwargs(
                 new_arg_kwargs is None
                 and arg_kwargs.first_param.annotation is not Optional
             ):
+                arg_kwargs.authenticated = False
                 return args, kwargs
             arg_kwargs.authenticated = False
             if isinstance(idx_kw, int):
