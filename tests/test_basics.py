@@ -35,17 +35,20 @@ def get_db() -> dict[str, User]:
 
 def get_username(token: str) -> str:
     if token == "valid_token1":
-        return "authenticated_user1"
+        return "username1"
     if token == "valid_token2":
-        return "authenticated_user2"
+        return "username2"
     raise ValueError("Invalid token")
 
 
 def get_user_with_db(
-    username: str, db: dict[str, User] = Depends(get_db)
+    token: str, db: dict[str, User] = Depends(get_db)
 ) -> Optional[User]:
-    print("`get_user_with_db::username`: ", username)
+    print("`get_user_with_db::token`: ", token)
     print("`get_user_with_db::db`: ", db)
+    username = get_username(token)
+    print("`get_user_with_db::username`: ", username)
+    print("`get_user_with_db::db.get(username)`: ", db.get(username))
     return db.get(username)
 
 
@@ -279,7 +282,7 @@ def test_endpoints():
     )
     assert response.status_code == 200, response.status_code
     assert response.json() == {
-        "username": "authenticated_user1",
+        "username": "username1",
         "message": "This is a protected endpoint",
     }, response.json()
 
@@ -288,7 +291,7 @@ def test_endpoints():
     )
     assert response.status_code == 200, response.status_code
     assert response.json() == {
-        "username": "authenticated_user2",
+        "username": "username2",
         "message": "This is a protected endpoint",
     }, response.json()
 

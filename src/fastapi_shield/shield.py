@@ -1,6 +1,9 @@
 from typing_extensions import Doc
 from fastapi import Request, HTTPException, status
-from fastapi.dependencies.utils import get_typed_signature
+from fastapi.dependencies.utils import (
+    solve_dependencies,
+    get_dependant,
+)
 from fastapi.params import Security
 
 from functools import wraps
@@ -46,6 +49,15 @@ class ShieldDepends(Security):
         self.dependency = lambda: self
         self.shielded_dependency = shielded_dependency
         self.authenticated = False
+        shielded_dependency_signature = signature(shielded_dependency)
+        self.check_dependency_signature(shielded_dependency_signature)
+        parameters = shielded_dependency_signature.parameters.values()
+        self.first_param = None
+        self.rest_params = []
+        if len(parameters) > 1:
+            self.first_param, *self.rest_params = parameters
+        if len(parameters) == 1:
+            self.first_param = list(parameters)[0]
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(authenticated={self.authenticated}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
@@ -54,6 +66,49 @@ class ShieldDepends(Security):
         if self.authenticated:
             return self.shielded_dependency(*args, **kwargs)
         return self
+
+    def check_dependency_signature(self, signature: Signature):
+        params = signature.parameters
+        for idx, param in enumerate(params.values()):
+            if idx == 0:
+                continue
+            if param.default is Parameter.empty:
+                raise ValueError(f"Parameter '{param.name}' must have a default value")
+
+    @property
+    def __dict__(self):
+        """Custom __dict__ implementation to exclude signature parameters from serialization"""
+        return {
+            "authenticated": self.authenticated,
+            "dependency": self.dependency,
+            "shielded_dependency": self.shielded_dependency,
+            "use_cache": self.use_cache,
+            "scopes": self.scopes,
+        }
+
+    async def resolve_dependencies(self, request: Request):
+        def mocked_shielded_dependency(*args, **kwargs):
+            return self.shielded_dependency(*args, **kwargs)
+
+        mocked_shielded_dependency.__signature__ = Signature(
+            rearrange_params(
+                merge_dedup_seq_params(
+                    self.rest_params,
+                )
+            )
+        )
+        solved_dependencies = await solve_dependencies(
+            request=request,
+            dependant=get_dependant(path="", call=mocked_shielded_dependency),
+            async_exit_stack=None,
+            embed_body_fields=False,
+        )
+        if solved_dependencies.errors:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to solve dependencies",
+            )
+        return solved_dependencies.values
 
 
 def ShieldedDepends(  # noqa: N802
@@ -69,7 +124,9 @@ def ShieldedDepends(  # noqa: N802
     return ShieldDepends(shielded_dependency=shielded_dependency)
 
 
-def prepend_request_to_signature_of_endpoint(endpoint: EndPointFunc) -> Signature:
+def prepend_request_to_signature_params_of_endpoint(
+    endpoint: EndPointFunc,
+) -> Sequence[Parameter]:
     new_request_param: Parameter = Parameter(
         name="request",
         kind=Parameter.POSITIONAL_ONLY,
@@ -78,7 +135,7 @@ def prepend_request_to_signature_of_endpoint(endpoint: EndPointFunc) -> Signatur
     )
     new_signature = signature(endpoint)
     new_params = [*[new_request_param], *new_signature.parameters.values()]
-    return Signature(new_params)
+    return new_params
 
 
 def prepend_params_to_signature(
@@ -176,13 +233,10 @@ class Shield(Generic[T, U]):
             }
             auth_status, obj = self._guard_func(**guard_func_args)
             if auth_status:
-                print(
-                    "`wrapper::inject_authenticated_entities_into_args_kwargs`: ",
-                    obj,
+                (
                     args,
-                    kwargs,
-                )
-                args, endpoint_kwargs = inject_authenticated_entities_into_args_kwargs(
+                    endpoint_kwargs,
+                ) = await inject_authenticated_entities_into_args_kwargs(
                     obj, *args, **kwargs
                 )
                 endpoint_kwargs = {
@@ -198,14 +252,10 @@ class Shield(Generic[T, U]):
             rearrange_params(
                 merge_dedup_seq_params(
                     self._guard_func_params.values(),
-                    signature(endpoint).parameters.values(),
+                    prepend_request_to_signature_params_of_endpoint(endpoint),
                 )
             )
         )
-        print("`wrapper.__name__`: ", wrapper.__name__)
-        print("`signature(endpoint)`: ", signature(endpoint))
-        print("`wrapper::__signature__`: ", wrapper.__signature__)
-        print("`get_typed_signature(wrapper)`: ", get_typed_signature(wrapper))
         return wrapper
 
 
@@ -217,7 +267,7 @@ def get_values_from_kwargs_for_dependency(
     return dependency_kwargs
 
 
-def inject_authenticated_entities_into_args_kwargs(
+async def inject_authenticated_entities_into_args_kwargs(
     obj, *args, **kwargs
 ) -> Tuple[Tuple[Any, ...], dict[str, Any]]:
     authenticated_depends = search_args_kwargs_for_authenticated_depends(
@@ -231,7 +281,16 @@ def inject_authenticated_entities_into_args_kwargs(
                     detail="Already authenticated",
                 )
             arg_kwargs.authenticated = True
-            new_arg_kwargs = arg_kwargs.shielded_dependency(obj)
+            request = kwargs.get("request")
+            if not request:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="Request is required",
+                )
+            solved_dependencies_values = await arg_kwargs.resolve_dependencies(request)
+            new_arg_kwargs = arg_kwargs.shielded_dependency(
+                obj, **solved_dependencies_values
+            )
             arg_kwargs.authenticated = False
             if isinstance(idx_kw, int):
                 args = args[:idx_kw] + (new_arg_kwargs,) + args[idx_kw + 1 :]
