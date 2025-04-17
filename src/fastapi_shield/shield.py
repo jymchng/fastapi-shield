@@ -58,6 +58,9 @@ class ShieldDepends(Security):
             self.first_param, *self.rest_params = parameters
         if len(parameters) == 1:
             self.first_param = list(parameters)[0]
+        if self.first_param.default is not Parameter.empty:
+            self.rest_params += [self.first_param]
+            self.first_param = None
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(authenticated={self.authenticated}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
@@ -288,10 +291,15 @@ async def inject_authenticated_entities_into_args_kwargs(
                     detail="Request is required",
                 )
             solved_dependencies_values = await arg_kwargs.resolve_dependencies(request)
+            print("`solved_dependencies_values`: ", solved_dependencies_values)
             new_arg_kwargs = arg_kwargs.shielded_dependency(
-                obj, **solved_dependencies_values
+                *((obj,) if arg_kwargs.first_param is not None else ()),
+                **solved_dependencies_values,
             )
-            if new_arg_kwargs is None and arg_kwargs.first_param.annotation is not Optional:
+            if (
+                new_arg_kwargs is None
+                and arg_kwargs.first_param.annotation is not Optional
+            ):
                 return args, kwargs
             arg_kwargs.authenticated = False
             if isinstance(idx_kw, int):

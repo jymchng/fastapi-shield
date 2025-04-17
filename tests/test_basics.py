@@ -29,8 +29,13 @@ FAKE_DB_DATA = {
 }
 
 
-def get_db() -> dict[str, User]:
-    return FAKE_DB_DATA
+def get_db(
+    db: dict[str, User] = Depends(lambda: FAKE_DB_DATA),
+    db2: dict[str, User] = Depends(lambda: FAKE_DB_DATA),
+) -> dict[str, User]:
+    print("`get_db::db`: ", db)
+    print("`get_db::db2`: ", db2)
+    return db
 
 
 def get_username(token: str) -> Optional[str]:
@@ -97,7 +102,8 @@ auth_api_shield: Shield = Shield(get_auth_status_from_header)
 
 def roles_shield(roles: list[str]):
     def decorator(
-        username: str = ShieldedDepends(get_username), db: dict[str, User] = ShieldedDepends(get_db)
+        username: str = ShieldedDepends(get_username),
+        db: dict[str, User] = ShieldedDepends(get_db),
     ):
         user = db.get(username)
         print("`allowed_user_roles::user`: ", user)
