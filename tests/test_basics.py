@@ -33,20 +33,18 @@ def get_db() -> dict[str, User]:
     return FAKE_DB_DATA
 
 
-def get_username(token: str) -> str:
+def get_username(token: str) -> Optional[str]:
     if token == "valid_token1":
         return "username1"
     if token == "valid_token2":
         return "username2"
-    raise ValueError("Invalid token")
+    return
 
 
 def get_user_with_db(
-    token: str, db: dict[str, User] = Depends(get_db)
+    username: str, db: dict[str, User] = Depends(get_db)
 ) -> Optional[User]:
-    print("`get_user_with_db::token`: ", token)
     print("`get_user_with_db::db`: ", db)
-    username = get_username(token)
     print("`get_user_with_db::username`: ", username)
     print("`get_user_with_db::db.get(username)`: ", db.get(username))
     return db.get(username)
@@ -99,8 +97,9 @@ auth_api_shield: Shield = Shield(get_auth_status_from_header)
 
 def roles_shield(roles: list[str]):
     def decorator(
-        user: User = ShieldedDepends(get_user_with_db),
+        username: str = ShieldedDepends(get_username), db: dict[str, User] = ShieldedDepends(get_db)
     ):
+        user = db.get(username)
         print("`allowed_user_roles::user`: ", user)
         for role in roles:
             if role in user.roles:

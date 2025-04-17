@@ -291,6 +291,8 @@ async def inject_authenticated_entities_into_args_kwargs(
             new_arg_kwargs = arg_kwargs.shielded_dependency(
                 obj, **solved_dependencies_values
             )
+            if new_arg_kwargs is None and arg_kwargs.first_param.annotation is not Optional:
+                return args, kwargs
             arg_kwargs.authenticated = False
             if isinstance(idx_kw, int):
                 args = args[:idx_kw] + (new_arg_kwargs,) + args[idx_kw + 1 :]
