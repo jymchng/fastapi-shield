@@ -89,7 +89,7 @@ def roles_shield(roles: list[str]):
             if role in authenticated_user.roles:
                 return True, ""
         return False, ""
-    return decorator
+    return Shield(decorator)
 
 
 # Unprotected endpoint
