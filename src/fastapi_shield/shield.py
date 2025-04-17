@@ -1,5 +1,6 @@
 from typing_extensions import Doc
 from fastapi import Request, HTTPException, status
+from fastapi.dependencies.utils import get_typed_signature
 
 from functools import wraps
 from inspect import signature, Signature, Parameter
@@ -42,7 +43,7 @@ class ShieldDepends:
         self.authenticated = False
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(authenticated={self.authenticated}; shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
+        return f"{type(self).__name__}(authenticated={self.authenticated}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
 
     def __call__(self, *args, **kwargs):
         if self.authenticated:
@@ -93,6 +94,17 @@ def merge_dedup_seq_params(
                 seen[param.name] = param
                 results.append(param)
     return results
+
+
+def change_all_shielded_depends_defaults_to_annotated_as_shielded_depends(
+    seq_of_params: Sequence[Parameter],
+) -> list[Parameter]:
+    return [
+        param.replace(annotation=ShieldDepends)
+        if isinstance(param.default, ShieldDepends)
+        else param
+        for param in seq_of_params
+    ]
 
 
 def rearrange_params(seq_of_params: Sequence[Parameter]) -> list[Parameter]:
@@ -185,7 +197,10 @@ class Shield(Generic[T, U]):
                 )
             )
         )
+        print("`wrapper.__name__`: ", wrapper.__name__)
+        print("`signature(endpoint)`: ", signature(endpoint))
         print("`wrapper::__signature__`: ", wrapper.__signature__)
+        print("`get_typed_signature(wrapper)`: ", get_typed_signature(wrapper))
         return wrapper
 
 

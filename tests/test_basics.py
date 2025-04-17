@@ -25,6 +25,10 @@ FAKE_DB_DATA = {
 }
 
 
+def get_username(token: str) -> str:
+    return get_user(token).username
+
+
 def get_user(token: str) -> User:
     if token == "valid_token1":
         print("`get_user` returns `FAKE_DB_DATA['username1']`")
@@ -79,13 +83,19 @@ def allowed_user_roles(roles: list[str]):
 app = FastAPI()
 auth_shield: Shield = Shield(get_auth_status)
 auth_api_shield: Shield = Shield(get_auth_status_from_header)
-roles_shield: Shield = lambda roles: Shield(allowed_user_roles(roles))
+def roles_shield(roles: list[str]):
+    def decorator(authenticated_user: User = ShieldedDepends(get_user)):
+        for role in roles:
+            if role in authenticated_user.roles:
+                return True, ""
+        return False, ""
+    return decorator
 
 
 # Unprotected endpoint
 @app.get("/unprotected")
 async def unprotected_endpoint(user: User = ShieldedDepends(get_user)):
-    return {"user": user, "message": "This is an unprotected endpoint"}
+    return {"message": "This is an unprotected endpoint", "user": user}
 
 
 # Protected endpoint
