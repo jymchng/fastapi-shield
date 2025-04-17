@@ -291,7 +291,6 @@ async def inject_authenticated_entities_into_args_kwargs(
                     detail="Request is required",
                 )
             solved_dependencies_values = await arg_kwargs.resolve_dependencies(request)
-            print("`solved_dependencies_values`: ", solved_dependencies_values)
             new_arg_kwargs = arg_kwargs.shielded_dependency(
                 *((obj,) if arg_kwargs.first_param is not None else ()),
                 **solved_dependencies_values,
