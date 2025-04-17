@@ -57,18 +57,6 @@ class ShieldDepends(Security):
             return self.shielded_dependency(*args, **kwargs)
         return self
 
-    def __pydantic_core_schema__(self, *_, **__):
-        return core_schema.no_info_after_validator_function(
-            self,
-            core_schema.union_schema(
-                [
-                    core_schema.none_schema(),
-                    core_schema.str_schema(),
-                    core_schema.any_schema(),
-                ],
-            ),
-        )
-
 
 def ShieldedDepends(  # noqa: N802
     shielded_dependency: Annotated[
