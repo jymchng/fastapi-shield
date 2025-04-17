@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, Request
+from fastapi import Depends, FastAPI, Header, Request
 from fastapi.testclient import TestClient
 from fastapi_shield.shield import (
     Shield,
@@ -7,7 +7,7 @@ from fastapi_shield.shield import (
 )
 from fastapi import status
 from pydantic import BaseModel
-from typing import Tuple
+from typing import Optional, Tuple
 
 
 class User(BaseModel):
@@ -33,7 +33,7 @@ def get_db() -> dict[str, User]:
     return FAKE_DB_DATA
 
 
-def from_token_to_username(token: str) -> str:
+def get_username(token: str) -> str:
     if token == "valid_token1":
         return "authenticated_user1"
     if token == "valid_token2":
@@ -41,11 +41,12 @@ def from_token_to_username(token: str) -> str:
     raise ValueError("Invalid token")
 
 
-def get_username(token: str, db: dict[str, User] = ShieldedDepends(get_db)) -> str:
-    print("`get_username::token`: ", token)
-    print("`get_username::db`: ", db)
-    username = from_token_to_username(token)
-    return username
+def get_user_with_db(
+    username: str, db: dict[str, User] = Depends(get_db)
+) -> Optional[User]:
+    print("`get_user_with_db::username`: ", username)
+    print("`get_user_with_db::db`: ", db)
+    return db.get(username)
 
 
 def get_user(token: str) -> User:
@@ -87,23 +88,6 @@ def get_auth_status(
     return (AuthenticationStatus.UNAUTHENTICATED, "")
 
 
-def allowed_user_roles(roles: list[str]):
-    def decorator(
-        authenticated_username: str = ShieldedDepends(get_username),
-        *,
-        db: dict[str, User] = ShieldedDepends(get_db),
-    ):
-        print("`allowed_user_roles::authenticated_username`: ", authenticated_username)
-        print("`allowed_user_roles::db`: ", db)
-        authenticated_user = db.get(authenticated_username)
-        for role in roles:
-            if role in authenticated_user.roles:
-                return True, ""
-        return False, ""
-
-    return decorator
-
-
 # Define the FastAPI app
 app = FastAPI()
 auth_shield: Shield = Shield(get_auth_status)
@@ -111,9 +95,12 @@ auth_api_shield: Shield = Shield(get_auth_status_from_header)
 
 
 def roles_shield(roles: list[str]):
-    def decorator(authenticated_user: User = ShieldedDepends(get_user)):
+    def decorator(
+        user: User = ShieldedDepends(get_user_with_db),
+    ):
+        print("`allowed_user_roles::user`: ", user)
         for role in roles:
-            if role in authenticated_user.roles:
+            if role in user.roles:
                 return True, ""
         return False, ""
 
