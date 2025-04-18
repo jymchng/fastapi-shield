@@ -105,17 +105,27 @@ if TYPE_EXTENSIONS_IMPORTED and TYPE_CHECKING:
         **kwargs: NoxSessionParams,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
 
-
-DEFAULT_SESSION_KWARGS: "NoxSessionParams" = {
-    "reuse_venv": True,  # probably want to reuse it so that you don't keep recreating it
-    # you can also pass in other kwargs to nox_session, e.g. pinning a python version
-}
+# Fundamental Variables
+ROOT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 MANIFEST_FILENAME = "pyproject.toml"
 PROJECT_MANIFEST = load_toml(MANIFEST_FILENAME)
 PROJECT_NAME: str = PROJECT_MANIFEST["project"]["name"]
 PROJECT_NAME_NORMALIZED: str = PROJECT_NAME.replace("-", "_").replace(" ", "_")
+
 _PROJECT_CODES_DIR: str = os.path.join("src", PROJECT_NAME_NORMALIZED)
 PROJECT_CODES_DIR: str = _PROJECT_CODES_DIR if os.path.exists(_PROJECT_CODES_DIR) else "."
+DIST_DIR: str = os.path.join(ROOT_DIR, "dist")
+BUILD_DIR: str = os.path.join(ROOT_DIR, "build")
+TEST_DIR: str = os.path.join(ROOT_DIR, "tests")
+EXAMPLES_DIR: str = os.path.join(ROOT_DIR, "examples")
+
+
+# Statics
+DEFAULT_SESSION_KWARGS: "NoxSessionParams" = {
+    "reuse_venv": True,  # probably want to reuse it so that you don't keep recreating it
+    # you can also pass in other kwargs to nox_session, e.g. pinning a python version
+}
+
 
 Session.log(
     object.__new__(Session),
@@ -205,7 +215,7 @@ def session(
 
 # dependency_group is used to install the dependencies for the test session
 # default_posargs is used to pass additional arguments to the test session
-@session(dependency_group="dev", default_posargs=["tests", "-s", "-vv"])
+@session(dependency_group="dev", default_posargs=[TEST_DIR, "-s", "-vv"])
 def test(session: AlteredSession):
     command = [
         shutil.which("uv"),
@@ -259,7 +269,7 @@ def alter_session(
 )
 def clean(session: Session):
     session.run("uv", "clean")
-    session.run("rm", "-rf", "build", "dist", "*.egg-info")
+    session.run("rm", "-rf", BUILD_DIR, DIST_DIR, "*.egg-info")
     import glob
     import os
     import shutil
@@ -277,17 +287,17 @@ def clean(session: Session):
         f"{PROJECT_CODES_DIR}/**/*.so",
         f"{PROJECT_CODES_DIR}/**/*.pyd",
         # Build directory extensions
-        "build/**/*.so",
-        "build/**/*.pyd",
+        f"{BUILD_DIR}/**/*.so",
+        f"{BUILD_DIR}/**/*.pyd",
     ]
 
     # Remove dist directory
-    if os.path.exists("dist"):
-        shutil.rmtree("dist")
+    if os.path.exists(DIST_DIR):
+        shutil.rmtree(DIST_DIR)
 
     # Remove build directory
-    if os.path.exists("build"):
-        shutil.rmtree("build")
+    if os.path.exists(BUILD_DIR):
+        shutil.rmtree(BUILD_DIR)
 
     for pattern in extensions_patterns:
         for file in glob.glob(pattern, recursive=True):
@@ -298,7 +308,7 @@ def clean(session: Session):
                 session.log(f"Error removing {file}: {e}")
 
     # Remove __pycache__ directories and .pyc files
-    for root, dirs, files in os.walk("."):
+    for root, dirs, files in os.walk(ROOT_DIR):
         # Remove __pycache__ directories
         for dir in dirs:
             if dir == "__pycache__":
@@ -340,7 +350,7 @@ def fastapi_auth(session: Session):
 @session(
     dependency_group="examples",
     default_posargs=[
-        "examples/scratchpad.py",
+        f"{EXAMPLES_DIR}/scratchpad.py",
     ],
 )
 def scratchpad(session: Session):
@@ -357,7 +367,7 @@ def scratchpad(session: Session):
 @session(
     dependency_group="examples",
     environment_mapping={"ENVIRONMENT_KEY": "staging"},
-    default_posargs=["examples/fastapi_auth_staging.py", "-s", "-vv"],
+    default_posargs=[f"{EXAMPLES_DIR}/fastapi_auth_staging.py", "-s", "-vv"],
 )
 def test_staging(session: Session):
     session.run(
@@ -374,7 +384,7 @@ def test_staging(session: Session):
 @session(
     dependency_group="examples",
     environment_mapping={"ENVIRONMENT_KEY": "production"},
-    default_posargs=["examples/fastapi_auth_prod.py", "-s", "-vv"],
+    default_posargs=[f"{EXAMPLES_DIR}/fastapi_auth_prod.py", "-s", "-vv"],
 )
 def test_production(session: Session):
     session.run(
@@ -391,7 +401,7 @@ def test_production(session: Session):
 @session(
     dependency_group="examples",
     environment_mapping={"ENVIRONMENT_KEY": "development"},
-    default_posargs=["examples/fastapi_auth_dev.py", "-s", "-vv"],
+    default_posargs=[f"{EXAMPLES_DIR}/fastapi_auth_dev.py", "-s", "-vv"],
 )
 def test_development(session: Session):
     session.run(
@@ -463,7 +473,7 @@ def build(session: Session):
     session.run("uv", "build")
 
 
-@session(dependency_group="test", default_posargs=["tests/benchmark.py", "-v"])
+@session(dependency_group="test", default_posargs=[f"{TEST_DIR}/benchmark.py", "-v"])
 def benchmark(session: Session):
     session.run(
         "uv",
@@ -485,9 +495,9 @@ def list_dist_files(session: Session):
     import os
 
     # Find the latest wheel file in the dist directory
-    wheel_files = sorted(glob.glob("dist/*.whl"), key=os.path.getmtime, reverse=True)
+    wheel_files = sorted(glob.glob(f"{DIST_DIR}/*.whl"), key=os.path.getmtime, reverse=True)
     tarball_files = sorted(
-        glob.glob("dist/*.tar.gz"), key=os.path.getmtime, reverse=True
+        glob.glob(f"{DIST_DIR}/*.tar.gz"), key=os.path.getmtime, reverse=True
     )
 
     if not wheel_files and not tarball_files:
@@ -529,7 +539,7 @@ def list_dist_files(session: Session):
             session.log(f"Total files in tarball: {len(file_list)}")
 
 
-@session(dependency_group="dev", default_posargs=[".", "--check-untyped-defs"])
+@session(dependency_group="dev", default_posargs=[PROJECT_CODES_DIR, "--check-untyped-defs"])
 def type_check(session: Session):
     session.run("uv", "tool", "run", "mypy")
 
@@ -564,7 +574,7 @@ def test_client_install_run(session: Session):
     from packaging import version
 
     # Get all tarball files
-    tarball_files = glob.glob(f"dist/{PROJECT_NAME_NORMALIZED}-*.tar.gz")
+    tarball_files = glob.glob(f"{DIST_DIR}/{PROJECT_NAME_NORMALIZED}-*.tar.gz")
 
     if not tarball_files:
         session.error("No tarball files found in dist/ directory")
