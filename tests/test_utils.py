@@ -158,4 +158,3 @@ def test_kw_only_last():
     result = list(rearrange_params(params))
     _ = Signature(result)
     assert [p.name for p in result] == ["a", "b", "c"]
-

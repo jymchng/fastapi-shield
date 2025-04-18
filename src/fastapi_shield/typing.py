@@ -1,9 +1,6 @@
-from typing import TypeVar, Callable, Any, Tuple, Union
+from typing import TypeVar, Callable, Any
 
 TYPE_CHECKING = False
-
-if TYPE_CHECKING:
-    from fastapi_shield.shield import AuthenticationStatus
 
 T = TypeVar("T")
 U = TypeVar("U")

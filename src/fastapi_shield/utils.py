@@ -1,5 +1,5 @@
 from inspect import Parameter, signature
-from typing import Sequence
+from typing import Iterator, Sequence
 
 from fastapi_shield.typing import EndPointFunc
 from fastapi import Request
@@ -30,7 +30,7 @@ def prepend_request_to_signature_params_of_endpoint(
     yield from new_signature.parameters.values()
 
 
-def rearrange_params(params: Sequence[Parameter]):
+def rearrange_params(params: Iterator[Parameter]):
     """
     Perfectly optimized parameter rearrangement with:
     - Direct iterator consumption
@@ -71,7 +71,7 @@ def rearrange_params(params: Sequence[Parameter]):
         kind = p.kind
         if kind == POS_KW:
             # Special handling for POSITIONAL_OR_KEYWORD
-            kind = 1 if p.default is EMPTY else 2
+            kind = 1 if p.default is EMPTY else 2  # type: ignore[assignment]
 
         if kind == now_kind:
             yield p

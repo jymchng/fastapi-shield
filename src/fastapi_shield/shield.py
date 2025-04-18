@@ -12,11 +12,10 @@ from fastapi_shield.utils import (
     prepend_request_to_signature_params_of_endpoint,
     merge_dedup_seq_params,
 )
-from fastapi_shield.typing import EndPointFunc, ShieldFunc, T, U
+from fastapi_shield.typing import EndPointFunc, ShieldFunc, U
 
 from functools import cached_property, wraps
 from inspect import signature, Signature, Parameter
-from enum import Enum
 
 from typing import (
     Annotated,
@@ -25,8 +24,6 @@ from typing import (
     Any,
     Generic,
     Tuple,
-    Sequence,
-    Union,
 )
 
 

@@ -7,6 +7,7 @@ from nox.sessions import Session
 from nox import session as nox_session
 import shutil
 import os
+
 try:
     import tomli as tomllib
 
@@ -105,6 +106,7 @@ if TYPE_EXTENSIONS_IMPORTED and TYPE_CHECKING:
         **kwargs: NoxSessionParams,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
 
+
 # Fundamental Variables
 ROOT_DIR: str = os.path.dirname(os.path.abspath(__file__))
 MANIFEST_FILENAME = "pyproject.toml"
@@ -113,7 +115,9 @@ PROJECT_NAME: str = PROJECT_MANIFEST["project"]["name"]
 PROJECT_NAME_NORMALIZED: str = PROJECT_NAME.replace("-", "_").replace(" ", "_")
 
 _PROJECT_CODES_DIR: str = os.path.join("src", PROJECT_NAME_NORMALIZED)
-PROJECT_CODES_DIR: str = _PROJECT_CODES_DIR if os.path.exists(_PROJECT_CODES_DIR) else "."
+PROJECT_CODES_DIR: str = (
+    _PROJECT_CODES_DIR if os.path.exists(_PROJECT_CODES_DIR) else "."
+)
 DIST_DIR: str = os.path.join(ROOT_DIR, "dist")
 BUILD_DIR: str = os.path.join(ROOT_DIR, "build")
 TEST_DIR: str = os.path.join(ROOT_DIR, "tests")
@@ -130,10 +134,16 @@ DEFAULT_SESSION_KWARGS: "NoxSessionParams" = {
 Session.log(
     object.__new__(Session),
     {
-        "PROJECT_NAME": PROJECT_NAME,
-        "PROJECT_NAME_NORMALIZED": PROJECT_NAME_NORMALIZED,
-        "PROJECT_CODES_DIR": PROJECT_CODES_DIR,
-    }
+        "FUNDAMENTAL VARIABLES": {
+            "PROJECT_NAME": PROJECT_NAME,
+            "PROJECT_NAME_NORMALIZED": PROJECT_NAME_NORMALIZED,
+            "PROJECT_CODES_DIR": PROJECT_CODES_DIR,
+            "DIST_DIR": DIST_DIR,
+            "BUILD_DIR": BUILD_DIR,
+            "TEST_DIR": TEST_DIR,
+            "EXAMPLES_DIR": EXAMPLES_DIR,
+        }
+    },
 )
 
 
@@ -427,15 +437,15 @@ def format(session: Session):
     # Check if the directory exists before trying to format files
     # Find the src directory or use parent directory
     import pathlib
-    
+
     # Look for src directory
     format_dir = pathlib.Path(PROJECT_CODES_DIR)
-    
+
     session.log(f"Using {format_dir} as the directory for formatting")
-    
+
     # Format python files first
     session.run("uv", "tool", "run", "ruff", "format", format_dir)
-    
+
     # Format c files
     c_files_path = format_dir
     if not os.path.exists(c_files_path):
@@ -495,7 +505,9 @@ def list_dist_files(session: Session):
     import os
 
     # Find the latest wheel file in the dist directory
-    wheel_files = sorted(glob.glob(f"{DIST_DIR}/*.whl"), key=os.path.getmtime, reverse=True)
+    wheel_files = sorted(
+        glob.glob(f"{DIST_DIR}/*.whl"), key=os.path.getmtime, reverse=True
+    )
     tarball_files = sorted(
         glob.glob(f"{DIST_DIR}/*.tar.gz"), key=os.path.getmtime, reverse=True
     )
@@ -539,7 +551,9 @@ def list_dist_files(session: Session):
             session.log(f"Total files in tarball: {len(file_list)}")
 
 
-@session(dependency_group="dev", default_posargs=[PROJECT_CODES_DIR, "--check-untyped-defs"])
+@session(
+    dependency_group="dev", default_posargs=[PROJECT_CODES_DIR, "--check-untyped-defs"]
+)
 def type_check(session: Session):
     session.run("uv", "tool", "run", "mypy")
 
