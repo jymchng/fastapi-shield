@@ -1,2 +1,3 @@
-def hello() -> str:
-    return "Hello from fastapi-shield!"
+from fastapi_shield.shield import Shield, ShieldedDepends, AuthenticationStatus
+
+__all__ = ["Shield", "ShieldedDepends", "AuthenticationStatus"]

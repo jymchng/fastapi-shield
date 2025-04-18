@@ -5,7 +5,12 @@ from fastapi.dependencies.utils import (
     get_dependant,
 )
 from fastapi.params import Security
-from fastapi_shield.utils import rearrange_params
+from fastapi_shield.utils import (
+    rearrange_params,
+    prepend_request_to_signature_params_of_endpoint,
+    merge_dedup_seq_params,
+)
+from fastapi_shield.typing import EndPointFunc, ShieldFunc, T, U
 
 from functools import cached_property, wraps
 from inspect import signature, Signature, Parameter
@@ -17,14 +22,10 @@ from typing import (
     Callable,
     Any,
     Generic,
-    TypeVar,
     Tuple,
     Sequence,
     Union,
 )
-
-T = TypeVar("T")
-U = TypeVar("U")
 
 
 class AuthenticationStatus(Enum):
@@ -33,10 +34,6 @@ class AuthenticationStatus(Enum):
 
     def __bool__(self) -> bool:
         return self is AuthenticationStatus.AUTHENTICATED
-
-
-EndPointFunc = Callable[..., Any]
-ShieldFunc = Callable[[T], Tuple[Union[AuthenticationStatus, bool], U]]
 
 
 class ShieldDepends(Security):
@@ -149,49 +146,6 @@ def ShieldedDepends(  # noqa: N802
     )
 
 
-def prepend_request_to_signature_params_of_endpoint(
-    endpoint: EndPointFunc,
-):
-    new_request_param: Parameter = Parameter(
-        name="request",
-        kind=Parameter.POSITIONAL_ONLY,
-        annotation=Request,
-        default=Parameter.empty,
-    )
-    new_signature = signature(endpoint)
-    yield from [new_request_param]
-    yield from new_signature.parameters.values()
-
-
-def prepend_params_to_signature(
-    params: Sequence[Parameter], signature: Signature
-) -> Signature:
-    new_params = [*params, *signature.parameters.values()]
-    return Signature(new_params)
-
-
-def merge_dedup_seq_params(
-    *seqs_of_params: Sequence[Parameter],
-):
-    seen = {}
-    for seq_of_params in seqs_of_params:
-        for param in seq_of_params:
-            if param.name not in seen:
-                seen[param.name] = param
-                yield param
-
-
-def change_all_shielded_depends_defaults_to_annotated_as_shielded_depends(
-    seq_of_params: Sequence[Parameter],
-) -> list[Parameter]:
-    return [
-        param.replace(annotation=ShieldDepends)
-        if isinstance(param.default, ShieldDepends)
-        else param
-        for param in seq_of_params
-    ]
-
-
 class Shield(Generic[T, U]):
     def __init__(
         self,
@@ -222,7 +176,7 @@ class Shield(Generic[T, U]):
                     args,
                     endpoint_kwargs,
                 ) = await inject_authenticated_entities_into_args_kwargs(
-                    obj, *args, **kwargs
+                    obj, self, *args, **kwargs
                 )
                 endpoint_kwargs = {
                     k: v
@@ -244,19 +198,11 @@ class Shield(Generic[T, U]):
         return wrapper
 
 
-def get_values_from_kwargs_for_dependency(
-    dependency_func: Callable[[Any], Any], **kwargs
-):
-    dependency_func_params = signature(dependency_func).parameters
-    dependency_kwargs = {k: v for k, v in kwargs.items() if k in dependency_func_params}
-    return dependency_kwargs
-
-
 async def inject_authenticated_entities_into_args_kwargs(
-    obj, *args, **kwargs
+    obj, shield_inst: Shield, *args, **kwargs
 ) -> Tuple[Tuple[Any, ...], dict[str, Any]]:
     authenticated_depends = search_args_kwargs_for_authenticated_depends(
-        *args, **kwargs
+        shield_inst, *args, **kwargs
     )
     for idx_kw, arg_kwargs in authenticated_depends:
         if idx_kw is not None:
@@ -291,32 +237,14 @@ async def inject_authenticated_entities_into_args_kwargs(
     return args, kwargs
 
 
-def remove_authenticated_depends_from_signature_of_endpoint(
-    endpoint: EndPointFunc,
-) -> Signature:
-    new_signature = signature(endpoint)
-    return remove_authenticated_depends_from_signature(new_signature)
-
-
-def remove_authenticated_depends_from_signature(
-    signature: Signature,
-) -> Signature:
-    new_params = [
-        param
-        for param in signature.parameters.values()
-        if not isinstance(param.default, ShieldDepends)
-    ]
-    return Signature(new_params)
-
-
-def search_args_kwargs_for_authenticated_depends(
-    *args, **kwargs
-) -> list[Tuple[Union[str, int], ShieldDepends]]:
-    results = []
+def search_args_kwargs_for_authenticated_depends(shield_inst: Shield, *args, **kwargs):
     for idx, arg in enumerate(args):
-        if isinstance(arg, ShieldDepends):
-            results.append((idx, arg))
+        if isinstance(arg, ShieldDepends) and (
+            arg.shielded_by is None or arg.shielded_by is shield_inst
+        ):
+            yield (idx, arg)
     for kw, kwarg in kwargs.items():
-        if isinstance(kwarg, ShieldDepends):
-            results.append((kw, kwarg))
-    return results
+        if isinstance(kwarg, ShieldDepends) and (
+            kwarg.shielded_by is None or kwarg.shielded_by is shield_inst
+        ):
+            yield (kw, kwarg)

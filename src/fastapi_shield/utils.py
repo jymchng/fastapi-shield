@@ -1,5 +1,33 @@
-from inspect import Parameter
+from inspect import Parameter, signature
 from typing import Sequence
+
+from fastapi_shield.typing import EndPointFunc
+from fastapi import Request
+
+
+def merge_dedup_seq_params(
+    *seqs_of_params: Sequence[Parameter],
+):
+    seen = {}
+    for seq_of_params in seqs_of_params:
+        for param in seq_of_params:
+            if param.name not in seen:
+                seen[param.name] = param
+                yield param
+
+
+def prepend_request_to_signature_params_of_endpoint(
+    endpoint: EndPointFunc,
+):
+    new_request_param: Parameter = Parameter(
+        name="request",
+        kind=Parameter.POSITIONAL_ONLY,
+        annotation=Request,
+        default=Parameter.empty,
+    )
+    new_signature = signature(endpoint)
+    yield from [new_request_param]
+    yield from new_signature.parameters.values()
 
 
 def rearrange_params(params: Sequence[Parameter]):

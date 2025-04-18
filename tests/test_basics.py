@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.testclient import TestClient
-from fastapi_shield.shield import (
+from fastapi_shield import (
     Shield,
     ShieldedDepends,
     AuthenticationStatus,
@@ -163,7 +163,7 @@ async def protected_username_endpoint(
 @auth_shield
 @roles_shield(["admin"])
 async def protected_endpoint4(
-    request: Request, user: User = ShieldedDepends(get_user_with_db)
+    user: User = ShieldedDepends(get_user_with_db)
 ):
     return {
         "user": user,
