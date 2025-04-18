@@ -8,4 +8,4 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 U = TypeVar("U")
 EndPointFunc = Callable[..., Any]
-ShieldFunc = Callable[[T], Tuple[Union["AuthenticationStatus", bool], U]]
+ShieldFunc = Callable[..., U]

@@ -30,14 +30,6 @@ from typing import (
 )
 
 
-class AuthenticationStatus(Enum):
-    AUTHENTICATED = "AUTHENTICATED"
-    UNAUTHENTICATED = "UNAUTHENTICATED"
-
-    def __bool__(self) -> bool:
-        return self is AuthenticationStatus.AUTHENTICATED
-
-
 class ShieldDepends(Security):
     __slots__ = ("dependency", "shielded_dependency", "authenticated", "shielded_by")
 
@@ -54,13 +46,14 @@ class ShieldDepends(Security):
         self.authenticated = False
         self.shielded_by = shielded_by
         self.check_dependency_signature(signature(shielded_dependency))
+        self._shielded_dependency_params = signature(shielded_dependency).parameters
 
     @cached_property
     def first_param(self) -> Optional[Parameter]:
         dep = self.shielded_dependency
         if not dep:
             return None
-        params = list(signature(dep).parameters.values())
+        params = list(self._shielded_dependency_params.values())
         if len(params) == 0:
             return None
         first = params[0]
@@ -73,7 +66,7 @@ class ShieldDepends(Security):
         dep = self.shielded_dependency
         if not dep:
             return
-        params = list(signature(dep).parameters.values())
+        params = list(self._shielded_dependency_params.values())
         if not params:
             return
         first, *rest = params
@@ -153,10 +146,10 @@ def ShieldedDepends(  # noqa: N802
     )
 
 
-class Shield(Generic[T, U]):
+class Shield(Generic[U]):
     def __init__(
         self,
-        shield_func: ShieldFunc[T, U],
+        shield_func: ShieldFunc[U],
         exception_to_raise_if_fail: HTTPException = HTTPException(
             status_code=401, detail="Unauthorized"
         ),
@@ -177,8 +170,13 @@ class Shield(Generic[T, U]):
             guard_func_args = {
                 k: v for k, v in kwargs.items() if k in self._guard_func_params
             }
-            auth_status, obj = self._guard_func(**guard_func_args)
-            if auth_status:
+            if is_coroutine_callable(self._guard_func):
+                obj = await self._guard_func(**guard_func_args)
+                print("`obj`: ", obj)
+            else:
+                obj = self._guard_func(**guard_func_args)
+                print("`obj`: ", obj)
+            if obj:
                 (
                     args,
                     endpoint_kwargs,

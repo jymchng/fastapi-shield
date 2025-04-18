@@ -3,11 +3,10 @@ from fastapi.testclient import TestClient
 from fastapi_shield import (
     Shield,
     ShieldedDepends,
-    AuthenticationStatus,
 )
 from fastapi import status
 from pydantic import BaseModel
-from typing import Optional, Tuple
+from typing import Optional
 
 
 class User(BaseModel):
@@ -100,22 +99,22 @@ def validate_token(token: str):
 def get_auth_status_from_header(
     *,
     x_api_token: str = Header(),
-) -> Tuple[AuthenticationStatus, str]:
+) -> Optional[str]:
     if validate_token(x_api_token):
-        return (AuthenticationStatus.AUTHENTICATED, x_api_token)
-    return (AuthenticationStatus.UNAUTHENTICATED, "")
+        return x_api_token
+    return None
 
 
 def get_auth_status(
     request: Request,
-) -> Tuple[AuthenticationStatus, str]:
+) -> Optional[str]:
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        return AuthenticationStatus.UNAUTHENTICATED, ""
+        return None
     token = auth_header[len("Bearer ") :]
     if validate_token(token):
-        return (AuthenticationStatus.AUTHENTICATED, token)
-    return (AuthenticationStatus.UNAUTHENTICATED, "")
+        return token
+    return None
 
 
 # Define the FastAPI app
@@ -134,8 +133,8 @@ def roles_shield(roles: list[str]):
         print("`allowed_user_roles::roles`: ", roles)
         for role in user_roles:
             if role in roles:
-                return True, username
-        return False, ""
+                return username
+        return None
 
     return Shield(decorator)
 
@@ -191,7 +190,7 @@ async def protected_endpoint4(
 @app.get("/protected-api")
 @auth_api_shield
 def protected_endpoint3(
-    x_api_token: Header(), user: User = ShieldedDepends(get_user)
+    x_api_token: str = Header(), user: User = ShieldedDepends(get_user)
 ):
     return {
         "x-api-token": x_api_token,
@@ -212,13 +211,9 @@ async def protected_endpoint2(
     }
 
 
-# Test cases
-def test_endpoints():
+def test_unprotected_endpoint():
     client = TestClient(app)
-
-    # Test unprotected endpoint
     response = client.get("/unprotected")
-    print("`response.json()`: ", response.json())
     assert response.status_code == 200
     assert response.json() == {
         "message": "This is an unprotected endpoint",
@@ -231,32 +226,38 @@ def test_endpoints():
         },
     }, response.json()
 
-    # Test protected endpoint without token
+
+def test_protected_endpoint_without_token():
+    client = TestClient(app)
     response = client.get("/protected")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
     assert response.json() == {"detail": "Unauthorized"}, response.json()
 
+
+def test_protected2_endpoint_without_token():
+    client = TestClient(app)
     response = client.get("/protected2")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
     assert response.json() == {"detail": "Unauthorized"}, response.json()
 
-    # Test protected endpoint with invalid token
-    response = client.get(
-        "/protected", headers={"Authorization": "Bearer invalid_token"}
-    )
+
+def test_protected_endpoint_with_invalid_token():
+    client = TestClient(app)
+    response = client.get("/protected", headers={"Authorization": "Bearer invalid_token"})
     assert response.status_code == 401, response.status_code
     assert response.json() == {"detail": "Unauthorized"}, response.json()
 
-    response = client.get(
-        "/protected2", headers={"Authorization": "Bearer invalid_token"}
-    )
+
+def test_protected2_endpoint_with_invalid_token():
+    client = TestClient(app)
+    response = client.get("/protected2", headers={"Authorization": "Bearer invalid_token"})
     assert response.status_code == 401, response.status_code
     assert response.json() == {"detail": "Unauthorized"}, response.json()
 
-    # Test protected endpoint with valid token
-    response = client.get(
-        "/protected", headers={"Authorization": "Bearer valid_token1"}
-    )
+
+def test_protected_endpoint_with_valid_token():
+    client = TestClient(app)
+    response = client.get("/protected", headers={"Authorization": "Bearer valid_token1"})
     assert response.status_code == 200, response.status_code
     assert response.json() == {
         "user": {
@@ -267,15 +268,17 @@ def test_endpoints():
         "message": "This is a protected endpoint",
     }, response.json()
 
-    response = client.get(
-        "/protected", headers={"Authorization": "Bearer uinvalid_token1"}
-    )
+
+def test_protected_endpoint_with_malformed_token():
+    client = TestClient(app)
+    response = client.get("/protected", headers={"Authorization": "Bearer uinvalid_token1"})
     assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
     assert response.json() == {"detail": "Unauthorized"}, response.json()
 
-    response = client.get(
-        "/protected2", headers={"Authorization": "Bearer valid_token1"}
-    )
+
+def test_protected2_endpoint_with_valid_token():
+    client = TestClient(app)
+    response = client.get("/protected2", headers={"Authorization": "Bearer valid_token1"})
     assert response.status_code == 200, response.status_code
     assert response.json() == {
         "user1": {
@@ -286,6 +289,9 @@ def test_endpoints():
         "message": "This is a protected endpoint",
     }, response.json()
 
+
+def test_protected_api_endpoint_with_api_token():
+    client = TestClient(app)
     response = client.get("/protected-api", headers={"X-API-Token": "valid_token1"})
     assert response.status_code == 200, response.status_code
     assert response.json() == {
@@ -298,9 +304,10 @@ def test_endpoints():
         "message": "This is a protected endpoint",
     }, response.json()
 
-    response = client.get(
-        "/protected4", headers={"Authorization": "Bearer valid_token1"}
-    )
+
+def test_protected4_endpoint_with_admin_user():
+    client = TestClient(app)
+    response = client.get("/protected4", headers={"Authorization": "Bearer valid_token1"})
     assert response.status_code == 200, (response.status_code, response.json())
     assert response.json() == {
         "user": {
@@ -311,29 +318,30 @@ def test_endpoints():
         "message": "This is a protected endpoint",
     }, response.json()
 
-    response = client.get(
-        "/protected4", headers={"Authorization": "Bearer valid_token2"}
-    )
+
+def test_protected4_endpoint_with_non_admin_user():
+    client = TestClient(app)
+    response = client.get("/protected4", headers={"Authorization": "Bearer valid_token2"})
     assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
     assert response.json() == {"detail": "Unauthorized"}, response.json()
 
-    response = client.get(
-        "/protected-username", headers={"Authorization": "Bearer valid_token1"}
-    )
+
+def test_protected_username_endpoint_with_user1():
+    client = TestClient(app)
+    response = client.get("/protected-username", headers={"Authorization": "Bearer valid_token1"})
     assert response.status_code == 200, response.status_code
     assert response.json() == {
         "username": "username1",
         "message": "This is a protected endpoint",
     }, response.json()
 
-    response = client.get(
-        "/protected-username", headers={"Authorization": "Bearer valid_token2"}
-    )
+
+def test_protected_username_endpoint_with_user2():
+    client = TestClient(app)
+    response = client.get("/protected-username", headers={"Authorization": "Bearer valid_token2"})
     assert response.status_code == 200, response.status_code
     assert response.json() == {
         "username": "username2",
         "message": "This is a protected endpoint",
     }, response.json()
 
-
-test_endpoints()

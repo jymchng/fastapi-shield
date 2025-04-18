@@ -1,3 +1,3 @@
-from fastapi_shield.shield import Shield, ShieldedDepends, AuthenticationStatus
+from fastapi_shield.shield import Shield, ShieldedDepends
 
-__all__ = ["Shield", "ShieldedDepends", "AuthenticationStatus"]
+__all__ = ["Shield", "ShieldedDepends"]
