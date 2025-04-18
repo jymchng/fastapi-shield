@@ -1,11 +1,12 @@
 from functools import wraps
 import contextlib
 import nox
+from nox.project import load_toml
 import nox.command
 from nox.sessions import Session
 from nox import session as nox_session
 import shutil
-
+import os
 try:
     import tomli as tomllib
 
@@ -110,6 +111,20 @@ DEFAULT_SESSION_KWARGS: "NoxSessionParams" = {
     # you can also pass in other kwargs to nox_session, e.g. pinning a python version
 }
 MANIFEST_FILENAME = "pyproject.toml"
+PROJECT_MANIFEST = load_toml(MANIFEST_FILENAME)
+PROJECT_NAME: str = PROJECT_MANIFEST["project"]["name"]
+PROJECT_NAME_NORMALIZED: str = PROJECT_NAME.replace("-", "_").replace(" ", "_")
+_PROJECT_CODES_DIR: str = os.path.join("src", PROJECT_NAME_NORMALIZED)
+PROJECT_CODES_DIR: str = _PROJECT_CODES_DIR if os.path.exists(_PROJECT_CODES_DIR) else "."
+
+Session.log(
+    object.__new__(Session),
+    {
+        "PROJECT_NAME": PROJECT_NAME,
+        "PROJECT_NAME_NORMALIZED": PROJECT_NAME_NORMALIZED,
+        "PROJECT_CODES_DIR": PROJECT_CODES_DIR,
+    }
+)
 
 
 def uv_install_group_dependencies(session: Session, dependency_group: str):
@@ -259,8 +274,8 @@ def clean(session: Session):
         # Windows .pyd files (matches any .pyd extension)
         "**/*.pyd",
         # Specific directories if needed
-        "src/conditional_method/**/*.so",
-        "src/conditional_method/**/*.pyd",
+        f"{PROJECT_CODES_DIR}/**/*.so",
+        f"{PROJECT_CODES_DIR}/**/*.pyd",
         # Build directory extensions
         "build/**/*.so",
         "build/**/*.pyd",
@@ -403,16 +418,8 @@ def format(session: Session):
     # Find the src directory or use parent directory
     import pathlib
     
-    # Get the current file's directory
-    current_dir = pathlib.Path(__file__).parent.absolute()
-    
     # Look for src directory
-    src_dir = current_dir / "src"
-    if src_dir.exists():
-        format_dir = "src"
-    else:
-        # Use the parent directory name, normalized as a Python package name
-        format_dir = current_dir.name.replace("-", "_").lower()
+    format_dir = pathlib.Path(PROJECT_CODES_DIR)
     
     session.log(f"Using {format_dir} as the directory for formatting")
     
@@ -438,7 +445,7 @@ def check(session: Session):
     session.run("uv", "tool", "run", "ruff", "check", ".")
 
 
-@session(dependency_group="build")
+@session(dependency_group="dev")
 def build(session: Session):
     # for c extension which is now defuncted
     # command = [
@@ -448,10 +455,10 @@ def build(session: Session):
     #     "build",
     # ]
     # session.run(*command)
-    # # copy from ./build to ./src/conditional_method/_lib.c
+    # # copy from ./build to ./{PROJECT_CODES_DIR}/_lib.c
     # shutil.copy(
     #     "./build/lib.linux-x86_64-cpython-38/_lib.cpython-38-x86_64-linux-gnu.so",
-    #     "./src/conditional_method/_lib.cpython-38-x86_64-linux-gnu.so",
+    #     "./{PROJECT_CODES_DIR}/_lib.cpython-38-x86_64-linux-gnu.so",
     # )
     session.run("uv", "build")
 
@@ -545,26 +552,26 @@ def ci(session: Session):
 
 @session(reuse_venv=False)
 def test_client_install_run(session: Session):
-    with alter_session(session, dependency_group="build"):
+    with alter_session(session, dependency_group="dev"):
         clean(session)
         build(session)
     with alter_session(session, dependency_group="dev"):
         list_dist_files(session)
-    session.run("pip", "uninstall", "conditional-method", "-y")
+    session.run("pip", "uninstall", f"{PROJECT_NAME}", "-y")
     # Find the tarball with the largest semver version
     import glob
     import re
     from packaging import version
 
     # Get all tarball files
-    tarball_files = glob.glob("dist/conditional_method-*.tar.gz")
+    tarball_files = glob.glob(f"dist/{PROJECT_NAME_NORMALIZED}-*.tar.gz")
 
     if not tarball_files:
         session.error("No tarball files found in dist/ directory")
 
     # Extract version numbers using regex
     version_pattern = re.compile(
-        r"conditional_method-([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?).tar.gz"
+        rf"{PROJECT_NAME_NORMALIZED}-([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?).tar.gz"
     )
 
     # Create a list of (file_path, version) tuples
@@ -593,9 +600,9 @@ def test_client_install_run(session: Session):
         "run",
         "python",
         "-c",
-        "from conditional_method import cfg; print('cfg imported')",
+        f"from {PROJECT_NAME_NORMALIZED} import Shield, __version__; print(f'Shield imported, version: {{__version__}}')",
     )
-    session.run("uv", "run", "pip", "uninstall", "conditional-method", "-y")
+    session.run("uv", "run", "pip", "uninstall", f"{PROJECT_NAME}", "-y")
 
-    with alter_session(session, dependency_group="test"):
+    with alter_session(session, dependency_group="dev"):
         test(session)
