@@ -190,7 +190,7 @@ async def protected_endpoint4(
 
 @app.get("/protected-api")
 @auth_api_shield
-async def protected_endpoint3(
+def protected_endpoint3(
     x_api_token: Header(), user: User = ShieldedDepends(get_user)
 ):
     return {

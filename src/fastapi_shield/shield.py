@@ -39,6 +39,8 @@ class AuthenticationStatus(Enum):
 
 
 class ShieldDepends(Security):
+    __slots__ = ("dependency", "shielded_dependency", "authenticated", "shielded_by")
+
     def __init__(
         self,
         shielded_dependency: Optional[Callable[..., Any]] = None,
@@ -188,7 +190,10 @@ class Shield(Generic[T, U]):
                     for k, v in endpoint_kwargs.items()
                     if k in signature(endpoint).parameters
                 }
-                return await endpoint(*args, **endpoint_kwargs)
+                if is_coroutine_callable(endpoint):
+                    return await endpoint(*args, **endpoint_kwargs)
+                else:
+                    return endpoint(*args, **endpoint_kwargs)
 
             raise self._exception_to_raise_if_fail
 
