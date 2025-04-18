@@ -172,10 +172,8 @@ class Shield(Generic[U]):
             }
             if is_coroutine_callable(self._guard_func):
                 obj = await self._guard_func(**guard_func_args)
-                print("`obj`: ", obj)
             else:
                 obj = self._guard_func(**guard_func_args)
-                print("`obj`: ", obj)
             if obj:
                 (
                     args,
