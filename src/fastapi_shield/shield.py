@@ -1,11 +1,11 @@
 from typing_extensions import Doc
-from fastapi import Request, HTTPException, status, Depends
+from fastapi import Request, HTTPException, status
 from fastapi.dependencies.utils import (
     solve_dependencies,
     get_dependant,
     is_coroutine_callable,
 )
-from fastapi.routing import run_endpoint_function
+from contextlib import asynccontextmanager
 from fastapi.params import Security
 from fastapi_shield.utils import (
     rearrange_params,
@@ -125,6 +125,14 @@ class ShieldDepends(Security):
             )
         return solved_dependencies.values
 
+    @asynccontextmanager
+    async def as_authenticated(self):
+        self.authenticated = True
+        try:
+            yield
+        finally:
+            self.authenticated = False
+
 
 def ShieldedDepends(  # noqa: N802
     shielded_dependency: Annotated[
@@ -217,7 +225,6 @@ async def inject_authenticated_entities_into_args_kwargs(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Already authenticated",
                 )
-            arg_kwargs.authenticated = True
             request = kwargs.get("request")
             if not request:
                 raise HTTPException(
@@ -225,17 +232,16 @@ async def inject_authenticated_entities_into_args_kwargs(
                     detail="Request is required",
                 )
             solved_dependencies_values = await arg_kwargs.resolve_dependencies(request)
-            new_arg_kwargs = await arg_kwargs(
-                *((obj,) if arg_kwargs.first_param is not None else ()),
-                **solved_dependencies_values,
-            )
+            async with arg_kwargs.as_authenticated():
+                new_arg_kwargs = await arg_kwargs(
+                    *((obj,) if arg_kwargs.first_param is not None else ()),
+                    **solved_dependencies_values,
+                )
             if (
                 new_arg_kwargs is None
                 and arg_kwargs.first_param.annotation is not Optional
             ):
-                arg_kwargs.authenticated = False
                 return args, kwargs
-            arg_kwargs.authenticated = False
             if isinstance(idx_kw, int):
                 args = args[:idx_kw] + (new_arg_kwargs,) + args[idx_kw + 1 :]
             if isinstance(idx_kw, str):

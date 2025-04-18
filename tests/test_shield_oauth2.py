@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Path, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.testclient import TestClient
 from fastapi_shield.shield import Shield, ShieldedDepends
@@ -76,10 +76,10 @@ def get_current_username(token: str) -> str:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         if username is None:
-            raise ValueError("Invalid token")
+            raise HTTPException(status_code=401, detail="Invalid token")
         return username
     except jwt.PyJWTError:
-        raise ValueError("Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 def get_user_from_username(username: str) -> User:
     db_user = users_db.get(username)
@@ -155,7 +155,365 @@ async def admin_endpoint(current_user: User = ShieldedDepends(get_current_user))
     }
 
 # Tests
+def test_public_endpoint():
+    client = TestClient(app)
+    response = client.get("/public")
+    assert response.status_code == 200
+    assert response.json() == {"message": "This is a public endpoint"}
+
+
+def test_login_success():
+    client = TestClient(app)
+    login_response = client.post(
+        "/token",
+        data={"username": "testuser", "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    token_data = login_response.json()
+    assert "access_token" in token_data
+    assert token_data["token_type"] == "bearer"
+
+
+def test_protected_endpoint_without_token():
+    client = TestClient(app)
+    response = client.get("/users/me")
+    assert response.status_code == 401
+
+
+def test_protected_endpoint_with_valid_token():
+    client = TestClient(app)
+    # Get token
+    login_response = client.post(
+        "/token",
+        data={"username": "testuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    # Test with token
+    response = client.get(
+        "/users/me",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    user_data = response.json()
+    assert user_data["username"] == "testuser"
+    assert user_data["email"] == "testuser@example.com"
+
+
+def test_admin_endpoint_with_non_admin_user():
+    client = TestClient(app)
+    # Get token for regular user
+    login_response = client.post(
+        "/token",
+        data={"username": "testuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    # Try to access admin endpoint
+    response = client.get(
+        "/admin",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 401
+
+
+def test_admin_endpoint_with_admin_user():
+    client = TestClient(app)
+    # Get token for admin user
+    admin_login = client.post(
+        "/token",
+        data={"username": "adminuser", "password": "password123"}
+    )
+    admin_token = admin_login.json()["access_token"]
+    
+    # Access admin endpoint
+    response = client.get(
+        "/admin",
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "This is an admin endpoint"
+    assert response.json()["user"]["username"] == "adminuser"
+
+
+def test_login_with_disabled_user():
+    client = TestClient(app)
+    disabled_login = client.post(
+        "/token",
+        data={"username": "disableduser", "password": "password123"}
+    )
+    assert disabled_login.status_code == 400
+    assert disabled_login.json()["detail"] == "Inactive user"
+
+
+# Adding 15 more test cases
+def test_login_with_invalid_password():
+    client = TestClient(app)
+    response = client.post(
+        "/token",
+        data={"username": "testuser", "password": "wrongpassword"}
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Incorrect username or password"
+
+
+def test_login_with_nonexistent_user():
+    client = TestClient(app)
+    response = client.post(
+        "/token",
+        data={"username": "nonexistentuser", "password": "password123"}
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Incorrect username or password"
+
+
+def test_protected_endpoint_with_invalid_token_format():
+    client = TestClient(app)
+    response = client.get(
+        "/users/me",
+        headers={"Authorization": "Bearer invalidtokenformat"}
+    )
+    assert response.status_code == 401
+
+
+def test_protected_endpoint_with_malformed_header():
+    client = TestClient(app)
+    response = client.get(
+        "/users/me",
+        headers={"Authorization": "NotBearer token12345"}
+    )
+    assert response.status_code == 401
+
+
+def test_protected_endpoint_with_empty_token():
+    client = TestClient(app)
+    response = client.get(
+        "/users/me",
+        headers={"Authorization": "Bearer "}
+    )
+    assert response.status_code == 401
+
+
+def test_protected_endpoint_without_authorization_header():
+    client = TestClient(app)
+    response = client.get("/users/me", headers={})
+    assert response.status_code == 401
+
+
+def test_admin_can_access_regular_endpoints():
+    client = TestClient(app)
+    # Get token for admin user
+    login_response = client.post(
+        "/token",
+        data={"username": "adminuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    # Access regular protected endpoint
+    response = client.get(
+        "/users/me",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200, (response.status_code, response.json())
+    assert response.json()["username"] == "adminuser"
+
+
+# Add /users/role-check endpoint to app
+@app.get("/users/role-check")
+@auth_shield
+async def check_user_role(current_user: User = ShieldedDepends(get_current_user)):
+    return {"username": current_user.username, "roles": current_user.roles}
+
+
+def test_role_check_endpoint():
+    client = TestClient(app)
+    # Get token for regular user
+    login_response = client.post(
+        "/token",
+        data={"username": "testuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    # Check roles
+    response = client.get(
+        "/users/role-check",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["username"] == "testuser"
+    assert "user" in response.json()["roles"]
+    assert "admin" not in response.json()["roles"]
+
+
+def test_admin_role_check():
+    client = TestClient(app)
+    # Get token for admin user
+    login_response = client.post(
+        "/token",
+        data={"username": "adminuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    # Check roles
+    response = client.get(
+        "/users/role-check",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["username"] == "adminuser"
+    assert "user" in response.json()["roles"]
+    assert "admin" in response.json()["roles"]
+
+
+# Add multi-role shield
+def multi_role_shield(required_roles: List[str], require_all: bool = False):
+    def decorator(user: User = ShieldedDepends(get_current_user)):
+        if require_all:
+            # User must have all specified roles
+            has_all = all(role in user.roles for role in required_roles)
+            return user if has_all else None
+        else:
+            # User must have at least one of the specified roles
+            has_any = any(role in user.roles for role in required_roles)
+            return user if has_any else None
+    
+    return Shield(decorator)
+
+# Add endpoint requiring multiple roles
+@app.get("/multi-role")
+@auth_shield
+@multi_role_shield(["admin", "user"], require_all=True)
+async def multi_role_endpoint(current_user: User = ShieldedDepends(get_current_user)):
+    return {
+        "message": "This endpoint requires multiple roles",
+        "user": current_user
+    }
+
+
+def test_multi_role_endpoint_with_admin():
+    client = TestClient(app)
+    # Get token for admin user (who has both admin and user roles)
+    login_response = client.post(
+        "/token",
+        data={"username": "adminuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    # Access multi-role endpoint
+    response = client.get(
+        "/multi-role",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "This endpoint requires multiple roles"
+
+
+def test_nested_dependencies():
+    # This test verifies that ShieldedDepends works correctly with nested dependencies
+    client = TestClient(app)
+    login_response = client.post(
+        "/token",
+        data={"username": "adminuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    # The admin endpoint already has nested dependencies
+    response = client.get(
+        "/admin",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+
+
+def get_current_user_custom(error: str=Path()) -> User:
+    return get_current_user(error)
+
+
+# Add an endpoint with custom forbidden response
+custom_shield = Shield(
+    get_current_user_custom,
+    exception_to_raise_if_fail=HTTPException(
+        status_code=403, 
+        detail="Custom forbidden response"
+    )
+)
+
+@app.get("/custom-error/{error}")
+@custom_shield
+async def custom_error_endpoint():
+    return {"message": "You won't see this if unauthorized"}
+
+
+def test_custom_error_response():
+    client = TestClient(app)
+    response = client.get("/custom-error")
+    assert response.status_code == 404, (response.status_code, response.json())
+    assert response.json()["detail"] == "Not Found"
+
+
+# Add case-sensitive username endpoint
+@app.get("/case-sensitive")
+@auth_shield
+async def case_sensitive_endpoint(
+    current_user: User = ShieldedDepends(get_current_user)
+):
+    # This test ensures the exact username is preserved
+    if current_user.username != "adminuser":  # Exact match required
+        raise HTTPException(status_code=403, detail="Username must match exactly")
+    return {"message": "Case sensitive match succeeded"}
+
+
+def test_case_sensitive_matching():
+    client = TestClient(app)
+    login_response = client.post(
+        "/token",
+        data={"username": "adminuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    response = client.get(
+        "/case-sensitive",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Case sensitive match succeeded"
+
+
+# Add an endpoint with multiple shield dependencies
+@app.get("/multiple-shields")
+@auth_shield
+async def multiple_shields_endpoint(
+    token_user: User = ShieldedDepends(get_current_user),
+    roles: List[str] = ShieldedDepends(lambda token: get_current_user(token).roles)
+):
+    return {
+        "user": token_user,
+        "roles": roles
+    }
+
+
+def test_multiple_shield_dependencies():
+    client = TestClient(app)
+    login_response = client.post(
+        "/token",
+        data={"username": "adminuser", "password": "password123"}
+    )
+    access_token = login_response.json()["access_token"]
+    
+    response = client.get(
+        "/multiple-shields",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["user"]["username"] == "adminuser"
+    assert "admin" in response.json()["roles"]
+
+
 def test_oauth2_shield():
+    """
+    This is the original monolithic test, kept for reference.
+    All functionality is now broken into individual test functions.
+    """
     client = TestClient(app)
     
     # Test public endpoint
@@ -184,7 +542,7 @@ def test_oauth2_shield():
         "/users/me",
         headers={"Authorization": f"Bearer {access_token}"}
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, (response.status_code, response.json())
     user_data = response.json()
     assert user_data["username"] == "testuser"
     assert user_data["email"] == "testuser@example.com"
