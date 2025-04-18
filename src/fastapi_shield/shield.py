@@ -5,6 +5,7 @@ from fastapi.dependencies.utils import (
     get_dependant,
 )
 from fastapi.params import Security
+from fastapi_shield.utils import rearrange_params
 
 from functools import wraps
 from inspect import signature, Signature, Parameter
@@ -170,44 +171,6 @@ def change_all_shielded_depends_defaults_to_annotated_as_shielded_depends(
         else param
         for param in seq_of_params
     ]
-
-
-def rearrange_params(seq_of_params: Sequence[Parameter]) -> list[Parameter]:
-    pos_only_params = [
-        param for param in seq_of_params if param.kind == Parameter.POSITIONAL_ONLY
-    ]
-    var_pos_params = [
-        param for param in seq_of_params if param.kind == Parameter.VAR_POSITIONAL
-    ]
-    kw_or_pos_params = [
-        param
-        for param in seq_of_params
-        if (
-            param.kind == Parameter.POSITIONAL_OR_KEYWORD
-            and param.default is param.empty
-        )
-    ] + [
-        param
-        for param in seq_of_params
-        if (
-            param.kind == Parameter.POSITIONAL_OR_KEYWORD
-            and param.default is not param.empty
-        )
-    ]
-    var_kw_params = [
-        param for param in seq_of_params if param.kind == Parameter.VAR_KEYWORD
-    ]
-    kw_only_params = [
-        param for param in seq_of_params if param.kind == Parameter.KEYWORD_ONLY
-    ]
-    rearranged_params = [
-        *pos_only_params,
-        *var_pos_params,
-        *kw_or_pos_params,
-        *var_kw_params,
-        *kw_only_params,
-    ]
-    return rearranged_params
 
 
 class Shield(Generic[T, U]):
