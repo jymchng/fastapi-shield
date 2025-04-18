@@ -1,5 +1,5 @@
 from typing_extensions import Doc
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException, status, Depends
 from fastapi.dependencies.utils import (
     solve_dependencies,
     get_dependant,
@@ -7,7 +7,7 @@ from fastapi.dependencies.utils import (
 from fastapi.params import Security
 from fastapi_shield.utils import rearrange_params
 
-from functools import wraps
+from functools import cached_property, wraps
 from inspect import signature, Signature, Parameter
 from enum import Enum
 
@@ -43,6 +43,7 @@ class ShieldDepends(Security):
     def __init__(
         self,
         shielded_dependency: Optional[Callable[..., Any]] = None,
+        shielded_by: Optional["Shield"] = None,
         *args,
         **kwargs,
     ):
@@ -50,18 +51,36 @@ class ShieldDepends(Security):
         self.dependency = lambda: self
         self.shielded_dependency = shielded_dependency
         self.authenticated = False
-        shielded_dependency_signature = signature(shielded_dependency)
-        self.check_dependency_signature(shielded_dependency_signature)
-        parameters = shielded_dependency_signature.parameters.values()
-        self.first_param = None
-        self.rest_params = []
-        if len(parameters) > 1:
-            self.first_param, *self.rest_params = parameters
-        if len(parameters) == 1:
-            self.first_param = list(parameters)[0]
-        if self.first_param.default is not Parameter.empty:
-            self.rest_params += [self.first_param]
-            self.first_param = None
+        self.shielded_by = shielded_by
+        self.check_dependency_signature(signature(shielded_dependency))
+
+    @cached_property
+    def first_param(self) -> Optional[Parameter]:
+        dep = self.shielded_dependency
+        if not dep:
+            return None
+        params = list(signature(dep).parameters.values())
+        if len(params) == 0:
+            return None
+        first = params[0]
+        if first.default is Parameter.empty:
+            return first
+        return None
+
+    @cached_property
+    def rest_params(self):
+        dep = self.shielded_dependency
+        if not dep:
+            return
+        params = list(signature(dep).parameters.values())
+        if not params:
+            return
+        first, *rest = params
+        if first.default is Parameter.empty:
+            yield from rest
+        else:
+            yield first
+            yield from rest
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(authenticated={self.authenticated}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
@@ -90,20 +109,15 @@ class ShieldDepends(Security):
             "scopes": self.scopes,
         }
 
-    async def resolve_dependencies(self, request: Request):
-        def mocked_shielded_dependency(*args, **kwargs):
-            return self.shielded_dependency(*args, **kwargs)
+    @cached_property
+    def __signature__(self) -> Signature:
+        """Generate the rearranged signature for FastAPI solving."""
+        return Signature(self.rest_params)
 
-        mocked_shielded_dependency.__signature__ = Signature(
-            rearrange_params(
-                merge_dedup_seq_params(
-                    self.rest_params,
-                )
-            )
-        )
+    async def resolve_dependencies(self, request: Request):
         solved_dependencies = await solve_dependencies(
             request=request,
-            dependant=get_dependant(path="", call=mocked_shielded_dependency),
+            dependant=get_dependant(path="", call=self),
             async_exit_stack=None,
             embed_body_fields=False,
         )
@@ -123,14 +137,21 @@ def ShieldedDepends(  # noqa: N802
             The dependency to be shielded.
             """
         ),
-    ] = None,
+    ],
+    *,
+    shielded_by: Optional["Shield"] = None,
+    use_cache: bool = True,
 ) -> Any:
-    return ShieldDepends(shielded_dependency=shielded_dependency)
+    return ShieldDepends(
+        shielded_dependency=shielded_dependency,
+        use_cache=use_cache,
+        shielded_by=shielded_by,
+    )
 
 
 def prepend_request_to_signature_params_of_endpoint(
     endpoint: EndPointFunc,
-) -> Sequence[Parameter]:
+):
     new_request_param: Parameter = Parameter(
         name="request",
         kind=Parameter.POSITIONAL_ONLY,
@@ -138,8 +159,8 @@ def prepend_request_to_signature_params_of_endpoint(
         default=Parameter.empty,
     )
     new_signature = signature(endpoint)
-    new_params = [*[new_request_param], *new_signature.parameters.values()]
-    return new_params
+    yield from [new_request_param]
+    yield from new_signature.parameters.values()
 
 
 def prepend_params_to_signature(
@@ -151,15 +172,13 @@ def prepend_params_to_signature(
 
 def merge_dedup_seq_params(
     *seqs_of_params: Sequence[Parameter],
-) -> list[Parameter]:
+):
     seen = {}
-    results = []
     for seq_of_params in seqs_of_params:
         for param in seq_of_params:
             if param.name not in seen:
                 seen[param.name] = param
-                results.append(param)
-    return results
+                yield param
 
 
 def change_all_shielded_depends_defaults_to_annotated_as_shielded_depends(

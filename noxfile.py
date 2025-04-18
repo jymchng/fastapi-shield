@@ -400,18 +400,37 @@ def format(session: Session):
     import glob
 
     # Check if the directory exists before trying to format files
-    c_files_path = "src/conditional_method"
+    # Find the src directory or use parent directory
+    import pathlib
+    
+    # Get the current file's directory
+    current_dir = pathlib.Path(__file__).parent.absolute()
+    
+    # Look for src directory
+    src_dir = current_dir / "src"
+    if src_dir.exists():
+        format_dir = "src"
+    else:
+        # Use the parent directory name, normalized as a Python package name
+        format_dir = current_dir.name.replace("-", "_").lower()
+    
+    session.log(f"Using {format_dir} as the directory for formatting")
+    
+    # Format python files first
+    session.run("uv", "tool", "run", "ruff", "format", format_dir)
+    
+    # Format c files
+    c_files_path = format_dir
     if not os.path.exists(c_files_path):
         session.log(f"Directory {c_files_path} does not exist, skipping clang-format")
         return
 
     # Check if there are any C files to format
-    c_files = glob.glob(f"{c_files_path}/*.c")
+    c_files = glob.glob(f"{c_files_path}/*.c", recursive=True)
     if not c_files:
         session.log(f"No C files found in {c_files_path}, skipping clang-format")
         return
     session.run("uv", "tool", "run", "clang-format", "-i", *c_files)
-    session.run("uv", "tool", "run", "ruff", "format", ".")
 
 
 @session(dependency_group="dev")
