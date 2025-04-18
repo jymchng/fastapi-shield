@@ -3,7 +3,9 @@ from fastapi import Request, HTTPException, status, Depends
 from fastapi.dependencies.utils import (
     solve_dependencies,
     get_dependant,
+    is_coroutine_callable,
 )
+from fastapi.routing import run_endpoint_function
 from fastapi.params import Security
 from fastapi_shield.utils import (
     rearrange_params,
@@ -82,9 +84,12 @@ class ShieldDepends(Security):
     def __repr__(self) -> str:
         return f"{type(self).__name__}(authenticated={self.authenticated}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
 
-    def __call__(self, *args, **kwargs):
+    async def __call__(self, *args, **kwargs):
         if self.authenticated:
-            return self.shielded_dependency(*args, **kwargs)
+            if is_coroutine_callable(self.shielded_dependency):
+                return await self.shielded_dependency(*args, **kwargs)
+            else:
+                return self.shielded_dependency(*args, **kwargs)
         return self
 
     def check_dependency_signature(self, signature: Signature):
@@ -219,7 +224,7 @@ async def inject_authenticated_entities_into_args_kwargs(
                     detail="Request is required",
                 )
             solved_dependencies_values = await arg_kwargs.resolve_dependencies(request)
-            new_arg_kwargs = arg_kwargs.shielded_dependency(
+            new_arg_kwargs = await arg_kwargs(
                 *((obj,) if arg_kwargs.first_param is not None else ()),
                 **solved_dependencies_values,
             )

@@ -37,6 +37,14 @@ def get_db(
     print("`get_db::db2`: ", db2)
     return db
 
+async def a_get_db(
+    db: dict[str, User] = Depends(lambda: FAKE_DB_DATA),
+    db2: dict[str, User] = Depends(lambda: FAKE_DB_DATA),
+) -> dict[str, User]:
+    print("`get_db::db`: ", db)
+    print("`get_db::db2`: ", db2)
+    return db
+
 
 def from_token_get_roles(token: str) -> list[str]:
     if token == "valid_token1":
@@ -63,7 +71,7 @@ def get_username(token: str) -> Optional[str]:
 
 
 def get_user_with_db(
-    username: str, db: dict[str, User] = Depends(get_db)
+    username: str, db: dict[str, User] = Depends(a_get_db)
 ) -> Optional[User]:
     print("`get_user_with_db::db`: ", db)
     print("`get_user_with_db::username`: ", username)
@@ -118,8 +126,9 @@ auth_api_shield: Shield = Shield(get_auth_status_from_header)
 
 def roles_shield(roles: list[str]):
     def decorator(
-        username: str = ShieldedDepends(from_token_get_username),
-        user_roles: list[str] = ShieldedDepends(from_token_get_roles),
+        # `from_token_get_username` is shielded by `auth_shield`
+        username: str = ShieldedDepends(from_token_get_username, shielded_by=auth_shield),
+        user_roles: list[str] = ShieldedDepends(from_token_get_roles, shielded_by=auth_shield),
     ):
         print("`allowed_user_roles::username`: ", username)
         print("`allowed_user_roles::roles`: ", roles)
@@ -129,6 +138,10 @@ def roles_shield(roles: list[str]):
         return False, ""
 
     return Shield(decorator)
+
+
+admin_only_shield = roles_shield(["admin"])
+user_only_shield = roles_shield(["user"])
 
 
 # Unprotected endpoint
@@ -161,9 +174,13 @@ async def protected_username_endpoint(
 # Protected endpoint
 @app.get("/protected4")
 @auth_shield
-@roles_shield(["admin"])
+@admin_only_shield
 async def protected_endpoint4(
-    user: User = ShieldedDepends(get_user_with_db)
+    # `get_user_with_db` is shielded by `admin_only_shield`
+    # `get_user_with_db` has two parameters: `username` and `db`
+    # `username` passed to `get_user_with_db` from the return value of `shield_func` within `admin_only_shield`
+    # `db` passed to `get_user_with_db` as a FastAPI dependency, i.e. `db: dict[str, User] = Depends(a_get_db)`
+    user: User = ShieldedDepends(get_user_with_db, shielded_by=admin_only_shield)
 ):
     return {
         "user": user,
