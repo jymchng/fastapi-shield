@@ -7,6 +7,8 @@ from fastapi.dependencies.utils import (
 )
 from contextlib import asynccontextmanager
 from fastapi.params import Security
+from fastapi.routing import compile_path
+
 from fastapi_shield.utils import (
     rearrange_params,
     prepend_request_to_signature_params_of_endpoint,
@@ -129,18 +131,22 @@ class ShieldDepends(Security):
         return Signature(self.rest_params)
 
     async def resolve_dependencies(self, request: Request):
-        path = request.url.path
+        _, path_format, _ = compile_path(request.url.path)
+        print(f"`path_format`: {path_format}")
         solved_dependencies = await solve_dependencies(
             request=request,
-            dependant=get_dependant(path=path, call=self),
+            dependant=get_dependant(path=path_format, call=self),
             async_exit_stack=None,
             embed_body_fields=False,
         )
         if solved_dependencies.errors:
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to solve dependencies",
-            )
+            if self.auto_error:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to solve dependencies",
+                )
+            else:
+                return {}
         return solved_dependencies.values
 
     @asynccontextmanager

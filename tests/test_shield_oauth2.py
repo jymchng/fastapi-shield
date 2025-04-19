@@ -291,6 +291,7 @@ def test_protected_endpoint_with_empty_token():
     assert response.status_code == 500, (response.status_code, response.json())
     assert response.json()["detail"] == "Failed to shield", response.json()
 
+
 def test_protected_endpoint_without_authorization_header():
     client = TestClient(app)
     response = client.get("/users/me", headers={})

@@ -4,7 +4,6 @@ from fastapi_shield import (
     Shield,
     ShieldedDepends,
 )
-from fastapi import status
 from pydantic import BaseModel
 from typing import Optional
 
