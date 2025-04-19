@@ -198,11 +198,16 @@ class Shield(Generic[U]):
         self._exception_to_raise_if_fail = exception_to_raise_if_fail
         self._default_response_to_return_if_fail = default_response_to_return_if_fail
         self.auto_error = auto_error
-        if name:
-            if isinstance(name, str):
-                if name not in self.SHIELD_FUNCTIONS_NAMES:
-                    self.SHIELD_FUNCTIONS_NAMES.add(name)
+        if name and isinstance(name, str) and name not in self.SHIELD_FUNCTIONS_NAMES:
+            self.SHIELD_FUNCTIONS_NAMES.add(name)
         self.name = name
+        
+        
+    def _raise_or_return_default_response(self):
+        if self.auto_error:
+            raise self._exception_to_raise_if_fail
+        else:
+            return self._default_response_to_return_if_fail
 
     def __call__(self, endpoint: EndPointFunc) -> EndPointFunc:
         assert callable(endpoint), "`endpoint` must be callable"
@@ -221,10 +226,7 @@ class Shield(Generic[U]):
             if obj:
                 request: Request = kwargs.get("request")
                 if not request:
-                    if self.auto_error:
-                        raise self._exception_to_raise_if_fail
-                    else:
-                        return self._default_response_to_return_if_fail
+                    self._raise_or_return_default_response()
                 _, path_format, _ = compile_path(request.url.path)
                 endpoint_dependant = get_dependant(path=path_format, call=endpoint)
                 endpoint_solved_dependencies = await solve_dependencies(
@@ -234,12 +236,8 @@ class Shield(Generic[U]):
                     embed_body_fields=False,
                 )
                 if endpoint_solved_dependencies.errors:
-                    if self.auto_error:
-                        raise self._exception_to_raise_if_fail
-                    else:
-                        return self._default_response_to_return_if_fail
+                    self._raise_or_return_default_response()
                 kwargs.update(endpoint_solved_dependencies.values)
-
                 (
                     args,
                     endpoint_kwargs,
