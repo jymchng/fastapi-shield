@@ -118,15 +118,8 @@ class ShieldDepends(Security):
             async_exit_stack=None,
             embed_body_fields=False,
         )
-        if solved_dependencies.errors:
-            if self.auto_error:
-                raise HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to solve dependencies",
-                )
-            else:
-                return {}
-        return solved_dependencies.values
+        
+        return solved_dependencies
 
     @asynccontextmanager
     async def _as_authenticated(self):
@@ -276,11 +269,16 @@ async def inject_authenticated_entities_into_args_kwargs(
                     status.HTTP_400_BAD_REQUEST,
                     detail="Request is required",
                 )
-            solved_dependencies_values = await arg_kwargs.resolve_dependencies(request)
+            solved_dependencies = await arg_kwargs.resolve_dependencies(request)
+            if solved_dependencies.errors:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to solve dependencies",
+                )
             async with arg_kwargs._as_authenticated():
                 new_arg_kwargs = await arg_kwargs(
                     *((obj,) if arg_kwargs.first_param is not None else ()),
-                    **solved_dependencies_values,
+                    **solved_dependencies.values,
                 )
             if (
                 new_arg_kwargs is None
@@ -301,3 +299,4 @@ def search_args_kwargs_for_authenticated_depends(*args, **kwargs):
     for kw, kwarg in kwargs.items():
         if isinstance(kwarg, ShieldDepends):
             yield (kw, kwarg)
+    return ()
