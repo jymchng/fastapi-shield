@@ -130,7 +130,7 @@ auth_api_shield: Shield = Shield(get_auth_status_from_header)
 
 
 def check_username_is_path_param(
-    username_from_authentication: str = ShieldedDepends(from_token_get_username, shielded_by=auth_shield),
+    username_from_authentication: str = ShieldedDepends(lambda username: username),
     username: str = Path(),
 ):
     print(
@@ -145,18 +145,18 @@ def check_username_is_path_param(
 def roles_shield(roles: list[str]):
     def decorator(
         # `from_token_get_username` is shielded by `auth_shield`
-        username_from_roles: str = ShieldedDepends(
+        username: str = ShieldedDepends(
             from_token_get_username, shielded_by=auth_shield
         ),
         user_roles: list[str] = ShieldedDepends(
             from_token_get_roles, shielded_by=auth_shield
         ),
     ):
-        print("`allowed_user_roles::username`: ", username_from_roles)
+        print("`allowed_user_roles::username`: ", username)
         print("`allowed_user_roles::roles`: ", roles)
         for role in user_roles:
             if role in roles:
-                return username_from_roles
+                return username
         return None
 
     return Shield(decorator, name="roles_shield")

@@ -1,7 +1,6 @@
 from inspect import Parameter, signature
-from typing import Iterator, Sequence
+from typing import Callable, Iterator, Sequence
 
-from fastapi_shield.typing import EndPointFunc
 from fastapi import Request
 
 
@@ -16,8 +15,8 @@ def merge_dedup_seq_params(
                 yield param
 
 
-def prepend_request_to_signature_params_of_endpoint(
-    endpoint: EndPointFunc,
+def prepend_request_to_signature_params_of_function(
+    function: Callable,
 ):
     new_request_param: Parameter = Parameter(
         name="request",
@@ -25,7 +24,7 @@ def prepend_request_to_signature_params_of_endpoint(
         annotation=Request,
         default=Parameter.empty,
     )
-    new_signature = signature(endpoint)
+    new_signature = signature(function)
     yield from [new_request_param]
     yield from new_signature.parameters.values()
 

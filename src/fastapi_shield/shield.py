@@ -11,7 +11,7 @@ from fastapi.routing import compile_path
 
 from fastapi_shield.utils import (
     rearrange_params,
-    prepend_request_to_signature_params_of_endpoint,
+    prepend_request_to_signature_params_of_function,
     merge_dedup_seq_params,
 )
 from fastapi_shield.typing import EndPointFunc, ShieldFunc, U
@@ -28,17 +28,6 @@ from typing import (
     Tuple,
     Union,
 )
-
-
-def check_shield_instances_match(
-    shield_inst: "Shield", shield_depends: "ShieldDepends"
-):
-    shielded: Union[None, "Shield", str] = shield_depends.shielded_by
-    return (
-        (shield_inst is shielded)
-        or (shielded is None)
-        or (shield_inst.name == shielded)
-    )
 
 
 class ShieldDepends(Security):
@@ -132,7 +121,6 @@ class ShieldDepends(Security):
 
     async def resolve_dependencies(self, request: Request):
         _, path_format, _ = compile_path(request.url.path)
-        print(f"`path_format`: {path_format}")
         solved_dependencies = await solve_dependencies(
             request=request,
             dependant=get_dependant(path=path_format, call=self),
@@ -185,6 +173,7 @@ class Shield(Generic[U]):
         "_exception_to_raise_if_fail",
         "_default_response_to_return_if_fail",
         "name",
+        "auto_error",
     )
 
     SHIELD_FUNCTIONS_NAMES = set()
@@ -194,6 +183,7 @@ class Shield(Generic[U]):
         shield_func: ShieldFunc[U],
         *,
         name: Optional[str] = None,
+        auto_error: bool = True,
         exception_to_raise_if_fail: HTTPException = HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to shield"
         ),
@@ -207,6 +197,7 @@ class Shield(Generic[U]):
         )
         self._exception_to_raise_if_fail = exception_to_raise_if_fail
         self._default_response_to_return_if_fail = default_response_to_return_if_fail
+        self.auto_error = auto_error
         if name:
             if isinstance(name, str):
                 if name not in self.SHIELD_FUNCTIONS_NAMES:
@@ -228,12 +219,34 @@ class Shield(Generic[U]):
             else:
                 obj = self._guard_func(**guard_func_args)
             if obj:
+                request: Request = kwargs.get("request")
+                if not request:
+                    if self.auto_error:
+                        raise self._exception_to_raise_if_fail
+                    else:
+                        return self._default_response_to_return_if_fail
+                _, path_format, _ = compile_path(request.url.path)
+                endpoint_dependant = get_dependant(path=path_format, call=endpoint)
+                endpoint_solved_dependencies = await solve_dependencies(
+                    request=request,
+                    dependant=endpoint_dependant,
+                    async_exit_stack=None,
+                    embed_body_fields=False,
+                )
+                if endpoint_solved_dependencies.errors:
+                    if self.auto_error:
+                        raise self._exception_to_raise_if_fail
+                    else:
+                        return self._default_response_to_return_if_fail
+                kwargs.update(endpoint_solved_dependencies.values)
+
                 (
                     args,
                     endpoint_kwargs,
                 ) = await inject_authenticated_entities_into_args_kwargs(
-                    obj, self, *args, **kwargs
+                    obj, *args, **kwargs
                 )
+
                 endpoint_kwargs = {
                     k: v for k, v in endpoint_kwargs.items() if k in endpoint_params
                 }
@@ -247,8 +260,7 @@ class Shield(Generic[U]):
         wrapper.__signature__ = Signature(
             rearrange_params(
                 merge_dedup_seq_params(
-                    self._guard_func_params.values(),
-                    prepend_request_to_signature_params_of_endpoint(endpoint),
+                    prepend_request_to_signature_params_of_function(self._guard_func),
                 )
             )
         )
@@ -256,10 +268,10 @@ class Shield(Generic[U]):
 
 
 async def inject_authenticated_entities_into_args_kwargs(
-    obj, shield_inst: Shield, *args, **kwargs
+    obj, *args, **kwargs
 ) -> Tuple[Tuple[Any, ...], dict[str, Any]]:
     authenticated_depends = search_args_kwargs_for_authenticated_depends(
-        shield_inst, *args, **kwargs
+        *args, **kwargs
     )
     for idx_kw, arg_kwargs in authenticated_depends:
         if idx_kw is not None:
@@ -292,14 +304,10 @@ async def inject_authenticated_entities_into_args_kwargs(
     return args, kwargs
 
 
-def search_args_kwargs_for_authenticated_depends(shield_inst: Shield, *args, **kwargs):
+def search_args_kwargs_for_authenticated_depends(*args, **kwargs):
     for idx, arg in enumerate(args):
-        if isinstance(arg, ShieldDepends) and check_shield_instances_match(
-            shield_inst, arg
-        ):
+        if isinstance(arg, ShieldDepends):
             yield (idx, arg)
     for kw, kwarg in kwargs.items():
-        if isinstance(kwarg, ShieldDepends) and check_shield_instances_match(
-            shield_inst, kwarg
-        ):
+        if isinstance(kwarg, ShieldDepends):
             yield (kw, kwarg)

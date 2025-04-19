@@ -107,6 +107,7 @@ def get_current_user(token: str) -> User:
     return get_user_from_username(username)
 
 
+# auth_shield will pass `token` to all ShieldedDepends instances lower in the dependency tree
 auth_shield = Shield(oauth2_scheme)
 
 
@@ -165,7 +166,7 @@ async def read_users_me(current_user: User = ShieldedDepends(get_current_user)):
 @app.get("/admin")
 @auth_shield
 @admin_only_shield
-async def admin_endpoint(current_user: User = ShieldedDepends(get_current_user)):
+async def admin_endpoint(current_user: User = ShieldedDepends(lambda user: user)):
     return {"message": "This is an admin endpoint", "user": current_user}
 
 
@@ -377,7 +378,7 @@ def multi_role_shield(required_roles: List[str], require_all: bool = False):
 @app.get("/multi-role")
 @auth_shield
 @multi_role_shield(["admin", "user"], require_all=True)
-async def multi_role_endpoint(current_user: User = ShieldedDepends(get_current_user)):
+async def multi_role_endpoint(current_user: User = ShieldedDepends(lambda user: user)):
     return {"message": "This endpoint requires multiple roles", "user": current_user}
 
 
