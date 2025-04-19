@@ -164,7 +164,7 @@ class Shield(Generic[U]):
 
     def __init__(
         self,
-        shield_func: ShieldFunc[U],
+        shield_func: U,
         *,
         name: Optional[str] = None,
         auto_error: bool = True,

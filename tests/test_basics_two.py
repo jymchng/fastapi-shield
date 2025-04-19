@@ -125,8 +125,8 @@ def get_auth_status(
 
 # Define the FastAPI app
 app = FastAPI()
-auth_shield: Shield = Shield(get_auth_status)
-auth_api_shield: Shield = Shield(get_auth_status_from_header)
+auth_shield = Shield(get_auth_status)
+auth_api_shield = Shield(get_auth_status_from_header)
 
 
 def check_username_is_path_param(\
