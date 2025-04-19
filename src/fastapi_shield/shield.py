@@ -50,7 +50,6 @@ class ShieldDepends(Security):
                 raise ValueError(f"Shield name '{shielded_by}' is not defined")
         self.shielded_by = shielded_by
         self.auto_error = auto_error
-        self.check_dependency_signature(signature(shielded_dependency))
         self._shielded_dependency_params = signature(shielded_dependency).parameters
 
     @cached_property
@@ -91,14 +90,6 @@ class ShieldDepends(Security):
             else:
                 return self.shielded_dependency(*args, **kwargs)
         return self
-
-    def check_dependency_signature(self, signature: Signature):
-        params = signature.parameters
-        for idx, param in enumerate(params.values()):
-            if idx == 0:
-                continue
-            if param.default is Parameter.empty:
-                raise ValueError(f"Parameter '{param.name}' must have a default value")
 
     @property
     def __dict__(self):
@@ -201,8 +192,7 @@ class Shield(Generic[U]):
         if name and isinstance(name, str) and name not in self.SHIELD_FUNCTIONS_NAMES:
             self.SHIELD_FUNCTIONS_NAMES.add(name)
         self.name = name
-        
-        
+
     def _raise_or_return_default_response(self):
         if self.auto_error:
             raise self._exception_to_raise_if_fail

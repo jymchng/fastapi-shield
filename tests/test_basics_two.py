@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, Header, Path, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Header, Path, Request
 from fastapi.testclient import TestClient
 import pytest
 from fastapi_shield import (
@@ -84,7 +84,7 @@ def get_user_with_db(
     return db.get(username)
 
 
-def get_user(token: str) -> User:
+def get_user(token: str, q: str) -> User:
     if token == "valid_token1":
         print("`get_user` returns `FAKE_DB_DATA['username1']`")
         return FAKE_DB_DATA["username1"]
@@ -129,10 +129,10 @@ auth_shield: Shield = Shield(get_auth_status)
 auth_api_shield: Shield = Shield(get_auth_status_from_header)
 
 
-def check_username_is_path_param(
+def check_username_is_path_param(\
+    q: str,
     username_from_authentication: str = ShieldedDepends(lambda username: username),
     username: str = Path(),
-    q: str = Query(default=""),
 ):
     print(
         f"`check_username_is_path_param::username_from_authentication`: {username_from_authentication}"
@@ -343,9 +343,9 @@ def test_protected2_endpoint_with_invalid_token():
 def test_protected_endpoint_with_valid_token():
     client = TestClient(app)
     response = client.get(
-        "/protected", headers={"Authorization": "Bearer valid_token1"}
+        "/protected?q=PROTECTED", headers={"Authorization": "Bearer valid_token1"}
     )
-    assert response.status_code == 200, response.status_code
+    assert response.status_code == 200, (response.status_code, response.json())
     assert response.json() == {
         "user": {
             "username": "authenticated_user1",
@@ -359,7 +359,7 @@ def test_protected_endpoint_with_valid_token():
 def test_protected_endpoint_with_malformed_token():
     client = TestClient(app)
     response = client.get(
-        "/protected", headers={"Authorization": "Bearer uinvalid_token1"}
+        "/protected?q=PROTECTED", headers={"Authorization": "Bearer uinvalid_token1"}
     )
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
         response.status_code
@@ -370,9 +370,9 @@ def test_protected_endpoint_with_malformed_token():
 def test_protected2_endpoint_with_valid_token():
     client = TestClient(app)
     response = client.get(
-        "/protected2", headers={"Authorization": "Bearer valid_token1"}
+        "/protected2?q=PROTECTED2", headers={"Authorization": "Bearer valid_token1"}
     )
-    assert response.status_code == 200, response.status_code
+    assert response.status_code == 200, (response.status_code, response.json())
     assert response.json() == {
         "user1": {
             "username": "authenticated_user1",
@@ -385,8 +385,8 @@ def test_protected2_endpoint_with_valid_token():
 
 def test_protected_api_endpoint_with_api_token():
     client = TestClient(app)
-    response = client.get("/protected-api", headers={"X-API-Token": "valid_token1"})
-    assert response.status_code == 200, response.status_code
+    response = client.get("/protected-api?q=PROTECTED_API", headers={"X-API-Token": "valid_token1"})
+    assert response.status_code == 200, (response.status_code, response.json())
     assert response.json() == {
         "x-api-token": "valid_token1",
         "user": {
