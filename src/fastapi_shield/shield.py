@@ -27,6 +27,13 @@ from typing import (
 )
 
 
+def check_shield_instances_match(shield_inst: "Shield", shield_depends: "ShieldDepends"):
+    if shield_inst is shield_depends.shielded_by:
+        return True
+    else:
+        return False
+
+
 class ShieldDepends(Security):
     __slots__ = ("dependency", "shielded_dependency", "authenticated", "shielded_by")
 
@@ -34,6 +41,7 @@ class ShieldDepends(Security):
         self,
         shielded_dependency: Optional[Callable[..., Any]] = None,
         shielded_by: Optional["Shield"] = None,
+        auto_error: bool = True,
         *args,
         **kwargs,
     ):
@@ -42,6 +50,7 @@ class ShieldDepends(Security):
         self.shielded_dependency = shielded_dependency
         self.authenticated = False
         self.shielded_by = shielded_by
+        self.auto_error = auto_error
         self.check_dependency_signature(signature(shielded_dependency))
         self._shielded_dependency_params = signature(shielded_dependency).parameters
 
@@ -102,6 +111,9 @@ class ShieldDepends(Security):
             "use_cache": self.use_cache,
             "scopes": self.scopes,
         }
+        
+    def __bool__(self):
+        return self.authenticated
 
     @cached_property
     def __signature__(self) -> Signature:
@@ -123,7 +135,7 @@ class ShieldDepends(Security):
         return solved_dependencies.values
 
     @asynccontextmanager
-    async def as_authenticated(self):
+    async def _as_authenticated(self):
         self.authenticated = True
         try:
             yield
@@ -231,7 +243,7 @@ async def inject_authenticated_entities_into_args_kwargs(
                     detail="Request is required",
                 )
             solved_dependencies_values = await arg_kwargs.resolve_dependencies(request)
-            async with arg_kwargs.as_authenticated():
+            async with arg_kwargs._as_authenticated():
                 new_arg_kwargs = await arg_kwargs(
                     *((obj,) if arg_kwargs.first_param is not None else ()),
                     **solved_dependencies_values,
