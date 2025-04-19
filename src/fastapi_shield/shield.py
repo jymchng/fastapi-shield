@@ -170,6 +170,8 @@ class Shield(Generic[U]):
     def __call__(self, endpoint: EndPointFunc) -> EndPointFunc:
         assert callable(endpoint), "`endpoint` must be callable"
 
+        endpoint_params = signature(endpoint).parameters
+        
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
             guard_func_args = {
@@ -189,7 +191,7 @@ class Shield(Generic[U]):
                 endpoint_kwargs = {
                     k: v
                     for k, v in endpoint_kwargs.items()
-                    if k in signature(endpoint).parameters
+                    if k in endpoint_params
                 }
                 if is_coroutine_callable(endpoint):
                     return await endpoint(*args, **endpoint_kwargs)
