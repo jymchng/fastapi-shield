@@ -16,7 +16,6 @@ from fastapi_shield.typing import EndPointFunc, ShieldFunc, U
 
 from functools import cached_property, wraps
 from inspect import signature, Signature, Parameter
-from weakref import WeakSet
 
 from typing import (
     Annotated,
