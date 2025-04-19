@@ -235,15 +235,15 @@ def test_unprotected_endpoint():
 def test_protected_endpoint_without_token():
     client = TestClient(app)
     response = client.get("/protected")
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
-    assert response.json() == {"detail": "Unauthorized"}, response.json()
+    assert response.status_code == 500, response.status_code
+    assert response.json() == {"detail": "Failed to shield"}, response.json()
 
 
 def test_protected2_endpoint_without_token():
     client = TestClient(app)
     response = client.get("/protected2")
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
-    assert response.json() == {"detail": "Unauthorized"}, response.json()
+    assert response.status_code == 500, response.status_code
+    assert response.json() == {"detail": "Failed to shield"}, response.json()
 
 
 def test_protected_endpoint_with_invalid_token():
@@ -251,8 +251,8 @@ def test_protected_endpoint_with_invalid_token():
     response = client.get(
         "/protected", headers={"Authorization": "Bearer invalid_token"}
     )
-    assert response.status_code == 401, response.status_code
-    assert response.json() == {"detail": "Unauthorized"}, response.json()
+    assert response.status_code == 500, response.status_code
+    assert response.json() == {"detail": "Failed to shield"}, response.json()
 
 
 def test_protected2_endpoint_with_invalid_token():
@@ -260,8 +260,8 @@ def test_protected2_endpoint_with_invalid_token():
     response = client.get(
         "/protected2", headers={"Authorization": "Bearer invalid_token"}
     )
-    assert response.status_code == 401, response.status_code
-    assert response.json() == {"detail": "Unauthorized"}, response.json()
+    assert response.status_code == 500, response.status_code
+    assert response.json() == {"detail": "Failed to shield"}, response.json()
 
 
 def test_protected_endpoint_with_valid_token():
@@ -285,8 +285,8 @@ def test_protected_endpoint_with_malformed_token():
     response = client.get(
         "/protected", headers={"Authorization": "Bearer uinvalid_token1"}
     )
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
-    assert response.json() == {"detail": "Unauthorized"}, response.json()
+    assert response.status_code == 500, response.status_code
+    assert response.json() == {"detail": "Failed to shield"}, response.json()
 
 
 def test_protected2_endpoint_with_valid_token():
@@ -341,8 +341,8 @@ def test_protected4_endpoint_with_non_admin_user():
     response = client.get(
         "/protected4", headers={"Authorization": "Bearer valid_token2"}
     )
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED, response.status_code
-    assert response.json() == {"detail": "Unauthorized"}, response.json()
+    assert response.status_code == 500, response.status_code
+    assert response.json() == {"detail": "Failed to shield"}, response.json()
 
 
 def test_protected_username_endpoint_with_user1():

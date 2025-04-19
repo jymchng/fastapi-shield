@@ -222,7 +222,8 @@ def test_admin_endpoint_with_non_admin_user():
 
     # Try to access admin endpoint
     response = client.get("/admin", headers={"Authorization": f"Bearer {access_token}"})
-    assert response.status_code == 401
+    assert response.status_code == 500, (response.status_code, response.json())
+    assert response.json()["detail"] == "Failed to shield", response.json()
 
 
 def test_admin_endpoint_with_admin_user():
@@ -287,13 +288,14 @@ def test_protected_endpoint_with_malformed_header():
 def test_protected_endpoint_with_empty_token():
     client = TestClient(app)
     response = client.get("/users/me", headers={"Authorization": "Bearer "})
-    assert response.status_code == 401
-
+    assert response.status_code == 500, (response.status_code, response.json())
+    assert response.json()["detail"] == "Failed to shield", response.json()
 
 def test_protected_endpoint_without_authorization_header():
     client = TestClient(app)
     response = client.get("/users/me", headers={})
-    assert response.status_code == 401
+    assert response.status_code == 401, (response.status_code, response.json())
+    assert response.json()["detail"] == "Not authenticated", response.json()
 
 
 def test_admin_can_access_regular_endpoints():
@@ -522,7 +524,8 @@ def test_oauth2_shield():
 
     # Test admin endpoint with non-admin user
     response = client.get("/admin", headers={"Authorization": f"Bearer {access_token}"})
-    assert response.status_code == 401
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to shield"
 
     # Test with admin user
     admin_login = client.post(

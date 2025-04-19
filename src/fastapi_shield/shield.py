@@ -16,6 +16,7 @@ from fastapi_shield.typing import EndPointFunc, ShieldFunc, U
 
 from functools import cached_property, wraps
 from inspect import signature, Signature, Parameter
+from weakref import WeakSet
 
 from typing import (
     Annotated,
@@ -24,14 +25,19 @@ from typing import (
     Any,
     Generic,
     Tuple,
+    Union,
 )
 
 
-def check_shield_instances_match(shield_inst: "Shield", shield_depends: "ShieldDepends"):
-    if shield_inst is shield_depends.shielded_by:
-        return True
-    else:
-        return False
+def check_shield_instances_match(
+    shield_inst: "Shield", shield_depends: "ShieldDepends"
+):
+    shielded: Union[None, "Shield", str] = shield_depends.shielded_by
+    return (
+        (shield_inst is shielded)
+        or (shielded is None)
+        or (shield_inst.name == shielded)
+    )
 
 
 class ShieldDepends(Security):
@@ -40,7 +46,7 @@ class ShieldDepends(Security):
     def __init__(
         self,
         shielded_dependency: Optional[Callable[..., Any]] = None,
-        shielded_by: Optional["Shield"] = None,
+        shielded_by: Union[None, "Shield", str] = None,
         auto_error: bool = True,
         *args,
         **kwargs,
@@ -49,6 +55,9 @@ class ShieldDepends(Security):
         self.dependency = lambda: self
         self.shielded_dependency = shielded_dependency
         self.authenticated = False
+        if isinstance(shielded_by, str):
+            if shielded_by not in Shield.SHIELD_FUNCTIONS_NAMES:
+                raise ValueError(f"Shield name '{shielded_by}' is not defined")
         self.shielded_by = shielded_by
         self.auto_error = auto_error
         self.check_dependency_signature(signature(shielded_dependency))
@@ -111,7 +120,7 @@ class ShieldDepends(Security):
             "use_cache": self.use_cache,
             "scopes": self.scopes,
         }
-        
+
     def __bool__(self):
         return self.authenticated
 
@@ -153,7 +162,7 @@ def ShieldedDepends(  # noqa: N802
         ),
     ],
     *,
-    shielded_by: Optional["Shield"] = None,
+    shielded_by: Union[None, "Shield", str] = None,
     use_cache: bool = True,
 ) -> Any:
     return ShieldDepends(
@@ -164,12 +173,25 @@ def ShieldedDepends(  # noqa: N802
 
 
 class Shield(Generic[U]):
+    __slots__ = (
+        "_guard_func",
+        "_guard_func_params",
+        "_exception_to_raise_if_fail",
+        "_default_response_to_return_if_fail",
+        "name",
+    )
+
+    SHIELD_FUNCTIONS_NAMES = set()
+
     def __init__(
         self,
         shield_func: ShieldFunc[U],
+        *,
+        name: Optional[str] = None,
         exception_to_raise_if_fail: HTTPException = HTTPException(
-            status_code=401, detail="Unauthorized"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to shield"
         ),
+        default_response_to_return_if_fail: Optional[Any] = None,
     ):
         assert callable(shield_func), "`shield_func` must be callable"
         self._guard_func = shield_func
@@ -178,12 +200,18 @@ class Shield(Generic[U]):
             "`exception_to_raise_if_fail` must be an instance of `HTTPException`"
         )
         self._exception_to_raise_if_fail = exception_to_raise_if_fail
+        self._default_response_to_return_if_fail = default_response_to_return_if_fail
+        if name:
+            if isinstance(name, str):
+                if name not in self.SHIELD_FUNCTIONS_NAMES:
+                    self.SHIELD_FUNCTIONS_NAMES.add(name)
+        self.name = name
 
     def __call__(self, endpoint: EndPointFunc) -> EndPointFunc:
         assert callable(endpoint), "`endpoint` must be callable"
 
         endpoint_params = signature(endpoint).parameters
-        
+
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
             guard_func_args = {
@@ -201,9 +229,7 @@ class Shield(Generic[U]):
                     obj, self, *args, **kwargs
                 )
                 endpoint_kwargs = {
-                    k: v
-                    for k, v in endpoint_kwargs.items()
-                    if k in endpoint_params
+                    k: v for k, v in endpoint_kwargs.items() if k in endpoint_params
                 }
                 if is_coroutine_callable(endpoint):
                     return await endpoint(*args, **endpoint_kwargs)
@@ -262,12 +288,12 @@ async def inject_authenticated_entities_into_args_kwargs(
 
 def search_args_kwargs_for_authenticated_depends(shield_inst: Shield, *args, **kwargs):
     for idx, arg in enumerate(args):
-        if isinstance(arg, ShieldDepends) and (
-            arg.shielded_by is None or arg.shielded_by is shield_inst
+        if isinstance(arg, ShieldDepends) and check_shield_instances_match(
+            shield_inst, arg
         ):
             yield (idx, arg)
     for kw, kwarg in kwargs.items():
-        if isinstance(kwarg, ShieldDepends) and (
-            kwarg.shielded_by is None or kwarg.shielded_by is shield_inst
+        if isinstance(kwarg, ShieldDepends) and check_shield_instances_match(
+            shield_inst, kwarg
         ):
             yield (kw, kwarg)
