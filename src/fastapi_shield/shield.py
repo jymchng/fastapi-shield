@@ -118,7 +118,7 @@ class ShieldDepends(Security):
             async_exit_stack=None,
             embed_body_fields=False,
         )
-        
+
         return solved_dependencies
 
     @asynccontextmanager
@@ -300,3 +300,30 @@ def search_args_kwargs_for_authenticated_depends(*args, **kwargs):
         if isinstance(kwarg, ShieldDepends):
             yield (kw, kwarg)
     return ()
+
+
+def shield(
+    shield_func: Optional[U] = None,
+    /,
+    name: Optional[str] = None,
+    auto_error: bool = True,
+    exception_to_raise_if_fail: HTTPException = HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to shield"
+    ),
+    default_response_to_return_if_fail: Optional[Any] = None,
+) -> Shield[U]:
+    if shield_func is None:
+        return lambda shield_func: Shield(
+            shield_func,
+            name=name,
+            auto_error=auto_error,
+            exception_to_raise_if_fail=exception_to_raise_if_fail,
+            default_response_to_return_if_fail=default_response_to_return_if_fail,
+        )
+    return Shield(
+        shield_func,
+        name=name,
+        auto_error=auto_error,
+        exception_to_raise_if_fail=exception_to_raise_if_fail,
+        default_response_to_return_if_fail=default_response_to_return_if_fail,
+    )
