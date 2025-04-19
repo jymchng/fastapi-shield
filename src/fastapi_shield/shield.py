@@ -129,9 +129,10 @@ class ShieldDepends(Security):
         return Signature(self.rest_params)
 
     async def resolve_dependencies(self, request: Request):
+        path = request.url.path
         solved_dependencies = await solve_dependencies(
             request=request,
-            dependant=get_dependant(path="", call=self),
+            dependant=get_dependant(path=path, call=self),
             async_exit_stack=None,
             embed_body_fields=False,
         )
