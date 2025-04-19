@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, Header, Path, Request
+from fastapi import Depends, FastAPI, HTTPException, Header, Path, Query, Request
 from fastapi.testclient import TestClient
 import pytest
 from fastapi_shield import (
@@ -132,12 +132,14 @@ auth_api_shield: Shield = Shield(get_auth_status_from_header)
 def check_username_is_path_param(
     username_from_authentication: str = ShieldedDepends(lambda username: username),
     username: str = Path(),
+    q: str = Query(default=""),
 ):
     print(
         f"`check_username_is_path_param::username_from_authentication`: {username_from_authentication}"
     )
     print(f"`check_username_is_path_param::username`: {username}")
-    if username_from_authentication != username:
+    print(f"`check_username_is_path_param::q`: {q}")
+    if username_from_authentication != username or q != "LOL":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found: user with username `{username_from_authentication}` is found to be accessing resource that requires `{username}`")
     return username
 
@@ -270,7 +272,7 @@ async def protected_endpoint2(
 def test_username_shield():
     client = TestClient(app)
     response = client.get(
-        "/protected-username-shield/username1",
+        "/protected-username-shield/username1?q=LOL",
         headers={"Authorization": "Bearer valid_token1"},
     )
     assert response.status_code == 200, (response.status_code, response.json())
@@ -283,7 +285,7 @@ def test_username_shield():
 def test_username_shield_with_invalid_username_path_param():
     client = TestClient(app)
     response = client.get(
-        "/protected-username-shield/username2",
+        "/protected-username-shield/username2?q=LOL",
         headers={"Authorization": "Bearer valid_token1"},
     )
     assert response.status_code == status.HTTP_404_NOT_FOUND, (response.status_code, response.json())

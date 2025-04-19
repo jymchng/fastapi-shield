@@ -229,6 +229,8 @@ class Shield(Generic[U]):
                     self._raise_or_return_default_response()
                 _, path_format, _ = compile_path(request.url.path)
                 endpoint_dependant = get_dependant(path=path_format, call=endpoint)
+                # because `solve_dependencies` is async, we need to await it
+                # hence no point to split returning `wrapper` into two functions, one sync and one async
                 endpoint_solved_dependencies = await solve_dependencies(
                     request=request,
                     dependant=endpoint_dependant,
