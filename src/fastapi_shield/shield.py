@@ -14,7 +14,7 @@ from fastapi_shield.utils import (
     prepend_request_to_signature_params_of_function,
     merge_dedup_seq_params,
 )
-from fastapi_shield.typing import EndPointFunc, ShieldFunc, U
+from fastapi_shield.typing import EndPointFunc, U
 
 from functools import cached_property, wraps
 from inspect import signature, Signature, Parameter
