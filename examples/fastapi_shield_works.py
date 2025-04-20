@@ -8,6 +8,7 @@
 
 import sys
 import os
+
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from fastapi import (
@@ -21,7 +22,7 @@ from fastapi import (
 )
 from typing import Any
 from pydantic import BaseModel
-from fastapi_shield.shield import ShieldedDepends, shield
+from fastapi_shield.shield import ShieldedDepends, patch_shields_for_openapi, shield
 from threading import Event
 
 # Create global variables to track task execution
@@ -109,6 +110,7 @@ def auth_required(
         return x_api_token
     return None
 
+
 # a decorator that returns a shield
 def roles_check(roles: list[str]):
     @shield
@@ -141,11 +143,35 @@ app = FastAPI()
 
 
 @app.get("/")
+@patch_shields_for_openapi
 async def root():
     return {"message": "Hello World"}
 
 
+os.environ["ENV"] = "PROD"
+
+
+@app.get("/say-hello/{name}")
+@patch_shields_for_openapi(activated_when=os.environ.get("ENV", "LOCAL") == "LOCAL")
+@auth_required  # this shield will return the payload if the token is valid
+async def name_will_not_appear_in_openapi_as_path_param(name: str):
+    # name will NOT appear in the openapi schema, it is a limitation of fastapi-shield
+    return {"message": f"Hello {name}"}
+
+
+os.environ["ENV"] = "LOCAL"
+
+
+@app.get("/say-hello-with-shield/{name}")
+@patch_shields_for_openapi(activated_when=os.environ.get("ENV", "LOCAL") == "LOCAL")
+@auth_required  # this shield will return the payload if the token is valid
+async def name_will_appear_in_openapi_as_path_param(name: str):
+    # name will appear in the openapi schema
+    return {"message": f"Hello {name} with shield"}
+
+
 @app.post("/protected/{username}")
+@patch_shields_for_openapi
 @auth_required  # this shield will return the payload if the token is valid
 @roles_check(["admin"])  # this shield will return the payload if the user is an admin
 @username_required  # this shield will return the payload if the username is the same as the username in the path
@@ -173,18 +199,25 @@ async def update_product(
     # background_task will work as expected
     # Add task to run in background
     task_id = "test_task"
-    assert isinstance(background_tasks, BackgroundTasks), "`background_tasks` is not a BackgroundTasks object"
-    background_tasks.add_task(write_log, task_id=task_id, message="Background task: Product with name `{}` updated successfully".format(
-        product.name
-    ))
-    
+    assert isinstance(background_tasks, BackgroundTasks), (
+        "`background_tasks` is not a BackgroundTasks object"
+    )
+    background_tasks.add_task(
+        write_log,
+        task_id=task_id,
+        message="Background task: Product with name `{}` updated successfully".format(
+            product.name
+        ),
+    )
+
     # Create event for testing
     task_events[task_id] = Event()
     return {
         "message": "Product with name `{}` updated successfully".format(product.name),
     }
-    
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

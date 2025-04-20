@@ -7,7 +7,7 @@ from fastapi.dependencies.utils import (
 )
 from contextlib import asynccontextmanager
 from fastapi.params import Security
-from fastapi.routing import compile_path
+from fastapi.routing import APIRoute, compile_path
 
 from fastapi_shield.utils import (
     rearrange_params,
@@ -28,6 +28,7 @@ from typing import (
     Generic,
     Sequence,
     Tuple,
+    Union,
 )
 
 
@@ -234,6 +235,11 @@ class Shield(Generic[U]):
                 )
             )
         )
+        getattr(endpoint, "__shielded__", False) or setattr(
+            wrapper,
+            "__shielded__",
+            True,
+        )
         return wrapper
 
 
@@ -311,3 +317,41 @@ def shield(
         exception_to_raise_if_fail=exception_to_raise_if_fail,
         default_response_to_return_if_fail=default_response_to_return_if_fail,
     )
+
+
+def gather_signature_params_across_wrapped_endpoints(
+    endpoint: EndPointFunc, /, signature_params: Optional[list[Parameter]] = None
+):
+    if signature_params is None:
+        signature_params = list(signature(endpoint).parameters.values())
+    if not hasattr(endpoint, "__wrapped__"):
+        signature_params.extend(signature(endpoint).parameters.values())
+        return signature_params
+    signature_params.extend(signature(endpoint.__wrapped__).parameters.values())
+    return gather_signature_params_across_wrapped_endpoints(
+        endpoint.__wrapped__, signature_params
+    )
+
+
+def patch_shields_for_openapi(
+    endpoint: Optional[EndPointFunc] = None,
+    /,
+    activated_when: Union[Callable[[], bool], bool] = lambda: True,
+):
+    if endpoint is None:
+        return lambda endpoint: patch_shields_for_openapi(
+            endpoint, activated_when=activated_when
+        )
+    if not getattr(endpoint, "__shielded__", False) or not (
+        activated_when() if callable(activated_when) else activated_when
+    ):
+        return endpoint
+    signature_params = gather_signature_params_across_wrapped_endpoints(endpoint)
+    endpoint.__signature__ = Signature(
+        rearrange_params(
+            merge_dedup_seq_params(
+                signature_params,
+            )
+        )
+    )
+    return endpoint

@@ -99,6 +99,7 @@ def auth_required(
         return x_api_token
     return None
 
+
 # a decorator that returns a shield
 def roles_check(roles: list[str]):
     @shield
@@ -163,11 +164,17 @@ async def update_product(
     # background_task will work as expected
     # Add task to run in background
     task_id = "test_task"
-    assert isinstance(background_tasks, BackgroundTasks), "`background_tasks` is not a BackgroundTasks object"
-    background_tasks.add_task(write_log, task_id=task_id, message="Background task: Product with name `{}` updated successfully".format(
-        product.name
-    ))
-    
+    assert isinstance(background_tasks, BackgroundTasks), (
+        "`background_tasks` is not a BackgroundTasks object"
+    )
+    background_tasks.add_task(
+        write_log,
+        task_id=task_id,
+        message="Background task: Product with name `{}` updated successfully".format(
+            product.name
+        ),
+    )
+
     # Create event for testing
     task_events[task_id] = Event()
     return {
@@ -204,13 +211,15 @@ def test_auth_required_authorized_with_invalid_username():
     client = TestClient(app)
     response = client.post(
         "/protected/user1",
-        headers={"X-API-TOKEN": "secret2"}, # secret2 is the token for username user2
+        headers={"X-API-TOKEN": "secret2"},  # secret2 is the token for username user2
         json={"product": {"name": "product1", "price": 100}},
     )
     assert response.status_code == 401, (response.status_code, response.json())
-    assert response.json() == {"detail": "Unauthorized; role mismatch"}, response.json() # because user2 is not an admin
-    
-    
+    assert response.json() == {"detail": "Unauthorized; role mismatch"}, (
+        response.json()
+    )  # because user2 is not an admin
+
+
 def test_user1_cannot_access_user2_endpoint():
     client = TestClient(app)
     response = client.post(
@@ -219,9 +228,11 @@ def test_user1_cannot_access_user2_endpoint():
         json={"product": {"name": "product1", "price": 100}},
     )
     assert response.status_code == 401, (response.status_code, response.json())
-    assert response.json() == {"detail": "Unauthorized; username mismatch"}, response.json()
-    
-    
+    assert response.json() == {"detail": "Unauthorized; username mismatch"}, (
+        response.json()
+    )
+
+
 def test_user2_cannot_update_product_for_user2_because_he_is_not_admin():
     client = TestClient(app)
     response = client.post(
@@ -237,6 +248,9 @@ def test_user2_cannot_update_product_for_user2_because_he_is_not_admin():
 async def test_background_task_is_executed():
     assert "test_task" in task_events, "Event not created"
     assert task_events["test_task"].wait(3), "Task didn't complete in time"
-    
+
     assert "test_task" in task_results
-    assert "Background task: Product with name `product1` updated successfully" in task_results["test_task"]
+    assert (
+        "Background task: Product with name `product1` updated successfully"
+        in task_results["test_task"]
+    )
