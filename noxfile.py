@@ -635,7 +635,7 @@ def test_client_install_run(session: Session):
 @session
 def run_examples(session: Session):
     import glob
-    
+
     examples_scripts = glob.glob(f"{EXAMPLES_DIR}/*.py")
     for script in examples_scripts:
         session.run("uv", "run", script)

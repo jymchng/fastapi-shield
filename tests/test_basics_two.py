@@ -129,7 +129,7 @@ auth_shield = Shield(get_auth_status)
 auth_api_shield = Shield(get_auth_status_from_header)
 
 
-def check_username_is_path_param(\
+def check_username_is_path_param(
     q: str,
     username_from_authentication: str = ShieldedDepends(lambda username: username),
     username: str = Path(),
@@ -140,7 +140,10 @@ def check_username_is_path_param(\
     print(f"`check_username_is_path_param::username`: {username}")
     print(f"`check_username_is_path_param::q`: {q}")
     if username_from_authentication != username or q != "LOL":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Not Found: user with username `{username_from_authentication}` is found to be accessing resource that requires `{username}`")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Not Found: user with username `{username_from_authentication}` is found to be accessing resource that requires `{username}`",
+        )
     return username
 
 
@@ -279,16 +282,21 @@ def test_username_shield():
         "username": "username1",
         "message": "This is a protected endpoint",
     }, response.json()
-    
-    
+
+
 def test_username_shield_with_invalid_username_path_param():
     client = TestClient(app)
     response = client.get(
         "/protected-username-shield/username2?q=LOL",
         headers={"Authorization": "Bearer valid_token1"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND, (response.status_code, response.json())
-    assert response.json() == {"detail": "Not Found: user with username `username1` is found to be accessing resource that requires `username2`"}, response.json()
+    assert response.status_code == status.HTTP_404_NOT_FOUND, (
+        response.status_code,
+        response.json(),
+    )
+    assert response.json() == {
+        "detail": "Not Found: user with username `username1` is found to be accessing resource that requires `username2`"
+    }, response.json()
 
 
 def test_unprotected_endpoint():
@@ -384,7 +392,9 @@ def test_protected2_endpoint_with_valid_token():
 
 def test_protected_api_endpoint_with_api_token():
     client = TestClient(app)
-    response = client.get("/protected-api?q=PROTECTED_API", headers={"X-API-Token": "valid_token1"})
+    response = client.get(
+        "/protected-api?q=PROTECTED_API", headers={"X-API-Token": "valid_token1"}
+    )
     assert response.status_code == 200, (response.status_code, response.json())
     assert response.json() == {
         "x-api-token": "valid_token1",
@@ -454,8 +464,18 @@ def test_protected_by_roles_shield_endpoint_with_admin_user():
         "/protected-by-roles-shield", headers={"Authorization": "Bearer valid_token1"}
     )
 
-    assert response.status_code == status.HTTP_200_OK, (response.status_code, response.json())
-    assert response.json() == {'message': 'This is a protected endpoint', 'user': {'email': 'authenticated_user1@example.com', 'roles': ['user', 'admin'], 'username': 'authenticated_user1'}}, response.json()
+    assert response.status_code == status.HTTP_200_OK, (
+        response.status_code,
+        response.json(),
+    )
+    assert response.json() == {
+        "message": "This is a protected endpoint",
+        "user": {
+            "email": "authenticated_user1@example.com",
+            "roles": ["user", "admin"],
+            "username": "authenticated_user1",
+        },
+    }, response.json()
 
 
 def test_protected_by_roles_shield_endpoint_with_non_admin_user():
@@ -463,5 +483,8 @@ def test_protected_by_roles_shield_endpoint_with_non_admin_user():
     response = client.get(
         "/protected-by-roles-shield", headers={"Authorization": "Bearer valid_token2"}
     )
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (response.status_code, response.json())
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
+        response.status_code,
+        response.json(),
+    )
     assert response.json() == {"detail": "Failed to shield"}, response.json()

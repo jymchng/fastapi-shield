@@ -13,6 +13,7 @@ from fastapi_shield.utils import (
     rearrange_params,
     prepend_request_to_signature_params_of_function,
     merge_dedup_seq_params,
+    get_solved_dependencies,
 )
 from fastapi_shield.typing import EndPointFunc, U
 
@@ -186,6 +187,7 @@ class Shield(Generic[U]):
         assert callable(endpoint), "`endpoint` must be callable"
 
         endpoint_params = signature(endpoint).parameters
+        dependency_cache = {}
 
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
@@ -200,15 +202,10 @@ class Shield(Generic[U]):
                 request: Request = kwargs.get("request")
                 if not request:
                     self._raise_or_return_default_response()
-                _, path_format, _ = compile_path(request.url.path)
-                endpoint_dependant = get_dependant(path=path_format, call=endpoint)
                 # because `solve_dependencies` is async, we need to await it
                 # hence no point to split returning `wrapper` into two functions, one sync and one async
-                endpoint_solved_dependencies = await solve_dependencies(
-                    request=request,
-                    dependant=endpoint_dependant,
-                    async_exit_stack=None,
-                    embed_body_fields=False,
+                endpoint_solved_dependencies = await get_solved_dependencies(
+                    request, endpoint, dependency_cache
                 )
                 if endpoint_solved_dependencies.errors:
                     self._raise_or_return_default_response()
