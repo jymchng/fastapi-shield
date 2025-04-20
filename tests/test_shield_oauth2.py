@@ -114,7 +114,7 @@ auth_shield = Shield(oauth2_scheme)
 # Role-based shield
 def roles_shield(required_roles: List[str]):
     def decorator(
-        user: User = ShieldedDepends(get_current_user, shielded_by=auth_shield),
+        user: User = ShieldedDepends(get_current_user),
     ):
         for role in required_roles:
             if role in user.roles:

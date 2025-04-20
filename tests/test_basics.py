@@ -127,10 +127,10 @@ def roles_shield(roles: list[str]):
     def decorator(
         # `from_token_get_username` is shielded by `auth_shield`
         username: str = ShieldedDepends(
-            from_token_get_username, shielded_by=auth_shield
+            from_token_get_username,
         ),
         user_roles: list[str] = ShieldedDepends(
-            from_token_get_roles, shielded_by=auth_shield
+            from_token_get_roles,
         ),
     ):
         print("`allowed_user_roles::username`: ", username)
@@ -183,7 +183,7 @@ async def protected_endpoint4(
     # `get_user_with_db` has two parameters: `username` and `db`
     # `username` passed to `get_user_with_db` from the return value of `shield_func` within `admin_only_shield`
     # `db` passed to `get_user_with_db` as a FastAPI dependency, i.e. `db: dict[str, User] = Depends(a_get_db)`
-    user: User = ShieldedDepends(get_user_with_db, shielded_by=admin_only_shield),
+    user: User = ShieldedDepends(get_user_with_db),
 ):
     return {
         "user": user,
@@ -226,7 +226,7 @@ def test_unprotected_endpoint():
             "use_cache": True,
             "scopes": [],
             "shielded_dependency": {},
-            "authenticated": False,
+            "unblocked": False,
         },
     }, response.json()
 

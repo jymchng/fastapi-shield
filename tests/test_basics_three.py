@@ -129,7 +129,7 @@ def auth_shield(
 app = FastAPI()
 
 
-@shield(name="username_shield")
+@shield
 def username_shield(\
     q: str,
     username_from_authentication: str = ShieldedDepends(lambda username: username),
@@ -147,14 +147,14 @@ def username_shield(\
 
 def roles_shield(roles: list[str]):
     
-    @shield(name="roles_shield")
+    @shield
     def decorator(
         # `from_token_get_username` is shielded by `auth_shield`
         username: str = ShieldedDepends(
-            from_token_get_username, shielded_by=auth_shield
+            from_token_get_username,
         ),
         user_roles: list[str] = ShieldedDepends(
-            from_token_get_roles, shielded_by=auth_shield
+            from_token_get_roles,
         ),
     ):
         print("`allowed_user_roles::username`: ", username)
@@ -221,7 +221,7 @@ async def protected_endpoint4(
     # `get_user_with_db` has two parameters: `username` and `db`
     # `username` passed to `get_user_with_db` from the return value of `shield_func` within `admin_only_shield`
     # `db` passed to `get_user_with_db` as a FastAPI dependency, i.e. `db: dict[str, User] = Depends(a_get_db)`
-    user: User = ShieldedDepends(get_user_with_db, shielded_by="roles_shield"),
+    user: User = ShieldedDepends(get_user_with_db),
 ):
     return {
         "user": user,
@@ -229,22 +229,20 @@ async def protected_endpoint4(
     }
 
 
-with pytest.raises(ValueError):
-    # Protected endpoint
-    @app.get("/protected-by-roles-shield")
-    @auth_shield
-    @roles_shield(["admin"])
-    async def protected_by_roles_shield(
-        # `get_user_with_db` is shielded by `admin_only_shield`
-        # `get_user_with_db` has two parameters: `username` and `db`
-        # `username` passed to `get_user_with_db` from the return value of `shield_func` within `admin_only_shield`
-        # `db` passed to `get_user_with_db` as a FastAPI dependency, i.e. `db: dict[str, User] = Depends(a_get_db)`
-        user: User = ShieldedDepends(get_user_with_db, shielded_by="role_shield"),
-    ):
-        return {
-            "user": user,
-            "message": "This is a protected endpoint",
-        }
+@app.get("/protected-by-roles-shield")
+@auth_shield
+@roles_shield(["admin"])
+async def protected_by_roles_shield(
+    # `get_user_with_db` is shielded by `admin_only_shield`
+    # `get_user_with_db` has two parameters: `username` and `db`
+    # `username` passed to `get_user_with_db` from the return value of `shield_func` within `admin_only_shield`
+    # `db` passed to `get_user_with_db` as a FastAPI dependency, i.e. `db: dict[str, User] = Depends(a_get_db)`
+    user: User = ShieldedDepends(get_user_with_db),
+):
+    return {
+        "user": user,
+        "message": "This is a protected endpoint",
+    }
 
 
 @app.get("/protected-api")
@@ -305,7 +303,7 @@ def test_unprotected_endpoint():
             "use_cache": True,
             "scopes": [],
             "shielded_dependency": {},
-            "authenticated": False,
+            "unblocked": False,
         },
     }, response.json()
 
@@ -457,8 +455,8 @@ def test_protected_by_roles_shield_endpoint_with_admin_user():
         "/protected-by-roles-shield", headers={"Authorization": "Bearer valid_token1"}
     )
 
-    assert response.status_code == 404, response.status_code
-    assert response.json() == {"detail": "Not Found"}, response.json()
+    assert response.status_code == status.HTTP_200_OK, (response.status_code, response.json())
+    assert response.json() == {'message': 'This is a protected endpoint', 'user': {'email': 'authenticated_user1@example.com', 'roles': ['user', 'admin'], 'username': 'authenticated_user1'}}, response.json()
 
 
 def test_protected_by_roles_shield_endpoint_with_non_admin_user():
@@ -466,5 +464,5 @@ def test_protected_by_roles_shield_endpoint_with_non_admin_user():
     response = client.get(
         "/protected-by-roles-shield", headers={"Authorization": "Bearer valid_token2"}
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND, response.status_code
-    assert response.json() == {"detail": "Not Found"}, response.json()
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, response.status_code
+    assert response.json() == {"detail": "Failed to shield"}, response.json()

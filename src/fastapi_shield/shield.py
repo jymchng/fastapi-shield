@@ -25,30 +25,25 @@ from typing import (
     Callable,
     Any,
     Generic,
+    Sequence,
     Tuple,
-    Union,
 )
 
 
 class ShieldDepends(Security):
-    __slots__ = ("dependency", "shielded_dependency", "authenticated", "shielded_by")
+    __slots__ = ("dependency", "shielded_dependency", "unblocked")
 
     def __init__(
         self,
         shielded_dependency: Optional[Callable[..., Any]] = None,
-        shielded_by: Union[None, "Shield", str] = None,
+        *,
         auto_error: bool = True,
-        *args,
-        **kwargs,
+        scopes: Optional[Sequence[str]] = None,
+        use_cache: bool = True,
     ):
-        super().__init__(*args, **kwargs)
-        self.dependency = lambda: self
+        super().__init__(use_cache=use_cache, scopes=scopes, dependency=lambda: self)
         self.shielded_dependency = shielded_dependency
-        self.authenticated = False
-        if isinstance(shielded_by, str):
-            if shielded_by not in Shield.SHIELD_FUNCTIONS_NAMES:
-                raise ValueError(f"Shield name '{shielded_by}' is not defined")
-        self.shielded_by = shielded_by
+        self.unblocked = False
         self.auto_error = auto_error
         self._shielded_dependency_params = signature(shielded_dependency).parameters
 
@@ -81,10 +76,10 @@ class ShieldDepends(Security):
             yield from rest
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(authenticated={self.authenticated}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
+        return f"{type(self).__name__}(unblocked={self.unblocked}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
 
     async def __call__(self, *args, **kwargs):
-        if self.authenticated:
+        if self.unblocked:
             if is_coroutine_callable(self.shielded_dependency):
                 return await self.shielded_dependency(*args, **kwargs)
             else:
@@ -95,7 +90,7 @@ class ShieldDepends(Security):
     def __dict__(self):
         """Custom __dict__ implementation to exclude signature parameters from serialization"""
         return {
-            "authenticated": self.authenticated,
+            "unblocked": self.unblocked,
             "dependency": self.dependency,
             "shielded_dependency": self.shielded_dependency,
             "use_cache": self.use_cache,
@@ -103,7 +98,7 @@ class ShieldDepends(Security):
         }
 
     def __bool__(self):
-        return self.authenticated
+        return self.unblocked
 
     @cached_property
     def __signature__(self) -> Signature:
@@ -122,12 +117,12 @@ class ShieldDepends(Security):
         return solved_dependencies
 
     @asynccontextmanager
-    async def _as_authenticated(self):
-        self.authenticated = True
+    async def _as_unblocked(self):
+        self.unblocked = True
         try:
             yield
         finally:
-            self.authenticated = False
+            self.unblocked = False
 
 
 def ShieldedDepends(  # noqa: N802
@@ -140,13 +135,15 @@ def ShieldedDepends(  # noqa: N802
         ),
     ],
     *,
-    shielded_by: Union[None, "Shield", str] = None,
+    auto_error: bool = True,
+    scopes: Optional[Sequence[str]] = None,
     use_cache: bool = True,
 ) -> Any:
     return ShieldDepends(
         shielded_dependency=shielded_dependency,
+        auto_error=auto_error,
+        scopes=scopes,
         use_cache=use_cache,
-        shielded_by=shielded_by,
     )
 
 
@@ -156,17 +153,13 @@ class Shield(Generic[U]):
         "_guard_func_params",
         "_exception_to_raise_if_fail",
         "_default_response_to_return_if_fail",
-        "name",
         "auto_error",
     )
-
-    SHIELD_FUNCTIONS_NAMES = set()
 
     def __init__(
         self,
         shield_func: U,
         *,
-        name: Optional[str] = None,
         auto_error: bool = True,
         exception_to_raise_if_fail: HTTPException = HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to shield"
@@ -182,9 +175,6 @@ class Shield(Generic[U]):
         self._exception_to_raise_if_fail = exception_to_raise_if_fail
         self._default_response_to_return_if_fail = default_response_to_return_if_fail
         self.auto_error = auto_error
-        if name and isinstance(name, str) and name not in self.SHIELD_FUNCTIONS_NAMES:
-            self.SHIELD_FUNCTIONS_NAMES.add(name)
-        self.name = name
 
     def _raise_or_return_default_response(self):
         if self.auto_error:
@@ -238,7 +228,7 @@ class Shield(Generic[U]):
                 else:
                     return endpoint(*args, **endpoint_kwargs)
 
-            raise self._exception_to_raise_if_fail
+            return self._raise_or_return_default_response()
 
         wrapper.__signature__ = Signature(
             rearrange_params(
@@ -258,10 +248,10 @@ async def inject_authenticated_entities_into_args_kwargs(
     )
     for idx_kw, arg_kwargs in authenticated_depends:
         if idx_kw is not None:
-            if arg_kwargs.authenticated:
+            if arg_kwargs.unblocked:
                 raise HTTPException(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Already authenticated",
+                    detail="Already unblocked",
                 )
             request = kwargs.get("request")
             if not request:
@@ -275,7 +265,7 @@ async def inject_authenticated_entities_into_args_kwargs(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to solve dependencies",
                 )
-            async with arg_kwargs._as_authenticated():
+            async with arg_kwargs._as_unblocked():
                 new_arg_kwargs = await arg_kwargs(
                     *((obj,) if arg_kwargs.first_param is not None else ()),
                     **solved_dependencies.values,
@@ -305,7 +295,6 @@ def search_args_kwargs_for_authenticated_depends(*args, **kwargs):
 def shield(
     shield_func: Optional[U] = None,
     /,
-    name: Optional[str] = None,
     auto_error: bool = True,
     exception_to_raise_if_fail: HTTPException = HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to shield"
@@ -315,14 +304,12 @@ def shield(
     if shield_func is None:
         return lambda shield_func: Shield(
             shield_func,
-            name=name,
             auto_error=auto_error,
             exception_to_raise_if_fail=exception_to_raise_if_fail,
             default_response_to_return_if_fail=default_response_to_return_if_fail,
         )
     return Shield(
         shield_func,
-        name=name,
         auto_error=auto_error,
         exception_to_raise_if_fail=exception_to_raise_if_fail,
         default_response_to_return_if_fail=default_response_to_return_if_fail,
