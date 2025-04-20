@@ -636,6 +636,9 @@ def test_client_install_run(session: Session):
 def run_examples(session: Session):
     import glob
 
-    examples_scripts = glob.glob(f"{EXAMPLES_DIR}/*.py")
+    if session.posargs:
+        examples_scripts = glob.glob(f"{EXAMPLES_DIR}/{session.posargs[0]}")
+    else:
+        examples_scripts = glob.glob(f"{EXAMPLES_DIR}/*.py")
     for script in examples_scripts:
         session.run("uv", "run", script)
