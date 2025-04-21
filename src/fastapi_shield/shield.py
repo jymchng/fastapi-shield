@@ -1,5 +1,5 @@
 from typing_extensions import Doc
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException, Response, status
 from fastapi.dependencies.utils import (
     solve_dependencies,
     get_dependant,
@@ -150,12 +150,11 @@ def ShieldedDepends(  # noqa: N802
 class Shield(Generic[U]):
     __slots__ = (
         "auto_error",
-        
+        "name",
         "_guard_func",
         "_guard_func_params",
         "_exception_to_raise_if_fail",
         "_default_response_to_return_if_fail",
-        
         "__weakref__",
     )
 
@@ -163,20 +162,29 @@ class Shield(Generic[U]):
         self,
         shield_func: U,
         *,
+        name: str = None,
         auto_error: bool = True,
-        exception_to_raise_if_fail: HTTPException = HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to shield"
-        ),
-        default_response_to_return_if_fail: Optional[Any] = None,
+        exception_to_raise_if_fail: Optional[HTTPException] = None,
+        default_response_to_return_if_fail: Optional[Response] = None,
     ):
         assert callable(shield_func), "`shield_func` must be callable"
         self._guard_func = shield_func
         self._guard_func_params = signature(shield_func).parameters
-        assert isinstance(exception_to_raise_if_fail, HTTPException), (
+        self.name = name or "unknown"
+        self._exception_to_raise_if_fail = exception_to_raise_if_fail or HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Shield with name `{self.name}` blocks the request",
+        )
+        assert isinstance(self._exception_to_raise_if_fail, HTTPException), (
             "`exception_to_raise_if_fail` must be an instance of `HTTPException`"
         )
-        self._exception_to_raise_if_fail = exception_to_raise_if_fail
-        self._default_response_to_return_if_fail = default_response_to_return_if_fail
+        self._default_response_to_return_if_fail = (
+            default_response_to_return_if_fail
+            or Response(
+                content=f"Shield with name `{self.name}` blocks the request",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        )
         self.auto_error = auto_error
 
     def _raise_or_return_default_response(self):
@@ -299,21 +307,22 @@ def search_args_kwargs_for_authenticated_depends(*args, **kwargs):
 def shield(
     shield_func: Optional[U] = None,
     /,
+    name: str = None,
     auto_error: bool = True,
-    exception_to_raise_if_fail: HTTPException = HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to shield"
-    ),
-    default_response_to_return_if_fail: Optional[Any] = None,
+    exception_to_raise_if_fail: Optional[HTTPException] = None,
+    default_response_to_return_if_fail: Optional[Response] = None,
 ) -> Shield[U]:
     if shield_func is None:
-        return lambda shield_func: Shield(
+        return lambda shield_func: shield(
             shield_func,
+            name=name,
             auto_error=auto_error,
             exception_to_raise_if_fail=exception_to_raise_if_fail,
             default_response_to_return_if_fail=default_response_to_return_if_fail,
         )
     return Shield(
         shield_func,
+        name=name,
         auto_error=auto_error,
         exception_to_raise_if_fail=exception_to_raise_if_fail,
         default_response_to_return_if_fail=default_response_to_return_if_fail,
