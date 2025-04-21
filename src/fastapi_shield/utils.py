@@ -28,7 +28,7 @@ def generate_unique_id_for_fastapi_shield(dependant: Dependant, path_format: str
     return operation_id
 
 
-async def get_body_field_should_embed_from_request(
+def get_body_field_from_dependant(
     dependant: Dependant, path_format: str
 ) -> tuple[Optional[ModelField], bool]:
     flat_dependant = get_flat_dependant(dependant)
@@ -106,7 +106,7 @@ async def get_solved_dependencies(
     (
         body_field,
         should_embed_body_fields,
-    ) = await get_body_field_should_embed_from_request(endpoint_dependant, path_format)
+    ) = get_body_field_from_dependant(endpoint_dependant, path_format)
     body = await get_body_from_request(request, body_field)
     async with AsyncExitStack() as stack:
         endpoint_solved_dependencies = await solve_dependencies(
