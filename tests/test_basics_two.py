@@ -1,6 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException, Header, Path, Request
 from fastapi.testclient import TestClient
-import pytest
 from fastapi_shield import (
     Shield,
     ShieldedDepends,

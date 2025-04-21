@@ -1,13 +1,10 @@
 from typing_extensions import Doc
 from fastapi import Request, HTTPException, Response, status
 from fastapi.dependencies.utils import (
-    solve_dependencies,
-    get_dependant,
     is_coroutine_callable,
 )
 from contextlib import asynccontextmanager
 from fastapi.params import Security
-from fastapi.routing import APIRoute, compile_path
 
 from fastapi_shield.utils import (
     rearrange_params,
@@ -249,6 +246,7 @@ class Shield(Generic[U]):
             "__shielded__",
             True,
         )
+        setattr(wrapper, "__endpoint_params__", endpoint_params)
         return wrapper
 
 
@@ -329,18 +327,12 @@ def shield(
     )
 
 
-def gather_signature_params_across_wrapped_endpoints(
-    endpoint: EndPointFunc, /, signature_params: Optional[list[Parameter]] = None
-):
-    if signature_params is None:
-        signature_params = list(signature(endpoint).parameters.values())
-    if not hasattr(endpoint, "__wrapped__"):
-        signature_params.extend(signature(endpoint).parameters.values())
-        return signature_params
-    signature_params.extend(signature(endpoint.__wrapped__).parameters.values())
-    return gather_signature_params_across_wrapped_endpoints(
-        endpoint.__wrapped__, signature_params
-    )
+def gather_signature_params_across_wrapped_endpoints(maybe_wrapped_fn: EndPointFunc):
+    yield from signature(maybe_wrapped_fn).parameters.values()
+    if hasattr(maybe_wrapped_fn, "__wrapped__"):
+        yield from gather_signature_params_across_wrapped_endpoints(
+            maybe_wrapped_fn.__wrapped__
+        )
 
 
 def patch_shields_for_openapi(

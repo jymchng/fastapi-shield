@@ -218,6 +218,7 @@ async def update_product(
 
 
 if __name__ == "__main__":
+    # uv run python -m fastapi dev examples/fastapi_shield_works.py
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
