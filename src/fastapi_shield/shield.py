@@ -151,11 +151,14 @@ def ShieldedDepends(  # noqa: N802
 
 class Shield(Generic[U]):
     __slots__ = (
+        "auto_error",
+        
         "_guard_func",
         "_guard_func_params",
         "_exception_to_raise_if_fail",
         "_default_response_to_return_if_fail",
-        "auto_error",
+        
+        "__weakref__",
     )
 
     def __init__(
