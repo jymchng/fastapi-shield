@@ -6,8 +6,12 @@
 # ]
 # ///
 
+from functools import wraps
+from inspect import Parameter, signature
 import sys
 import os
+
+from fastapi_shield.utils import get_solved_dependencies
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
@@ -19,10 +23,12 @@ from fastapi import (
     Header,
     Path,
     Depends,
+    Request,
 )
-from typing import Any
+from typing import Any, Callable
 from pydantic import BaseModel
-from fastapi_shield.shield import ShieldedDepends, patch_shields_for_openapi, shield
+from fastapi_shield.shield import ShieldedDepends, shield
+from fastapi_shield.openapi import patch_get_openapi
 from threading import Event
 
 # Create global variables to track task execution
@@ -33,7 +39,7 @@ FAKE_USER_DB = {
     "user1": {
         "username": "user1",
         "password": "password1",
-        "roles": ["admin"],
+        "roles": ["admin", "user"],
     },
     "user2": {
         "username": "user2",
@@ -82,7 +88,7 @@ def get_user(username: str):
 def get_payload_from_token(token: str):
     if token in ("secret1", "secret2", "secret3"):
         if token == "secret1":
-            return {"username": "user1", "roles": ["admin"]}
+            return {"username": "user1", "roles": ["admin", "user"]}
         elif token == "secret2":
             return {"username": "user2", "roles": ["user"]}
         elif token == "secret3":
@@ -99,6 +105,44 @@ async def write_log(task_id, message):
         task_events[task_id].set()
 
 
+def inspect_endpoint_dependant(endpoint: Callable):
+    print("`inspect_endpoint_dependant::endpoint`: ", endpoint)
+    from fastapi.routing import compile_path, get_dependant
+
+    @wraps(endpoint)
+    async def wrapper(*args, **kwargs):
+        print("`wrapper::args`: ", args)
+        print("`wrapper::kwargs`: ", kwargs)
+        print("`wrapper::endpoint`: ", endpoint)
+        request = kwargs.get("request")
+        _, path_format, _ = compile_path(request.url.path)
+        dependant = get_dependant(path=path_format, call=endpoint)
+        print("`wrapper::endpoint.dependant`: ", dependant)
+        # `wrapper::endpoint.dependant`:  Dependant(path_params=[], query_params=[ModelField(field_info=Query(PydanticUndefined), name='name', mode='validation')], header_params=[], cookie_params=[], body_params=[], dependencies=[], security_requirements=[], name=None, call=<function another_name_will_not_appear_in_openapi_as_path_param_without_auth_required at 0x7f43ba220af0>, request_param_name=None, websocket_param_name=None, http_connection_param_name=None, response_param_name=None, background_tasks_param_name=None, security_scopes_param_name=None, security_scopes=None, use_cache=True, path='/say-hello-without-auth-required/hey', cache_key=(<function another_name_will_not_appear_in_openapi_as_path_param_without_auth_required at 0x7f43ba220af0>, ()))
+        solved_dependencies = await get_solved_dependencies(request, endpoint, {})
+        wrapper_solved_dependencies = await get_solved_dependencies(
+            request, wrapper, {}
+        )
+        print("`wrapper::solved_dependencies`: ", solved_dependencies)
+        print("`wrapper::wrapper_solved_dependencies`: ", wrapper_solved_dependencies)
+        return await endpoint(kwargs["name"])
+
+    wrapper.__signature__ = signature(endpoint).replace(
+        parameters=[
+            Parameter(
+                name="request",
+                kind=Parameter.POSITIONAL_ONLY,
+                annotation=Request,
+                default=Parameter.empty,
+            ),
+            *signature(endpoint).parameters.values(),
+        ]
+    )
+    wrapper_dependant = get_dependant(path="", call=wrapper)
+    print("`wrapper::wrapper_dependant`: ", wrapper_dependant)
+    return wrapper
+
+
 @shield
 # simple shield that will return the `x_api_token` header if the token is valid
 # `auth_required` shield will be a decorator
@@ -106,9 +150,13 @@ def auth_required(
     # FastAPI will inject the `x_api_token` header into the `auth_required` shield
     x_api_token: str = Header(),
 ):
+    print("`x_api_token`: ", x_api_token)
     if validate_token(x_api_token):
+        print("`validate_token(x_api_token)`: ", validate_token(x_api_token))
         return x_api_token
-    return None
+    else:
+        print("`validate_token(x_api_token)`: ", validate_token(x_api_token))
+        return None
 
 
 # a decorator that returns a shield
@@ -143,7 +191,6 @@ app = FastAPI()
 
 
 @app.get("/")
-@patch_shields_for_openapi
 async def root():
     return {"message": "Hello World"}
 
@@ -152,10 +199,16 @@ os.environ["ENV"] = "PROD"
 
 
 @app.get("/say-hello/{name}")
-@patch_shields_for_openapi(activated_when=os.environ.get("ENV", "LOCAL") == "LOCAL")
 @auth_required  # this shield will return the payload if the token is valid
 async def name_will_not_appear_in_openapi_as_path_param(name: str):
-    # name will NOT appear in the openapi schema, it is a limitation of fastapi-shield
+    return {"message": f"Hello {name}"}
+
+
+@app.get("/say-hello-without-auth-required/{name}")
+@inspect_endpoint_dependant
+async def another_name_will_not_appear_in_openapi_as_path_param_without_auth_required(
+    name: str,
+):
     return {"message": f"Hello {name}"}
 
 
@@ -163,15 +216,29 @@ os.environ["ENV"] = "LOCAL"
 
 
 @app.get("/say-hello-with-shield/{name}")
-@patch_shields_for_openapi(activated_when=os.environ.get("ENV", "LOCAL") == "LOCAL")
 @auth_required  # this shield will return the payload if the token is valid
-async def name_will_appear_in_openapi_as_path_param(name: str):
+async def name_will_appear_in_openapi_as_path_param(q: int, name: str):
     # name will appear in the openapi schema
-    return {"message": f"Hello {name} with shield"}
+    print("`name`: ", name)
+    return {"message": f"Hello {name} with shield with q={q}"}
+
+
+@app.get("/protected/product/{product_name}")
+@auth_required
+@roles_check(["user"])
+async def get_product(
+    product_name: str = Path(),
+    product_db: dict[str, Product] = Depends(get_product_db),
+):
+    print("`product_db`: ", product_db)
+    print("`product_name`: ", product_name)
+    return {
+        "success": True,
+        "product": product_db[product_name],
+    }
 
 
 @app.post("/protected/{username}")
-@patch_shields_for_openapi
 @auth_required  # this shield will return the payload if the token is valid
 @roles_check(["admin"])  # this shield will return the payload if the user is an admin
 @username_required  # this shield will return the payload if the username is the same as the username in the path
@@ -213,8 +280,38 @@ async def update_product(
     # Create event for testing
     task_events[task_id] = Event()
     return {
+        "status": "success",
         "message": "Product with name `{}` updated successfully".format(product.name),
     }
+
+
+@app.post("/protected2/{username}")
+async def update_product_two(
+    background_tasks: BackgroundTasks,
+    product: Product = Body(embed=True),
+    product_db: dict[str, Product] = Depends(get_product_db),
+):
+    product_db[product.name] = product
+    task_id = "test_task"
+    assert isinstance(background_tasks, BackgroundTasks), (
+        "`background_tasks` is not a BackgroundTasks object"
+    )
+    background_tasks.add_task(
+        write_log,
+        task_id=task_id,
+        message="Background task: Product with name `{}` updated successfully".format(
+            product.name
+        ),
+    )
+
+    # Create event for testing
+    task_events[task_id] = Event()
+    return {
+        "message": "Product with name `{}` updated successfully".format(product.name),
+    }
+
+
+app.openapi = patch_get_openapi(app)
 
 
 if __name__ == "__main__":

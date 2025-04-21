@@ -318,14 +318,18 @@ def test_protected_endpoint_without_token():
     client = TestClient(app)
     response = client.get("/protected")
     assert response.status_code == 500, response.status_code
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def test_protected2_endpoint_without_token():
     client = TestClient(app)
     response = client.get("/protected2")
     assert response.status_code == 500, response.status_code
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def test_protected_endpoint_with_invalid_token():
@@ -334,7 +338,9 @@ def test_protected_endpoint_with_invalid_token():
         "/protected", headers={"Authorization": "Bearer invalid_token"}
     )
     assert response.status_code == 500, response.status_code
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def test_protected2_endpoint_with_invalid_token():
@@ -343,7 +349,9 @@ def test_protected2_endpoint_with_invalid_token():
         "/protected2", headers={"Authorization": "Bearer invalid_token"}
     )
     assert response.status_code == 500, response.status_code
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def test_protected_endpoint_with_valid_token():
@@ -370,7 +378,9 @@ def test_protected_endpoint_with_malformed_token():
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
         response.status_code
     )
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def test_protected2_endpoint_with_valid_token():
@@ -430,7 +440,9 @@ def test_protected4_endpoint_with_non_admin_user():
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
         response.status_code
     )
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def test_protected_username_endpoint_with_user1():
@@ -485,4 +497,6 @@ def test_protected_by_roles_shield_endpoint_with_non_admin_user():
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR, (
         response.status_code
     )
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()

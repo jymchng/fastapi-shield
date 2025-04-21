@@ -562,6 +562,7 @@ def type_check(session: Session):
 def dev(session: Session):
     clean(session)
     format(session)
+    no_print(session)
     check(session)
     build(session)
     list_dist_files(session)
@@ -642,3 +643,17 @@ def run_examples(session: Session):
         examples_scripts = glob.glob(f"{EXAMPLES_DIR}/*.py")
     for script in examples_scripts:
         session.run("uv", "run", script)
+
+
+@session(dependency_group="dev", default_posargs=[PROJECT_CODES_DIR])
+def no_print(session: Session):
+    output = session.run(
+        "grep",
+        "-rn",
+        "print",
+        silent=True,
+        success_codes=[1],
+    )
+    if output:
+        session.error("Found print statements in the code")
+        raise SystemExit(1)

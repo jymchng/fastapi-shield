@@ -1,8 +1,10 @@
+from fastapi.exceptions import RequestValidationError
 from typing_extensions import Doc
 from fastapi import Request, HTTPException, Response, status
 from fastapi.dependencies.utils import (
     is_coroutine_callable,
 )
+from fastapi._compat import _normalize_errors
 from contextlib import asynccontextmanager
 from fastapi.params import Security
 
@@ -12,6 +14,7 @@ from fastapi_shield.utils import (
     merge_dedup_seq_params,
     get_solved_dependencies,
 )
+from fastapi_shield.consts import IS_SHIELDED_ENDPOINT_KEY
 from fastapi_shield.typing import EndPointFunc, U
 
 from functools import cached_property, wraps
@@ -206,16 +209,26 @@ class Shield(Generic[U]):
             else:
                 obj = self._guard_func(**guard_func_args)
             if obj:
+                # from here onwards, the shield's job is done
+                # hence we should raise an error from now on if anything goes wrong
                 request: Request = kwargs.get("request")
+
                 if not request:
-                    self._raise_or_return_default_response()
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        detail="Request is required",
+                    )
                 # because `solve_dependencies` is async, we need to await it
                 # hence no point to split returning `wrapper` into two functions, one sync and one async
-                endpoint_solved_dependencies = await get_solved_dependencies(
+                endpoint_solved_dependencies, body = await get_solved_dependencies(
                     request, endpoint, dependency_cache
                 )
                 if endpoint_solved_dependencies.errors:
-                    self._raise_or_return_default_response()
+                    validation_error = RequestValidationError(
+                        _normalize_errors(endpoint_solved_dependencies.errors),
+                        body=body,
+                    )
+                    raise validation_error
                 kwargs.update(endpoint_solved_dependencies.values)
                 (
                     args,
@@ -223,7 +236,6 @@ class Shield(Generic[U]):
                 ) = await inject_authenticated_entities_into_args_kwargs(
                     obj, *args, **kwargs
                 )
-
                 endpoint_kwargs = {
                     k: v for k, v in endpoint_kwargs.items() if k in endpoint_params
                 }
@@ -241,9 +253,9 @@ class Shield(Generic[U]):
                 )
             )
         )
-        getattr(endpoint, "__shielded__", False) or setattr(
+        getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or setattr(
             wrapper,
-            "__shielded__",
+            IS_SHIELDED_ENDPOINT_KEY,
             True,
         )
         setattr(wrapper, "__endpoint_params__", endpoint_params)
@@ -269,12 +281,12 @@ async def inject_authenticated_entities_into_args_kwargs(
                     status.HTTP_400_BAD_REQUEST,
                     detail="Request is required",
                 )
-            solved_dependencies = await arg_kwargs.resolve_dependencies(request)
+            solved_dependencies, body = await arg_kwargs.resolve_dependencies(request)
             if solved_dependencies.errors:
-                raise HTTPException(
-                    status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to solve dependencies",
+                validation_error = RequestValidationError(
+                    _normalize_errors(solved_dependencies.errors), body=body
                 )
+                raise validation_error
             async with arg_kwargs._as_unblocked():
                 new_arg_kwargs = await arg_kwargs(
                     *((obj,) if arg_kwargs.first_param is not None else ()),
@@ -344,7 +356,7 @@ def patch_shields_for_openapi(
         return lambda endpoint: patch_shields_for_openapi(
             endpoint, activated_when=activated_when
         )
-    if not getattr(endpoint, "__shielded__", False) or not (
+    if not getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or not (
         activated_when() if callable(activated_when) else activated_when
     ):
         return endpoint

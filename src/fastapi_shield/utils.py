@@ -117,14 +117,15 @@ async def get_solved_dependencies(
             body=body,
             dependency_cache=dependency_cache,
         )
-    return endpoint_solved_dependencies
+    return endpoint_solved_dependencies, body
 
 
 def merge_dedup_seq_params(
     *seqs_of_params: Sequence[Parameter],
+    reverse: bool = True,
 ):
     seen = {}
-    for seq_of_params in seqs_of_params:
+    for seq_of_params in reversed(seqs_of_params) if reverse else seqs_of_params:
         for param in seq_of_params:
             if param.name not in seen:
                 seen[param.name] = param
