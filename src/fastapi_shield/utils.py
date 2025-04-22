@@ -96,12 +96,31 @@ async def get_body_from_request(
     return body
 
 
+def get_raw_or_full_path(request: Request) -> str:
+    scope = request.scope
+    root_path = scope.get("root_path", "")
+
+    route = scope.get("route")
+
+    if not route:
+        return request.url.path
+
+    path_format = getattr(route, "path_format", None)
+
+    if not path_format:
+        return request.url.path
+
+    if path_format:
+        return f"{root_path}{path_format}"
+
+
 async def get_solved_dependencies(
     request: Request,
     endpoint: Callable,
     dependency_cache: dict,
 ):
-    _, path_format, _ = compile_path(request.url.path)
+    full_or_raw_path = get_raw_or_full_path(request)
+    _, path_format, _ = compile_path(full_or_raw_path)
     endpoint_dependant = get_dependant(path=path_format, call=endpoint)
     (
         body_field,
