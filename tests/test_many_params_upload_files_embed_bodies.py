@@ -143,11 +143,11 @@ async def protected(
     assert isinstance(response, Response)
     assert isinstance(background_tasks, BackgroundTasks)
     assert isinstance(http, HTTPConnection)
-    
+
     for i, file in enumerate(files_data):
         print(f"File {i}: {file.filename}")
         with open(file.filename, "rb") as f:
-            assert f.read() == f"This is random data {i+1} dot csv".encode()
+            assert f.read() == f"This is random data {i + 1} dot csv".encode()
 
     return {
         "message": "Protected endpoint",
@@ -191,11 +191,11 @@ async def protected(
     assert isinstance(response, Response)
     assert isinstance(background_tasks, BackgroundTasks)
     assert isinstance(http, HTTPConnection)
-    
+
     for i, file in enumerate(files_data):
         print(f"File {i}: {file.filename}")
         with open(file.filename, "rb") as f:
-            assert f.read() == f"This is random data {i+1} dot csv".encode()
+            assert f.read() == f"This is random data {i + 1} dot csv".encode()
 
     return {
         "message": "Protected endpoint",
@@ -281,7 +281,7 @@ def test_auth_required_authorized_without_shield():
         "this_is_a_user": "good_user",
         "this_is_a_password": "good_password",
     }
-    
+
     # Make the POST request
     response = client.post(
         "/protected_without_shield/good-f/big-product/big-name/277?g=hey&k=69&j=big-j",

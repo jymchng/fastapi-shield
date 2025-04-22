@@ -29,7 +29,6 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 exclude = ["examples", "docs", "scripts", "scripts/*", "noxfile.py"]
-include = ["src/fastapi_shield/*"]
 
 [dependency-groups]
 dev = [

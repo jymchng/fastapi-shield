@@ -140,7 +140,7 @@ async def protected(
     assert isinstance(response, Response)
     assert isinstance(background_tasks, BackgroundTasks)
     assert isinstance(http, HTTPConnection)
-    
+
     return {
         "message": "Protected endpoint",
         "username": username,
@@ -177,7 +177,7 @@ async def protected(
     assert isinstance(response, Response)
     assert isinstance(background_tasks, BackgroundTasks)
     assert isinstance(http, HTTPConnection)
-    
+
     return {
         "message": "Protected endpoint",
         "username": username,
@@ -194,14 +194,27 @@ async def protected(
     }
 
 
-EXPECTED_JSON_WITH_OR_WITHOUT_SHIELD = {'message': 'Protected endpoint', 'username': 'good-f', 'big_house': 277, 'g': 'hey', 'product_name': 'big-product', 'k': 69, 'j': 'big-j', 'big_name': 'big-name', 'product': {'name': 'product1', 'price': 100}, 'product_two': {'name': 'product2', 'price': 200}, 'product_three': {'name': 'product3', 'price': 300}, 'cookie_data': 'test_cookie'}
+EXPECTED_JSON_WITH_OR_WITHOUT_SHIELD = {
+    "message": "Protected endpoint",
+    "username": "good-f",
+    "big_house": 277,
+    "g": "hey",
+    "product_name": "big-product",
+    "k": 69,
+    "j": "big-j",
+    "big_name": "big-name",
+    "product": {"name": "product1", "price": 100},
+    "product_two": {"name": "product2", "price": 200},
+    "product_three": {"name": "product3", "price": 300},
+    "cookie_data": "test_cookie",
+}
 
 
 def test_auth_required_authorized_with_shield():
     client = TestClient(app)
 
     cookies = {"cookie_data": "test_cookie"}
-    
+
     # Make the POST request
     response = client.post(
         "/protected_with_shield/good-f/big-product/big-name/277?g=hey&k=69&j=big-j",
@@ -223,7 +236,7 @@ def test_auth_required_authorized_without_shield():
     client = TestClient(app)
 
     cookies = {"cookie_data": "test_cookie"}
-    
+
     # Make the POST request
     response = client.post(
         "/protected_without_shield/good-f/big-product/big-name/277?g=hey&k=69&j=big-j",

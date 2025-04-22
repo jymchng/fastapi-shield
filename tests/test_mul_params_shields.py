@@ -1,4 +1,15 @@
-from fastapi import BackgroundTasks, Body, Cookie, FastAPI, HTTPException, Path, Header, Depends, Query, Response
+from fastapi import (
+    BackgroundTasks,
+    Body,
+    Cookie,
+    FastAPI,
+    HTTPException,
+    Path,
+    Header,
+    Depends,
+    Query,
+    Response,
+)
 from fastapi.requests import HTTPConnection
 from fastapi.testclient import TestClient
 from fastapi_shield.shield import ShieldedDepends, shield
@@ -67,6 +78,7 @@ def get_payload_from_token(token: str):
     else:
         raise HTTPException(status_code=401, detail="Unauthorized; token mismatch")
 
+
 @shield
 def auth_required(
     x_api_token: str = Header(),
@@ -75,6 +87,7 @@ def auth_required(
         return x_api_token
     else:
         return None
+
 
 def roles_check(roles: list[str]):
     @shield
@@ -96,10 +109,10 @@ async def username_required(
 ):
     assert authenticated_payload["username"] == "user1"
     if authenticated_payload["username"] == username:
-        return authenticated_payload
+        return username
     else:
         raise HTTPException(status_code=401, detail="Unauthorized; username mismatch")
-    
+
 
 app = FastAPI()
 
@@ -118,6 +131,9 @@ async def protected(
     background_tasks: BackgroundTasks,
     http: HTTPConnection,
     product_three: Product,
+    authenticated_user: dict[str, Any] = ShieldedDepends(
+        lambda username: get_user(username)
+    ),
     product: Product = Body(embed=True),
     product_two: Product = Body(embed=True),
     j: str = Query(),
@@ -127,7 +143,11 @@ async def protected(
     assert isinstance(response, Response)
     assert isinstance(background_tasks, BackgroundTasks)
     assert isinstance(http, HTTPConnection)
-    
+    assert authenticated_user == get_user(username)
+    assert isinstance(authenticated_user, dict)
+    assert authenticated_user["username"] == username
+    assert authenticated_user["roles"] == ["admin", "user"]
+
     return {
         "message": "Protected endpoint",
         "username": username,
@@ -137,6 +157,7 @@ async def protected(
         "k": k,
         "j": j,
         "big_name": big_name,
+        "authenticated_user": authenticated_user,
         "product": {"name": product.name, "price": product.price},
         "product_two": {"name": product_two.name, "price": product_two.price},
         "product_three": {"name": product_three.name, "price": product_three.price},
@@ -164,7 +185,7 @@ async def protected(
     assert isinstance(response, Response)
     assert isinstance(background_tasks, BackgroundTasks)
     assert isinstance(http, HTTPConnection)
-    
+
     return {
         "message": "Protected endpoint",
         "username": username,
@@ -181,14 +202,32 @@ async def protected(
     }
 
 
-EXPECTED_JSON_WITH_OR_WITHOUT_SHIELD = {'message': 'Protected endpoint', 'username': 'user1', 'big_house': 277, 'g': 'hey', 'product_name': 'big-product', 'k': 69, 'j': 'big-j', 'big_name': 'big-name', 'product': {'name': 'product1', 'price': 100}, 'product_two': {'name': 'product2', 'price': 200}, 'product_three': {'name': 'product3', 'price': 300}, 'cookie_data': 'test_cookie'}
+EXPECTED_JSON_WITH_OR_WITHOUT_SHIELD = {
+    "message": "Protected endpoint",
+    "username": "user1",
+    "big_house": 277,
+    "g": "hey",
+    "product_name": "big-product",
+    "k": 69,
+    "j": "big-j",
+    "big_name": "big-name",
+    "authenticated_user": {
+        "username": "user1",
+        "password": "password1",
+        "roles": ["admin", "user"],
+    },
+    "product": {"name": "product1", "price": 100},
+    "product_two": {"name": "product2", "price": 200},
+    "product_three": {"name": "product3", "price": 300},
+    "cookie_data": "test_cookie",
+}
 
 
 def test_auth_required_authorized_with_shield():
     client = TestClient(app)
 
     cookies = {"cookie_data": "test_cookie"}
-    
+
     # Make the POST request
     response = client.post(
         "/protected_with_shield/user1/big-product/big-name/277?g=hey&k=69&j=big-j",
@@ -204,8 +243,8 @@ def test_auth_required_authorized_with_shield():
     # Assert the response
     assert response.status_code == 200, (response.status_code, response.json())
     assert response.json() == EXPECTED_JSON_WITH_OR_WITHOUT_SHIELD
-    
-    
+
+
 # test user1 cannot access user2 endpoint
 def test_user1_cannot_access_user2_endpoint():
     client = TestClient(app)
@@ -220,18 +259,17 @@ def test_user1_cannot_access_user2_endpoint():
             "product_two": {"name": "product2", "price": 200},
         },
     )
-    
+
     # Assert the response
     assert response.status_code == 401, (response.status_code, response.json())
-    assert response.json() == {'detail': 'Unauthorized; username mismatch'}
-
+    assert response.json() == {"detail": "Unauthorized; username mismatch"}
 
 
 def test_auth_required_authorized_without_shield():
     client = TestClient(app)
 
     cookies = {"cookie_data": "test_cookie"}
-    
+
     # Make the POST request
     response = client.post(
         "/protected_without_shield/user1/big-product/big-name/277?g=hey&k=69&j=big-j",
@@ -246,4 +284,17 @@ def test_auth_required_authorized_without_shield():
 
     # Assert the response
     assert response.status_code == 200, (response.status_code, response.json())
-    assert response.json() == EXPECTED_JSON_WITH_OR_WITHOUT_SHIELD
+    assert response.json() == {
+        "message": "Protected endpoint",
+        "username": "user1",
+        "big_house": 277,
+        "g": "hey",
+        "product_name": "big-product",
+        "k": 69,
+        "j": "big-j",
+        "big_name": "big-name",
+        "product": {"name": "product1", "price": 100},
+        "product_two": {"name": "product2", "price": 200},
+        "product_three": {"name": "product3", "price": 300},
+        "cookie_data": "test_cookie",
+    }
