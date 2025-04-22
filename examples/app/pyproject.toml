@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fastapi-shield-example"
+version = "0.1.0"
+description = "Example application demonstrating FastAPI Shield for authentication and authorization"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "FastAPI Shield Example Contributors" }]
+
+dependencies = [
+    "fastapi>=0.100.1",
+    "fastapi-shield",
+    "httpx>=0.28.1",
+    "uvicorn",
+    # TODO: Add this when the package is published
+    "fastapi-shield",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+# TODO: Remove this when the package is published
+[tool.uv.sources]
+fastapi-shield = { path = "../../" }

@@ -132,7 +132,7 @@ async def protected(
     http: HTTPConnection,
     product_three: Product,
     authenticated_user: dict[str, Any] = ShieldedDepends(
-        lambda username: get_user(username)
+        get_user
     ),
     product: Product = Body(embed=True),
     product_two: Product = Body(embed=True),
