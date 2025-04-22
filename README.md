@@ -1,308 +1,284 @@
+<div align="center">
+
+<img src="./assets/logos/logo_hori_one.jpg" width=80% height=20%></img>
+
 # FastAPI Shield
 
-[![PyPI version](https://img.shields.io/pypi/v/fastapi-shield.svg)](https://pypi.org/project/fastapi-shield/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/fastapi-shield.svg)](https://pypi.org/project/fastapi-shield/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI Status](https://img.shields.io/github/workflow/status/author/fastapi-shield/ci)](https://github.com/author/fastapi-shield/actions)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://fastapi-shield.readthedocs.io)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
-[![codecov](https://codecov.io/gh/author/fastapi-shield/branch/main/graph/badge.svg)](https://codecov.io/gh/author/fastapi-shield)
+## Documentation
+<a href="https://fastapi-shield.readthedocs.io">
+  <img src="https://img.shields.io/badge/docs-passing-brightgreen.svg" width="100" alt="docs passing">
+</a>
 
-A powerful, flexible authentication and authorization framework for FastAPI applications.
+## Compatibility and Version
+<img src="https://img.shields.io/badge/%3E=python-3.9-blue.svg" alt="Python compat">
+<a href="https://pypi.python.org/pypi/fastapi-shield"><img src="https://img.shields.io/pypi/v/fastapi-shield.svg" alt="PyPi"></a>
 
-## 🛡️ Overview
+### License and Issues
+<a href="https://github.com/jimchng/fastapi-shield/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jimchng/fastapi-shield" alt="License"></a>
 
-FastAPI Shield provides a declarative, dependency-based approach to securing FastAPI endpoints. It extends FastAPI's dependency injection system to support:
+</div>
 
-- Token-based authentication
-- Role-based access control
-- Automatic dependency resolution
-- Nested security dependencies
-- Type-safe authentication flows
+A powerful, intuitive, and flexible authentication and authorization library for FastAPI applications. Stack your shields to create robust and customizable layers which effectively shields your endpoints from unwanted requests.
 
-## ⚙️ Installation
+# Features
+
+- **Decorator-based Security**: Apply shields as simple decorators to protect your endpoints
+- **Layered Protection**: Stack multiple shields for fine-grained access control
+- **Clean Design Pattern**: Shields provide a clear and intuitive metaphor for API protection
+- **Fully Integrated**: Works seamlessly with FastAPI's dependency injection system
+- **Type Safety**: Full type hint support for better IDE integration and code quality
+- **Customizable Responses**: Configure error responses when access is denied
+- **ShieldedDepends**: Special dependency mechanism for protected resources
+- **Lazy-Loading of Dependencies**: Dependencies are only loaded from FastAPI after the request passes through all the decorated shields
+
+# Installation
 
 ```bash
 pip install fastapi-shield
 ```
 
-## 🚀 Quick Start
+# Basic Usage
 
-Here's a simple example showing how to secure an endpoint with FastAPI Shield:
+## Create your First Shield
+
+Let's create a simple `@auth_shield` to shield against unauthenticated requests! 🛡️
 
 ```python
-from fastapi import FastAPI, Request, Header
-from fastapi_shield.shield import Shield, ShieldedDepends, AuthenticationStatus
-from pydantic import BaseModel
-from typing import Tuple, Optional
+from fastapi import Header
+from fastapi_shield import shield
 
-# Define a User model
-class User(BaseModel):
-    username: str
-    email: str
-    roles: list[str] = ["user"]
-
-# Sample database
-USERS_DB = {
-    "username1": User(
-        username="authenticated_user1",
-        email="user1@example.com",
-        roles=["user", "admin"],
-    ),
-    "username2": User(
-        username="authenticated_user2",
-        email="user2@example.com",
-    ),
-}
-
-# Authentication function
-def get_auth_status(request: Request) -> Tuple[AuthenticationStatus, str]:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return AuthenticationStatus.UNAUTHENTICATED, ""
-    
-    token = auth_header[len("Bearer "):]
-    
-    # Validate token (replace with your actual validation logic)
-    if token in ["valid_token1", "valid_token2"]:
-        return AuthenticationStatus.AUTHENTICATED, token
-    return AuthenticationStatus.UNAUTHENTICATED, ""
-
-# User retrieval function
-def get_username(token: str) -> Optional[str]:
-    if token == "valid_token1":
-        return "username1"
-    if token == "valid_token2":
-        return "username2"
+# Create a simple authentication shield
+@shield
+def auth_shield(api_token: str = Header()):
+    """
+    A basic shield that validates an API token.
+    Returns the token if valid, otherwise returns None which blocks the request.
+    """
+    if api_token == "valid_token":
+        return api_token
     return None
+```
 
-def get_user(token: str) -> User:
-    if token == "valid_token1":
-        return USERS_DB["username1"]
-    return USERS_DB["username2"]
+Now that you've created your first shield, you can easily apply it to any FastAPI endpoint! 🚀
 
-# Create a FastAPI app
+The shield acts as a decorator that protects your endpoint from unauthorized access. 
+
+When a request comes in, the shield evaluates the API token before the endpoint function is called.
+
+If the token is invalid (returning None), the request is blocked! 🚫 
+
+This creates a clean separation between authentication logic and business logic, making your code more maintainable.
+
+Just like a real shield, it stands in front of your endpoint to protect it! 💪
+
+
+## See your First Shield in Action
+
+Now let's see how our shield works in the wild! 🚀 When a user tries to access the protected endpoint, the shield jumps into action like a superhero! 🦸‍♀️
+
+```python
+from fastapi import FastAPI
+from db import get_db
+
 app = FastAPI()
 
-# Create a shield with the authentication function
-auth_shield = Shield(get_auth_status)
-
-# Protected endpoint
-@app.get("/protected")
-@auth_shield
-async def protected_endpoint(request: Request, user: User = ShieldedDepends(get_user)):
-    return {
-        "message": "This is a protected endpoint",
-        "user": user
-    }
-
-# Unprotected endpoint
+# Public endpoint
 @app.get("/public")
 async def public_endpoint():
-    return {"message": "This is a public endpoint"}
+    return {"message": "This endpoint is public!"}
+
+# Protected endpoint - requires authentication
+@app.get("/protected")
+@auth_shield # apply `@auth_shield`
+async def protected_endpoint(db: Dict[str, Any]=Depends(get_db)):
+    # `get_db` is only injected by FastAPI **after** the request made it through the `@auth_shield`!
+    return {
+        "message": "This endpoint is protected!",
+    }
 ```
 
-## 🔒 Authentication Flow
+<div align="center">
+  <img src="./assets/pictures/IMG_20250423_003431_018.jpg" alt="Shield Congratulations" width="40%">
+  
+  ### 🎉 Congratulations! You've made your First Wonderful Shield! 🎉
+</div>
 
-FastAPI Shield's authentication flow:
-
-1. When a request hits a protected endpoint, the shield's authentication function is called
-2. If authentication succeeds, the function returns `AuthenticationStatus.AUTHENTICATED` and the credential
-3. The credential is passed to shielded dependencies marked with `ShieldedDepends`
-4. If authentication fails, a 401 Unauthorized response is returned
-
-## 🔑 Advanced Usage
-
-### Role-Based Access Control
-
-Role-based access control is easily implemented by stacking shields:
+# To be continued...
 
 ```python
-from fastapi import FastAPI, Request, Depends
-from fastapi_shield.shield import Shield, ShieldedDepends, AuthenticationStatus
+from fastapi import FastAPI, Header
+from fastapi_shield import Shield, ShieldedDepends, shield
 
-# Get user from username
-def get_user_from_username(username: str, db: dict = Depends(lambda: USERS_DB)) -> User:
-    return db.get(username)
+app = FastAPI()
 
-# Get user roles from token
-def from_token_get_roles(token: str) -> list[str]:
-    if token == "valid_token1":
-        return ["user", "admin"]
-    if token == "valid_token2":
-        return ["user"]
-    return []
-
-# Get username from token
-def from_token_get_username(token: str) -> str:
-    if token == "valid_token1":
-        return "username1"
-    if token == "valid_token2":
-        return "username2"
+# Create a simple authentication shield
+@shield
+def auth_shield(api_token: str = Header()):
+    """
+    A basic shield that validates an API token.
+    Returns the token if valid, otherwise returns None which blocks the request.
+    """
+    if api_token == "valid_token":
+        return api_token
     return None
 
-# Create a role-based shield
-def roles_shield(required_roles: list[str]):
-    def decorator(
-        username: str = ShieldedDepends(from_token_get_username),
-        user_roles: list[str] = ShieldedDepends(from_token_get_roles),
-    ):
-        for role in user_roles:
-            if role in required_roles:
-                return True, username
-        return False, ""
+# Create a role-based shield factory
+def roles_required(required_roles: list[str]):
+    @shield
+    def role_shield(token_data: dict = ShieldedDepends(auth_shield)):
+        user_roles = token_data.get("roles", [])
+        if any(role in user_roles for role in required_roles):
+            return token_data
+        return None
+    return role_shield
 
-    return Shield(decorator)
+# Create shortcut shields
+admin_shield = roles_required(["admin"])
+user_shield = roles_required(["user", "admin"])
 
-# Create the FastAPI app and authentication shield
-app = FastAPI()
-auth_shield = Shield(get_auth_status)
+# Public endpoint
+@app.get("/public")
+async def public_endpoint():
+    return {"message": "This endpoint is public!"}
 
-# Endpoint requiring admin role
+# Protected endpoint - requires authentication
+@app.get("/protected")
+@auth_shield
+async def protected_endpoint(token: str = ShieldedDepends(lambda t: t)):
+    return {
+        "message": "This endpoint is protected!",
+        "token": token
+    }
+
+# Admin-only endpoint
 @app.get("/admin")
 @auth_shield
-@roles_shield(["admin"])
-async def admin_endpoint(request: Request, user: User = ShieldedDepends(get_user_from_username)):
-    return {"message": "Admin endpoint", "user": user}
+@admin_shield
+async def admin_endpoint():
+    return {"message": "This endpoint is for admins only!"}
 
-# Endpoint requiring only user role
+# User-level endpoint
 @app.get("/user")
 @auth_shield
-@roles_shield(["user"])
-async def user_endpoint(request: Request, user: User = ShieldedDepends(get_user_from_username)):
-    return {"message": "User endpoint", "user": user}
+@user_shield
+async def user_endpoint():
+    return {"message": "This endpoint is for users and admins!"}
 ```
 
-### Alternative Authentication Methods
+## Advanced Example
 
-You can define different authentication methods for different endpoints:
+Check out the complete product catalog API example in the [`examples/app`](examples/app) directory, which demonstrates:
+
+- Authentication with token-based shields
+- Role-based access control
+- Protecting user information
+- Admin-only operations for products
+- Testing protected endpoints with TestClient
 
 ```python
-# API key authentication
-def get_auth_status_from_header(
-    *, x_api_token: str = Header(),
-) -> Tuple[AuthenticationStatus, str]:
-    # Validate API token
-    if x_api_token in ["valid_token1", "valid_token2"]:
-        return AuthenticationStatus.AUTHENTICATED, x_api_token
-    return AuthenticationStatus.UNAUTHENTICATED, ""
+# Shield for requiring specific roles
+def roles_required(roles: List[str]):
+    """
+    Role-based authorization shield that checks if the authenticated user
+    has any of the required roles.
+    """
+    @shield
+    def role_shield(token: str = ShieldedDepends(lambda t: t)):
+        token_data = get_token_data(token)
+        user_roles = token_data.get("roles", [])
+        
+        # Check if user has any of the required roles
+        if any(role in user_roles for role in roles):
+            return token_data
+        
+        # No matching roles, return None to block the request
+        return None
+        
+    return role_shield
 
-# Create API key shield
-api_shield = Shield(get_auth_status_from_header)
-
-# API key protected endpoint
-@app.get("/api-endpoint")
-@api_shield
-async def api_endpoint(x_api_token: str = Header(), user: User = ShieldedDepends(get_user)):
-    return {
-        "x-api-token": x_api_token,
-        "user": user,
-        "message": "API protected endpoint"
-    }
+# Shortcut shields for common role checks
+admin_required = roles_required(["admin"])
+user_required = roles_required(["user", "admin"])
 ```
 
-## 📚 Nested Shielded Dependencies
+## Documentation
 
-FastAPI Shield truly shines with nested dependencies. Dependencies marked with `ShieldedDepends` are only evaluated if authentication succeeds:
+Visit our documentation for more details:
 
-```python
-from fastapi import Depends
+- **Getting Started**: Installation, basic usage, and core concepts
+- **Shields Guide**: Understanding the Shield pattern
+- **Authentication**: Token-based, OAuth, and custom authentication shields
+- **Authorization**: Role-based access control and permission shields
+- **Advanced Usage**: Complex security scenarios and custom shield creation, e.g. rate limiting shield
+- **Examples**: Complete application examples
 
-# Database dependency
-def get_db():
-    # In a real app, this would return a database connection
-    return {
-        "username1": User(username="user1", email="user1@example.com", roles=["admin"]),
-        "username2": User(username="user2", email="user2@example.com"),
-    }
+## How It Works
 
-# Get user with database dependency
-def get_user_with_db(username: str, db = Depends(get_db)) -> User:
-    return db.get(username)
+FastAPI Shield uses a layered decorator pattern to apply security checks:
 
-# This endpoint uses nested dependencies
-@app.get("/profile")
-@auth_shield
-async def profile_endpoint(
-    request: Request,
-    # First ShieldedDepends gets username from the token
-    # Second ShieldedDepends uses that username to get the user from db
-    user: User = ShieldedDepends(lambda username: get_user_with_db(
-        username, 
-        ShieldedDepends(from_token_get_username)
-    )),
-):
-    return {"user": user}
+1. **Define Shields**: Create functions decorated with `@shield` that validate authentication or authorization
+2. **Stack Shields**: Apply multiple shields to endpoints in the desired order
+3. **Access Protected Resources**: Use `ShieldedDepends` to access data from successful shields
+4. **Handle Failures**: Customize error responses when shield validation fails
+
+Each shield acts as an independent layer of security that can:
+- Allow the request to continue when it passes validation (returns a value)
+- Block the request when validation fails (returns None)
+- Pass state to dependent shields (via ShieldedDepends)
+
+## Development
+
+### Prerequisites
+
+- Python 3.9 or higher
+- FastAPI 0.100.1 or higher
+
+### Install Development Dependencies
+
+```bash
+pip install uv
+uv sync --dev
 ```
 
-## 🧩 API Reference
+### Building from Source
 
-### `Shield`
-
-The primary decorator for protecting endpoints:
-
-```python
-Shield(
-    shield_func: Callable[[T], Tuple[Union[AuthenticationStatus, bool], U]],
-    exception_to_raise_if_fail: HTTPException = HTTPException(status_code=401, detail="Unauthorized")
-)
+```bash
+git clone https://github.com/jimchng/fastapi-shield.git
+cd fastapi-shield
+pip install uv
+uv sync --dev
 ```
 
-### `ShieldedDepends`
+### Running Tests
 
-A dependency that only executes when authentication is successful:
+```bash
+# Install `uv`
+pip install uv
 
-```python
-ShieldedDepends(
-    shielded_dependency: Optional[Callable[..., Any]] = None
-)
+# Install `nox`
+uv add --dev nox
+
+# Or use `nox` as a tool
+uv tool install nox
+
+# Run all tests
+uv run python -m nox -s test
+
+# OR
+uv tool run nox -s test
+
+# Run specific test suite
+nox -s test -- tests/test_basics.py
 ```
 
-### `AuthenticationStatus`
+## Contributing
 
-An enum representing authentication status:
+We welcome contributions! Please see our Contributing Guide for details.
 
-```python
-class AuthenticationStatus(Enum):
-    AUTHENTICATED = "AUTHENTICATED"
-    UNAUTHENTICATED = "UNAUTHENTICATED"
-```
+## License
 
-## 🧪 Testing
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Testing protected endpoints is straightforward with FastAPI's TestClient:
+## Acknowledgments
 
-```python
-from fastapi.testclient import TestClient
-
-def test_protected_endpoint():
-    client = TestClient(app)
-    
-    # Unauthorized request
-    response = client.get("/protected")
-    assert response.status_code == 401
-    
-    # Authorized request
-    response = client.get(
-        "/protected", 
-        headers={"Authorization": "Bearer valid_token1"}
-    )
-    assert response.status_code == 200
-    assert response.json() == {
-        "user": {
-            "username": "authenticated_user1",
-            "email": "user1@example.com",
-            "roles": ["user", "admin"],
-        },
-        "message": "This is a protected endpoint",
-    }
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+Special thanks to all contributors who have helped shape this project.
