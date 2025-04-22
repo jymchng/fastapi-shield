@@ -1,0 +1,86 @@
+# Use Python 3.10 slim image as the base
+FROM python:3.10-slim as py3.10zero
+
+# Set the working directory
+WORKDIR /app
+
+# Install necessary system packages
+RUN apt-get update && apt-get install -y \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy application files into the container
+COPY src/ ./src/
+COPY tests/ ./tests/
+COPY README.md ./
+COPY pyproject.toml ./
+COPY noxfile.py ./
+COPY .gitignore ./
+
+# Create a virtual environment and install test dependencies
+RUN python -m venv .venv && \
+    . .venv/bin/activate && \
+    python -m pip install --upgrade pip && \
+    python -m pip install "nox>=2023.0.0" && \
+    python -m pip install uv && \
+    python -m uv build && \
+    python -m pip install dist/*.whl && \
+    python -m nox -s test && \
+    deactivate
+
+# Build stage - to create the distribution package
+FROM py3.10zero as builder
+
+# Create a build directory
+WORKDIR /build
+
+# Copy source files
+COPY --from=py3.10zero /app /build
+
+# Install build dependencies and build the package
+RUN python -m venv .venv && \
+    . .venv/bin/activate && \
+    python -m pip install --upgrade pip && \
+    python -m pip install uv && \
+    python -m uv build && \
+    deactivate
+
+# Final test stage
+FROM python:3.10-slim as py3.10first
+
+# Change to the client directory
+WORKDIR /client
+
+# Install necessary system packages
+RUN apt-get update && apt-get install -y \
+    gcc \
+    make \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the distribution files and testing files
+COPY --from=builder /build/dist/ ./dist/
+COPY tests/ ./tests/
+COPY noxfile.py ./
+COPY pyproject.toml ./
+COPY .gitignore ./
+COPY README.md ./
+
+RUN echo "Current Directory:" && \
+    ls -la
+
+# Install the package from the distribution and run tests
+RUN python -m venv .venv && \
+    . .venv/bin/activate && \
+    python -m pip install --upgrade pip && \
+    find dist -name "*.whl" -exec pip install {} \; && \
+    python -c "from fastapi_shield import Shield, shield; print(\"fastapi-shield is imported!\")" && \
+    python -m pip install uv && \
+    python -m uv export --no-emit-project --group dev > requirements-dev.txt && \
+    python -m pip install -r requirements-dev.txt && \
+    python -m pytest tests -s -vv && \
+    deactivate
+
+# Set the default command to execute when the container starts
+CMD ["echo", "all tests done"]

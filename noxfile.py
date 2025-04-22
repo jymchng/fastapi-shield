@@ -562,7 +562,6 @@ def type_check(session: Session):
 def dev(session: Session):
     clean(session)
     format(session)
-    no_print(session)
     check(session)
     build(session)
     list_dist_files(session)
