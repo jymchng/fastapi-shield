@@ -32,12 +32,12 @@ from typing import (
 )
 
 
-class ShieldDepends(Security):
+class ShieldDepends(Generic[U], Security):
     __slots__ = ("dependency", "shielded_dependency", "unblocked")
 
     def __init__(
         self,
-        shielded_dependency: Optional[Callable[..., Any]] = None,
+        shielded_dependency: Optional[U] = None,
         *,
         auto_error: bool = True,
         scopes: Optional[Sequence[str]] = None,
