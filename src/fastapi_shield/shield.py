@@ -152,6 +152,7 @@ class Shield(Generic[U]):
         "auto_error",
         "name",
         "_guard_func",
+        "_guard_func_is_async",
         "_guard_func_params",
         "_exception_to_raise_if_fail",
         "_default_response_to_return_if_fail",
@@ -169,6 +170,7 @@ class Shield(Generic[U]):
     ):
         assert callable(shield_func), "`shield_func` must be callable"
         self._guard_func = shield_func
+        self._guard_func_is_async = is_coroutine_callable(shield_func)
         self._guard_func_params = signature(shield_func).parameters
         self.name = name or "unknown"
         self._exception_to_raise_if_fail = exception_to_raise_if_fail or HTTPException(
@@ -198,13 +200,14 @@ class Shield(Generic[U]):
 
         endpoint_params = signature(endpoint).parameters
         dependency_cache = {}
+        endpoint_is_async = is_coroutine_callable(endpoint)
 
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
             guard_func_args = {
                 k: v for k, v in kwargs.items() if k in self._guard_func_params
             }
-            if is_coroutine_callable(self._guard_func):
+            if self._guard_func_is_async:
                 obj = await self._guard_func(**guard_func_args)
             else:
                 obj = self._guard_func(**guard_func_args)
@@ -239,7 +242,7 @@ class Shield(Generic[U]):
                 endpoint_kwargs = {
                     k: v for k, v in endpoint_kwargs.items() if k in endpoint_params
                 }
-                if is_coroutine_callable(endpoint):
+                if endpoint_is_async:
                     return await endpoint(*args, **endpoint_kwargs)
                 else:
                     return endpoint(*args, **endpoint_kwargs)
