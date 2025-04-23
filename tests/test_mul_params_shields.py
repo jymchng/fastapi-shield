@@ -1,7 +1,17 @@
 from typing import Any
 
-from fastapi import (BackgroundTasks, Body, Cookie, Depends, FastAPI, Header,
-                     HTTPException, Path, Query, Response)
+from fastapi import (
+    BackgroundTasks,
+    Body,
+    Cookie,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Response,
+)
 from fastapi.requests import HTTPConnection
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
@@ -123,9 +133,7 @@ async def protected(
     background_tasks: BackgroundTasks,
     http: HTTPConnection,
     product_three: Product,
-    authenticated_user: dict[str, Any] = ShieldedDepends(
-        get_user
-    ),
+    authenticated_user: dict[str, Any] = ShieldedDepends(get_user),
     product: Product = Body(embed=True),
     product_two: Product = Body(embed=True),
     j: str = Query(),

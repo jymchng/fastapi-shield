@@ -8,9 +8,14 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute, compile_path
 
 from fastapi_shield.shield import (
-    IS_SHIELDED_ENDPOINT_KEY, gather_signature_params_across_wrapped_endpoints)
-from fastapi_shield.utils import (get_body_field_from_dependant,
-                                  merge_dedup_seq_params, rearrange_params)
+    IS_SHIELDED_ENDPOINT_KEY,
+    gather_signature_params_across_wrapped_endpoints,
+)
+from fastapi_shield.utils import (
+    get_body_field_from_dependant,
+    merge_dedup_seq_params,
+    rearrange_params,
+)
 
 
 @contextmanager

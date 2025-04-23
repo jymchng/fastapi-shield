@@ -9,9 +9,13 @@ from typing import Any, Callable, Optional, Sequence
 from fastapi import HTTPException, Request, params
 from fastapi._compat import ModelField, Undefined
 from fastapi.dependencies.models import Dependant
-from fastapi.dependencies.utils import (_should_embed_body_fields,
-                                        get_body_field, get_dependant,
-                                        get_flat_dependant, solve_dependencies)
+from fastapi.dependencies.utils import (
+    _should_embed_body_fields,
+    get_body_field,
+    get_dependant,
+    get_flat_dependant,
+    solve_dependencies,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import compile_path, get_name
 

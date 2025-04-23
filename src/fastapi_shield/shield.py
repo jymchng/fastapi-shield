@@ -1,8 +1,7 @@
 from contextlib import asynccontextmanager
 from functools import cached_property, wraps
 from inspect import Parameter, Signature, signature
-from typing import (Annotated, Any, Callable, Generic, Optional, Sequence,
-                    Tuple, Union)
+from typing import Annotated, Any, Callable, Generic, Optional, Sequence, Tuple, Union
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi._compat import _normalize_errors
@@ -14,8 +13,11 @@ from typing_extensions import Doc
 from fastapi_shield.consts import IS_SHIELDED_ENDPOINT_KEY
 from fastapi_shield.typing import EndPointFunc, U
 from fastapi_shield.utils import (
-    get_solved_dependencies, merge_dedup_seq_params,
-    prepend_request_to_signature_params_of_function, rearrange_params)
+    get_solved_dependencies,
+    merge_dedup_seq_params,
+    prepend_request_to_signature_params_of_function,
+    rearrange_params,
+)
 
 
 class ShieldDepends(Generic[U], Security):
@@ -185,8 +187,14 @@ class Shield(Generic[U]):
         assert callable(endpoint), "`endpoint` must be callable"
 
         endpoint_params = signature(endpoint).parameters
-        dependency_cache = {}
         endpoint_is_async = is_coroutine_callable(endpoint)
+        shielded_depends_in_endpoint = {
+            param.name: param.default
+            for param in endpoint_params.values()
+            if isinstance(param.default, ShieldDepends)
+        }
+
+        dependency_cache = {}
 
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
@@ -219,14 +227,15 @@ class Shield(Generic[U]):
                     )
                     raise validation_error
                 kwargs.update(endpoint_solved_dependencies.values)
-                (
-                    args,
-                    endpoint_kwargs,
-                ) = await inject_authenticated_entities_into_args_kwargs(
-                    obj, *args, **kwargs
+                resolved_shielded_depends = (
+                    await inject_authenticated_entities_into_args_kwargs(
+                        obj, request, **shielded_depends_in_endpoint
+                    )
                 )
                 endpoint_kwargs = {
-                    k: v for k, v in endpoint_kwargs.items() if k in endpoint_params
+                    k: v
+                    for k, v in {**kwargs, **resolved_shielded_depends}.items()
+                    if k in endpoint_params
                 }
                 if endpoint_is_async:
                     return await endpoint(*args, **endpoint_kwargs)
@@ -252,23 +261,14 @@ class Shield(Generic[U]):
 
 
 async def inject_authenticated_entities_into_args_kwargs(
-    obj, *args, **kwargs
-) -> Tuple[Tuple[Any, ...], dict[str, Any]]:
-    authenticated_depends = search_args_kwargs_for_authenticated_depends(
-        *args, **kwargs
-    )
-    for idx_kw, arg_kwargs in authenticated_depends:
+    obj, request: Request, **kwargs: ShieldDepends
+) -> dict[str, Any]:
+    for idx_kw, arg_kwargs in kwargs.items():
         if idx_kw is not None:
             if arg_kwargs.unblocked:
                 raise HTTPException(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Already unblocked",
-                )
-            request = kwargs.get("request")
-            if not request:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail="Request is required",
                 )
             solved_dependencies, body = await arg_kwargs.resolve_dependencies(request)
             if solved_dependencies.errors:
@@ -285,12 +285,10 @@ async def inject_authenticated_entities_into_args_kwargs(
                 new_arg_kwargs is None
                 and arg_kwargs.first_param.annotation is not Optional
             ):
-                return args, kwargs
-            if isinstance(idx_kw, int):
-                args = args[:idx_kw] + (new_arg_kwargs,) + args[idx_kw + 1 :]
+                return kwargs
             if isinstance(idx_kw, str):
                 kwargs[idx_kw] = new_arg_kwargs
-    return args, kwargs
+    return kwargs
 
 
 def search_args_kwargs_for_authenticated_depends(*args, **kwargs):
