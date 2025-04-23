@@ -28,7 +28,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
-exclude = ["examples", "docs", "scripts", "scripts/*", "noxfile.py"]
+exclude = ["examples", "docs", "scripts", "scripts/*", "noxfile.py", "tests"]
 
 [dependency-groups]
 dev = [

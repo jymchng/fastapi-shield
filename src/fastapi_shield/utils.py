@@ -17,7 +17,7 @@ from fastapi.dependencies.utils import (
     solve_dependencies,
 )
 from fastapi.exceptions import RequestValidationError
-from fastapi.routing import compile_path, get_name
+from fastapi.routing import get_name
 
 
 def generate_unique_id_for_fastapi_shield(dependant: Dependant, path_format: str):

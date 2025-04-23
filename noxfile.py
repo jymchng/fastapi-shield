@@ -453,7 +453,7 @@ def format(session: Session):
 
 @session(dependency_group="dev")
 def check(session: Session):
-    session.run("uv", "tool", "run", "ruff", "check", ".")
+    session.run("uv", "tool", "run", "ruff", "check", ".", "--fix")
 
 
 @session(dependency_group="dev")

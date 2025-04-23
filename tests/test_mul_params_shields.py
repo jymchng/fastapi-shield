@@ -4,7 +4,6 @@ from fastapi import (
     BackgroundTasks,
     Body,
     Cookie,
-    Depends,
     FastAPI,
     Header,
     HTTPException,

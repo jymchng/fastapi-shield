@@ -1,11 +1,8 @@
 import os
-import shutil
-import tempfile
-from io import BytesIO
 from pathlib import Path
 from typing import List
 
-from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Header, UploadFile
 from fastapi.testclient import TestClient
 
 from fastapi_shield.shield import Shield, ShieldedDepends

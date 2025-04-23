@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from functools import cached_property, wraps
 from inspect import Parameter, Signature, signature
-from typing import Annotated, Any, Callable, Generic, Optional, Sequence, Tuple, Union
+from typing import Annotated, Any, Callable, Generic, Optional, Sequence, Union
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi._compat import _normalize_errors
@@ -10,10 +10,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.params import Security
 from typing_extensions import Doc
 
-from fastapi_shield.consts import IS_SHIELDED_ENDPOINT_KEY
+# Import directly to make patching work correctly in tests
+import fastapi_shield.utils
+from fastapi_shield.consts import (
+    IS_SHIELDED_ENDPOINT_KEY,
+    SHIELDED_ENDPOINT_PATH_FORMAT_KEY,
+)
 from fastapi_shield.typing import EndPointFunc, U
 from fastapi_shield.utils import (
-    get_path_format_from_request_for_endpoint,
     get_solved_dependencies,
     merge_dedup_seq_params,
     prepend_request_to_signature_params_of_function,
@@ -211,9 +215,17 @@ class Shield(Generic[U]):
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong
                 request: Request = kwargs.get("request")
-                
-                path_format = get_path_format_from_request_for_endpoint(request)
-                
+
+                if not hasattr(wrapper, SHIELDED_ENDPOINT_PATH_FORMAT_KEY):
+                    path_format = (
+                        fastapi_shield.utils.get_path_format_from_request_for_endpoint(
+                            request
+                        )
+                    )
+                else:
+                    path_format = getattr(wrapper, SHIELDED_ENDPOINT_PATH_FORMAT_KEY)
+                setattr(endpoint, SHIELDED_ENDPOINT_PATH_FORMAT_KEY, path_format)
+
                 if not request:
                     raise HTTPException(
                         status.HTTP_400_BAD_REQUEST,
@@ -259,7 +271,6 @@ class Shield(Generic[U]):
             IS_SHIELDED_ENDPOINT_KEY,
             True,
         )
-        setattr(wrapper, "__endpoint_params__", endpoint_params)
         return wrapper
 
 
@@ -273,7 +284,9 @@ async def inject_authenticated_entities_into_args_kwargs(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Already unblocked",
                 )
-            solved_dependencies, body = await arg_kwargs.resolve_dependencies(request, path_format)
+            solved_dependencies, body = await arg_kwargs.resolve_dependencies(
+                request, path_format
+            )
             if solved_dependencies.errors:
                 validation_error = RequestValidationError(
                     _normalize_errors(solved_dependencies.errors), body=body
