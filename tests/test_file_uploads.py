@@ -1,12 +1,15 @@
-from fastapi import BackgroundTasks, File, FastAPI, Header, HTTPException, UploadFile
-from fastapi.testclient import TestClient
 import os
-import tempfile
-from fastapi_shield.shield import Shield, ShieldedDepends
-from typing import List
-from pathlib import Path
 import shutil
+import tempfile
 from io import BytesIO
+from pathlib import Path
+from typing import List
+
+from fastapi import (BackgroundTasks, FastAPI, File, Header, HTTPException,
+                     UploadFile)
+from fastapi.testclient import TestClient
+
+from fastapi_shield.shield import Shield, ShieldedDepends
 
 # Create a FastAPI app
 app = FastAPI()

@@ -1,24 +1,19 @@
-import json
-from fastapi import HTTPException, Request
-from typing import Any, Callable, Optional
-from fastapi.exceptions import RequestValidationError
-from inspect import Parameter, signature
-from fastapi.dependencies.models import Dependant
-from fastapi.dependencies.utils import (
-    _should_embed_body_fields,
-    get_body_field,
-    get_dependant,
-    get_flat_dependant,
-    solve_dependencies,
-)
-import re
-from fastapi.routing import compile_path, get_name
-from fastapi._compat import Undefined, ModelField
-from contextlib import AsyncExitStack
-from fastapi import params
 import email.message
-from typing import Sequence
+import json
+import re
 from collections.abc import Iterator
+from contextlib import AsyncExitStack
+from inspect import Parameter, signature
+from typing import Any, Callable, Optional, Sequence
+
+from fastapi import HTTPException, Request, params
+from fastapi._compat import ModelField, Undefined
+from fastapi.dependencies.models import Dependant
+from fastapi.dependencies.utils import (_should_embed_body_fields,
+                                        get_body_field, get_dependant,
+                                        get_flat_dependant, solve_dependencies)
+from fastapi.exceptions import RequestValidationError
+from fastapi.routing import compile_path, get_name
 
 
 def generate_unique_id_for_fastapi_shield(dependant: Dependant, path_format: str):

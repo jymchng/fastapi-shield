@@ -1,12 +1,13 @@
-from functools import wraps
 import contextlib
-import nox
-from nox.project import load_toml
-import nox.command
-from nox.sessions import Session
-from nox import session as nox_session
-import shutil
 import os
+import shutil
+from functools import wraps
+
+import nox
+import nox.command
+from nox import session as nox_session
+from nox.project import load_toml
+from nox.sessions import Session
 
 try:
     import tomli as tomllib
@@ -18,17 +19,8 @@ except ImportError:
 TYPE_CHECKING = False
 TYPE_EXTENSIONS_IMPORTED = False
 if TYPE_CHECKING:
-    from typing import (
-        Any,
-        Callable,
-        Sequence,
-        TypedDict,
-        Union,
-        Optional,
-        Dict,
-        overload,
-        Literal,
-    )
+    from typing import (Any, Callable, Dict, Literal, Optional, Sequence,
+                        TypedDict, Union, overload)
 
     try:
         from typing_extensions import NotRequired
@@ -38,8 +30,8 @@ if TYPE_CHECKING:
         pass
 
 if TYPE_EXTENSIONS_IMPORTED and TYPE_CHECKING:
-    from typing_extensions import ParamSpec
     from nox.sessions import Func
+    from typing_extensions import ParamSpec
 
     P = ParamSpec("P")
 
@@ -431,9 +423,8 @@ def test_development(session: Session):
 def format(session: Session):
     # clang-format only c files
     # use glob to find all c files
-    import os
     import glob
-
+    import os
     # Check if the directory exists before trying to format files
     # Find the src directory or use parent directory
     import pathlib
@@ -500,9 +491,9 @@ def benchmark(session: Session):
 def list_dist_files(session: Session):
     """List all files packaged in the latest distribution."""
     import glob
+    import os
     import zipfile
     from pathlib import Path
-    import os
 
     # Find the latest wheel file in the dist directory
     wheel_files = sorted(
@@ -585,6 +576,7 @@ def test_client_install_run(session: Session):
     # Find the tarball with the largest semver version
     import glob
     import re
+
     from packaging import version
 
     # Get all tarball files

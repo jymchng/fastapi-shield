@@ -6,11 +6,12 @@
 # ///
 
 
-from fastapi import FastAPI, HTTPException, Request, Depends
 from functools import wraps
-from typing import Callable
-from fastapi.testclient import TestClient
 from inspect import Parameter, signature
+from typing import Callable
+
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.testclient import TestClient
 
 FAKE_DB = {
     "user1": {

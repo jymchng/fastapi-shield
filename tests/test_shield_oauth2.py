@@ -1,12 +1,13 @@
-from fastapi import FastAPI, Depends, HTTPException, Path
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.testclient import TestClient
-from fastapi_shield.shield import Shield, ShieldedDepends
-from pydantic import BaseModel
-from passlib.context import CryptContext
 from typing import List
 
 import jwt
+from fastapi import Depends, FastAPI, HTTPException, Path
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.testclient import TestClient
+from passlib.context import CryptContext
+from pydantic import BaseModel
+
+from fastapi_shield.shield import Shield, ShieldedDepends
 
 # JWT configuration
 SECRET_KEY = "test-secret-key-for-jwt-tokens-do-not-use-in-production"

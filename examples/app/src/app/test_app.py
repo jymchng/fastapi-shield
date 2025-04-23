@@ -1,7 +1,6 @@
-from fastapi.testclient import TestClient
-
 from app import app
 from database import PRODUCTS_DB
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

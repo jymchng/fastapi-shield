@@ -1,28 +1,13 @@
 import json
-from fastapi import (
-    Body,
-    FastAPI,
-    HTTPException,
-    Request,
-    Depends,
-    Query,
-    Header,
-    BackgroundTasks,
-    Response,
-    Security,
-    WebSocket,
-    Path,
-    File,
-    UploadFile,
-    Form,
-    Cookie,
-)
+import os
+import sys
 from functools import wraps
 from inspect import Parameter, signature
-import sys
-import os
 from pathlib import Path as PathLibPath
 
+from fastapi import (BackgroundTasks, Body, Cookie, Depends, FastAPI, File,
+                     Form, Header, HTTPException, Path, Query, Request,
+                     Response, Security, UploadFile, WebSocket)
 from fastapi.requests import HTTPConnection
 from fastapi.testclient import TestClient
 
@@ -30,20 +15,15 @@ from fastapi_shield.utils import get_solved_dependencies
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from fastapi import (
-    BackgroundTasks,
-    Body,
-    FastAPI,
-    HTTPException,
-    Header,
-    Path,
-    Depends,
-    Request,
-)
 from typing import Any, Callable, List
+
+from fastapi import (BackgroundTasks, Body, Depends, FastAPI, Header,
+                     HTTPException, Path, Request)
 from pydantic import BaseModel
+
+from fastapi_shield.consts import (IS_SHIELDED_ENDPOINT_KEY,
+                                   SHIELDED_ENDPOINT_KEY)
 from fastapi_shield.shield import ShieldedDepends, shield
-from fastapi_shield.consts import IS_SHIELDED_ENDPOINT_KEY, SHIELDED_ENDPOINT_KEY
 
 
 @shield

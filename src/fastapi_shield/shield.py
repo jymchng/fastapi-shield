@@ -1,35 +1,21 @@
-from fastapi.exceptions import RequestValidationError
-from typing_extensions import Doc
-from fastapi import Request, HTTPException, Response, status
-from fastapi.dependencies.utils import (
-    is_coroutine_callable,
-)
-from fastapi._compat import _normalize_errors
 from contextlib import asynccontextmanager
-from fastapi.params import Security
+from functools import cached_property, wraps
+from inspect import Parameter, Signature, signature
+from typing import (Annotated, Any, Callable, Generic, Optional, Sequence,
+                    Tuple, Union)
 
-from fastapi_shield.utils import (
-    rearrange_params,
-    prepend_request_to_signature_params_of_function,
-    merge_dedup_seq_params,
-    get_solved_dependencies,
-)
+from fastapi import HTTPException, Request, Response, status
+from fastapi._compat import _normalize_errors
+from fastapi.dependencies.utils import is_coroutine_callable
+from fastapi.exceptions import RequestValidationError
+from fastapi.params import Security
+from typing_extensions import Doc
+
 from fastapi_shield.consts import IS_SHIELDED_ENDPOINT_KEY
 from fastapi_shield.typing import EndPointFunc, U
-
-from functools import cached_property, wraps
-from inspect import signature, Signature, Parameter
-
-from typing import (
-    Annotated,
-    Optional,
-    Callable,
-    Any,
-    Generic,
-    Sequence,
-    Tuple,
-    Union,
-)
+from fastapi_shield.utils import (
+    get_solved_dependencies, merge_dedup_seq_params,
+    prepend_request_to_signature_params_of_function, rearrange_params)
 
 
 class ShieldDepends(Generic[U], Security):

@@ -1,8 +1,11 @@
-from fastapi import Header
-from fastapi_shield import shield, ShieldedDepends
 from typing import List, Optional
-from database import validate_token, get_token_data, get_user_by_username
+
+from database import get_token_data, get_user_by_username, validate_token
+from fastapi import Header
 from models import User
+
+from fastapi_shield import ShieldedDepends, shield
+
 
 # Authentication shield that validates the token in the Authorization header
 @shield

@@ -1,20 +1,12 @@
-from fastapi import (
-    BackgroundTasks,
-    Body,
-    Cookie,
-    FastAPI,
-    HTTPException,
-    Path,
-    Header,
-    Depends,
-    Query,
-    Response,
-)
+from typing import Any
+
+from fastapi import (BackgroundTasks, Body, Cookie, Depends, FastAPI, Header,
+                     HTTPException, Path, Query, Response)
 from fastapi.requests import HTTPConnection
 from fastapi.testclient import TestClient
-from fastapi_shield.shield import ShieldedDepends, shield
-from typing import Any
 from pydantic import BaseModel
+
+from fastapi_shield.shield import ShieldedDepends, shield
 
 
 class Product(BaseModel):

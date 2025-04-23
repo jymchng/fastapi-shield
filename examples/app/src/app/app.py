@@ -1,20 +1,11 @@
-from fastapi import FastAPI, HTTPException, Depends, Path, Query, Body, status
-from fastapi_shield import ShieldedDepends
+from database import (TOKENS_DB, get_all_products, get_product,
+                      get_user_by_username)
+from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, status
+from models import Product, TokenResponse, User
+from shields import (admin_required, auth_shield, get_authenticated_user,
+                     get_current_user_from_token, user_required)
 
-from models import Product, User, TokenResponse
-from database import (
-    get_product, 
-    get_all_products, 
-    get_user_by_username, 
-    TOKENS_DB
-)
-from shields import (
-    auth_shield, 
-    admin_required,
-    get_current_user_from_token, 
-    user_required, 
-    get_authenticated_user
-)
+from fastapi_shield import ShieldedDepends
 
 app = FastAPI(
     title="FastAPI Shield Example",

@@ -1,12 +1,11 @@
-from fastapi import Depends, FastAPI, HTTPException, Header, Path, Request
-from fastapi.testclient import TestClient
-from fastapi_shield import (
-    Shield,
-    ShieldedDepends,
-)
-from fastapi import status
-from pydantic import BaseModel
 from typing import Optional
+
+from fastapi import (Depends, FastAPI, Header, HTTPException, Path, Request,
+                     status)
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
+from fastapi_shield import Shield, ShieldedDepends
 
 
 class User(BaseModel):

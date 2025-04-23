@@ -1,4 +1,5 @@
 from inspect import Parameter, Signature
+
 from fastapi_shield.utils import rearrange_params
 
 

@@ -1,20 +1,16 @@
-from fastapi import FastAPI
-from fastapi.openapi.utils import get_openapi
-from functools import wraps
 from contextlib import contextmanager
-from inspect import signature, Signature
-from fastapi.routing import APIRoute
-from fastapi_shield.shield import (
-    IS_SHIELDED_ENDPOINT_KEY,
-    gather_signature_params_across_wrapped_endpoints,
-)
+from functools import wraps
+from inspect import Signature, signature
+
+from fastapi import FastAPI
 from fastapi.dependencies.utils import get_dependant
-from fastapi.routing import compile_path
-from fastapi_shield.utils import (
-    get_body_field_from_dependant,
-    merge_dedup_seq_params,
-    rearrange_params,
-)
+from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute, compile_path
+
+from fastapi_shield.shield import (
+    IS_SHIELDED_ENDPOINT_KEY, gather_signature_params_across_wrapped_endpoints)
+from fastapi_shield.utils import (get_body_field_from_dependant,
+                                  merge_dedup_seq_params, rearrange_params)
 
 
 @contextmanager

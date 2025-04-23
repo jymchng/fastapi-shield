@@ -1,18 +1,13 @@
-from fastapi import (
-    BackgroundTasks,
-    Body,
-    FastAPI,
-    HTTPException,
-    Header,
-    Path,
-    Depends,
-)
+from threading import Event
 from typing import Any
+
+import pytest
+from fastapi import (BackgroundTasks, Body, Depends, FastAPI, Header,
+                     HTTPException, Path)
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+
 from fastapi_shield.shield import ShieldedDepends, shield
-from threading import Event
-import pytest
 
 # Create global variables to track task execution
 task_results: dict[str, str] = {}

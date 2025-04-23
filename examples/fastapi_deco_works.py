@@ -6,28 +6,24 @@
 # ///
 
 
-import json
-from fastapi import Body, FastAPI, HTTPException, Request, Depends
-from functools import wraps
-from typing import Any, Callable, Optional
-from fastapi.exceptions import RequestValidationError
-from fastapi.testclient import TestClient
-from inspect import Parameter, signature
-from pydantic import BaseModel
-from fastapi.dependencies.models import Dependant
-from fastapi.dependencies.utils import (
-    _should_embed_body_fields,
-    get_body_field,
-    get_dependant,
-    get_flat_dependant,
-    solve_dependencies,
-)
-import re
-from fastapi.routing import compile_path, get_name
-from fastapi._compat import Undefined, ModelField
-from contextlib import AsyncExitStack
-from fastapi import params
 import email.message
+import json
+import re
+from contextlib import AsyncExitStack
+from functools import wraps
+from inspect import Parameter, signature
+from typing import Any, Callable, Optional
+
+from fastapi import Body, Depends, FastAPI, HTTPException, Request, params
+from fastapi._compat import ModelField, Undefined
+from fastapi.dependencies.models import Dependant
+from fastapi.dependencies.utils import (_should_embed_body_fields,
+                                        get_body_field, get_dependant,
+                                        get_flat_dependant, solve_dependencies)
+from fastapi.exceptions import RequestValidationError
+from fastapi.routing import compile_path, get_name
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
 
 FAKE_USER_DB = {
     "user1": {
