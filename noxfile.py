@@ -648,3 +648,8 @@ def no_print(session: Session):
     if output:
         session.error("Found print statements in the code")
         raise SystemExit(1)
+
+
+@session(reuse_venv=False)
+def test_all_vers(session: Session):
+    session.run("bash", "tests/build_test_pyvers_docker_images.sh", external=True)
