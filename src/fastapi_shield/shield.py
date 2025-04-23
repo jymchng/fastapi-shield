@@ -233,9 +233,8 @@ class Shield(Generic[U]):
                     )
                 )
                 endpoint_kwargs = {
-                    k: v
-                    for k, v in {**kwargs, **resolved_shielded_depends}.items()
-                    if k in endpoint_params
+                    k: resolved_shielded_depends.get(k) or kwargs.get(k)
+                    for k in endpoint_params
                 }
                 if endpoint_is_async:
                     return await endpoint(*args, **endpoint_kwargs)
