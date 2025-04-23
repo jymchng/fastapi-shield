@@ -13,6 +13,7 @@ from typing_extensions import Doc
 from fastapi_shield.consts import IS_SHIELDED_ENDPOINT_KEY
 from fastapi_shield.typing import EndPointFunc, U
 from fastapi_shield.utils import (
+    get_path_format_from_request_for_endpoint,
     get_solved_dependencies,
     merge_dedup_seq_params,
     prepend_request_to_signature_params_of_function,
@@ -95,9 +96,10 @@ class ShieldDepends(Generic[U], Security):
         """Generate the rearranged signature for FastAPI solving."""
         return Signature(self.rest_params)
 
-    async def resolve_dependencies(self, request: Request):
+    async def resolve_dependencies(self, request: Request, path_format: str):
         solved_dependencies = await get_solved_dependencies(
             request=request,
+            path_format=path_format,
             endpoint=self,
             dependency_cache={},
         )
@@ -209,7 +211,9 @@ class Shield(Generic[U]):
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong
                 request: Request = kwargs.get("request")
-
+                
+                path_format = get_path_format_from_request_for_endpoint(request)
+                
                 if not request:
                     raise HTTPException(
                         status.HTTP_400_BAD_REQUEST,
@@ -218,7 +222,7 @@ class Shield(Generic[U]):
                 # because `solve_dependencies` is async, we need to await it
                 # hence no point to split returning `wrapper` into two functions, one sync and one async
                 endpoint_solved_dependencies, body = await get_solved_dependencies(
-                    request, endpoint, dependency_cache
+                    request, path_format, endpoint, dependency_cache
                 )
                 if endpoint_solved_dependencies.errors:
                     validation_error = RequestValidationError(
@@ -229,7 +233,7 @@ class Shield(Generic[U]):
                 kwargs.update(endpoint_solved_dependencies.values)
                 resolved_shielded_depends = (
                     await inject_authenticated_entities_into_args_kwargs(
-                        obj, request, **shielded_depends_in_endpoint
+                        obj, request, path_format, **shielded_depends_in_endpoint
                     )
                 )
                 endpoint_kwargs = {
@@ -260,7 +264,7 @@ class Shield(Generic[U]):
 
 
 async def inject_authenticated_entities_into_args_kwargs(
-    obj, request: Request, **kwargs: ShieldDepends
+    obj, request: Request, path_format: str, **kwargs: ShieldDepends
 ) -> dict[str, Any]:
     for idx_kw, arg_kwargs in kwargs.items():
         if idx_kw is not None:
@@ -269,7 +273,7 @@ async def inject_authenticated_entities_into_args_kwargs(
                     status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Already unblocked",
                 )
-            solved_dependencies, body = await arg_kwargs.resolve_dependencies(request)
+            solved_dependencies, body = await arg_kwargs.resolve_dependencies(request, path_format)
             if solved_dependencies.errors:
                 validation_error = RequestValidationError(
                     _normalize_errors(solved_dependencies.errors), body=body
