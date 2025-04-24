@@ -1,21 +1,10 @@
 import os
 import sys
 
-from fastapi import (
-    BackgroundTasks,
-    Body,
-    Cookie,
-    FastAPI,
-    Form,
-    Header,
-    HTTPException,
-    Path,
-    Query,
-    Response,
-)
+from fastapi import (BackgroundTasks, Body, Cookie, FastAPI, Form, Header,
+                     HTTPException, Path, Query, Response)
 from fastapi.requests import HTTPConnection
 from fastapi.testclient import TestClient
-
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 

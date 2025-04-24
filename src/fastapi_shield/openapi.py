@@ -8,9 +8,7 @@ from fastapi.dependencies.utils import get_dependant
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute, compile_path
 
-from fastapi_shield.shield import (
-    IS_SHIELDED_ENDPOINT_KEY,
-)
+from fastapi_shield.shield import IS_SHIELDED_ENDPOINT_KEY
 from fastapi_shield.typing import EndPointFunc
 from fastapi_shield.utils import (
     get_body_field_from_dependant,

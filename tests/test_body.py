@@ -2,7 +2,8 @@ from threading import Event
 from typing import Any
 
 import pytest
-from fastapi import BackgroundTasks, Body, Depends, FastAPI, Header, HTTPException, Path
+from fastapi import (BackgroundTasks, Body, Depends, FastAPI, Header,
+                     HTTPException, Path)
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 

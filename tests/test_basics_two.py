@@ -1,6 +1,7 @@
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, status
+from fastapi import (Depends, FastAPI, Header, HTTPException, Path, Request,
+                     status)
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
