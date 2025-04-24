@@ -71,14 +71,13 @@ class ShieldDepends(Generic[U], Security):
             yield from rest
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(unblocked={self.unblocked}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"
+        return f"{type(self).__name__}(unblocked={self.unblocked}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"  # pylint: disable=line-too-long
 
     async def __call__(self, *args, **kwargs):
         if self.unblocked:
             if is_coroutine_callable(self.shielded_dependency):
                 return await self.shielded_dependency(*args, **kwargs)
-            else:
-                return self.shielded_dependency(*args, **kwargs)
+            return self.shielded_dependency(*args, **kwargs)
         return self
 
     @property
@@ -186,8 +185,7 @@ class Shield(Generic[U]):
     def _raise_or_return_default_response(self):
         if self.auto_error:
             raise self._exception_to_raise_if_fail
-        else:
-            return self._default_response_to_return_if_fail
+        return self._default_response_to_return_if_fail
 
     def __call__(self, endpoint: EndPointFunc) -> EndPointFunc:
         assert callable(endpoint), "`endpoint` must be callable"
@@ -254,8 +252,7 @@ class Shield(Generic[U]):
                 }
                 if endpoint_is_async:
                     return await endpoint(*args, **endpoint_kwargs)
-                else:
-                    return endpoint(*args, **endpoint_kwargs)
+                return endpoint(*args, **endpoint_kwargs)
 
             return self._raise_or_return_default_response()
 
@@ -266,8 +263,8 @@ class Shield(Generic[U]):
                 )
             )
         )
-        getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or setattr(
-            wrapper,
+        _ = getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or setattr(
+            endpoint,
             IS_SHIELDED_ENDPOINT_KEY,
             True,
         )

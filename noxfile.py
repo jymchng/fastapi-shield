@@ -451,9 +451,14 @@ def format(session: Session):
     session.run("uv", "tool", "run", "clang-format", "-i", *c_files)
 
 
-@session(dependency_group="dev")
+@session(dependency_group="dev", default_posargs=["check", ".", "--fix"])
 def check(session: Session):
-    session.run("uv", "tool", "run", "ruff", "check", ".", "--fix")
+    session.run("uv", "tool", "run", "ruff")
+    
+
+@session(dependency_group="dev", default_posargs=["src", "--rcfile", MANIFEST_FILENAME])
+def lint(session: Session):
+    session.run("uv", "tool", "run", "pylint")
 
 
 @session(dependency_group="dev")

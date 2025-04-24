@@ -40,13 +40,13 @@ def get_body_field_from_dependant(
     return body_field, embed_body_fields
 
 
-async def get_body_from_request(
+async def get_body_from_request(  # pylint: disable=too-many-nested-blocks,too-many-branches
     request: Request, body_field: Optional[ModelField] = None
 ):
     body: Any = None
     is_body_form = body_field and isinstance(body_field.field_info, params.Form)
     async with AsyncExitStack() as file_stack:
-        try:
+        try:  # pylint: disable=too-many-nested-blocks
             body: Any = None
             if body_field:
                 if is_body_form:
@@ -152,7 +152,7 @@ def prepend_request_to_signature_params_of_function(
     yield from new_signature.parameters.values()
 
 
-def rearrange_params(params: Iterator[Parameter]):
+def rearrange_params(iter_params: Iterator[Parameter]):
     """
     Perfectly optimized parameter rearrangement with:
     - Direct iterator consumption
@@ -171,9 +171,6 @@ def rearrange_params(params: Iterator[Parameter]):
     VAR_KW = Parameter.VAR_KEYWORD
     EMPTY = Parameter.empty
 
-    # Convert params to an iterator to consume only once
-    params = iter(params)
-
     # Define kind order mapping
     ORDER = (
         POS_ONLY,  # 0: POSITIONAL_ONLY
@@ -189,7 +186,7 @@ def rearrange_params(params: Iterator[Parameter]):
 
     # First pass: process params and create buffer1
     buffer1 = []
-    for p in params:
+    for p in iter_params:
         kind = p.kind
         if kind == POS_KW:
             # Special handling for POSITIONAL_OR_KEYWORD

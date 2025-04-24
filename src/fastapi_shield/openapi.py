@@ -30,7 +30,10 @@ def switch_routes(app: FastAPI):
             if isinstance(route, APIRoute):
                 shielded_endpoint = route.endpoint
 
-                @wraps(shielded_endpoint)
+                # okay to disable cell-var-from-loop from pylint
+                # because we're not using the `shielded_endpoint`
+                # in the closure `mocked_endpoint_signature`
+                @wraps(shielded_endpoint)  # pylint: disable=cell-var-from-loop
                 def mocked_endpoint_signature(*_, **__):
                     return ...
 

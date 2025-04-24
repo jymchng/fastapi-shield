@@ -97,6 +97,15 @@ async def protected_endpoint(db: Dict[str, Any]=Depends(get_db)):
     }
 ```
 
+```python
+from fastapi.testclient import TestClient
+
+client = TestClient(app)
+
+def test_unprotected():
+
+    client.get('/')
+
 <div align="center">
   <img src="./assets/pictures/IMG_20250423_003431_018.jpg" alt="Shield Congratulations" width="40%">
   

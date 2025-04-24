@@ -30,6 +30,24 @@ build-backend = "hatchling.build"
 [tool.ruff]
 exclude = ["examples", "docs", "scripts", "scripts/*", "noxfile.py", "tests"]
 
+[tool.pylint]
+disable = [
+    "C0111",  # missing-docstring
+    "C0103",  # invalid-name
+    "W0511",  # fixme
+    "R0903",  # too-few-public-methods
+    "R0913",  # too-many-arguments
+    "R0914",  # too-many-locals
+    "W0212",  # protected-access
+    "W0703",  # broad-except
+]
+extension-pkg-whitelist = ["pydantic"]
+good-names = ["i", "j", "k", "ex", "Run", "_", "id", "U"]
+max-line-length = 110
+ignore-patterns = ["^\\.#"]
+ignore-paths = ["tests/", "examples/", "docs/", "scripts/"]
+
+
 [dependency-groups]
 dev = [
     "fastapi[standard]>=0.100.1",
@@ -39,6 +57,7 @@ dev = [
     "passlib>=1.7.0",
     "pydantic>=2.0.0",
     "pyjwt>=2.0.0",
+    "pylint>=3.3.6",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "python-multipart>=0.0.5",
