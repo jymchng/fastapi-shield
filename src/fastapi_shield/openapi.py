@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from functools import wraps
 from inspect import Signature, signature
+from typing import Callable, Optional, Union
 
 from fastapi import FastAPI
 from fastapi.dependencies.utils import get_dependant
@@ -9,8 +10,8 @@ from fastapi.routing import APIRoute, compile_path
 
 from fastapi_shield.shield import (
     IS_SHIELDED_ENDPOINT_KEY,
-    gather_signature_params_across_wrapped_endpoints,
 )
+from fastapi_shield.typing import EndPointFunc
 from fastapi_shield.utils import (
     get_body_field_from_dependant,
     merge_dedup_seq_params,
@@ -121,3 +122,35 @@ def patch_get_openapi(app: FastAPI):
         return app.openapi_schema
 
     return patch_openapi
+
+
+def gather_signature_params_across_wrapped_endpoints(maybe_wrapped_fn: EndPointFunc):
+    yield from signature(maybe_wrapped_fn).parameters.values()
+    if hasattr(maybe_wrapped_fn, "__wrapped__"):
+        yield from gather_signature_params_across_wrapped_endpoints(
+            maybe_wrapped_fn.__wrapped__
+        )
+
+
+def patch_shields_for_openapi(
+    endpoint: Optional[EndPointFunc] = None,
+    /,
+    activated_when: Union[Callable[[], bool], bool] = lambda: True,
+):
+    if endpoint is None:
+        return lambda endpoint: patch_shields_for_openapi(
+            endpoint, activated_when=activated_when
+        )
+    if not getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or not (
+        activated_when() if callable(activated_when) else activated_when
+    ):
+        return endpoint
+    signature_params = gather_signature_params_across_wrapped_endpoints(endpoint)
+    endpoint.__signature__ = Signature(
+        rearrange_params(
+            merge_dedup_seq_params(
+                signature_params,
+            )
+        )
+    )
+    return endpoint

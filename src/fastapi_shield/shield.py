@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from functools import cached_property, wraps
 from inspect import Parameter, Signature, signature
-from typing import Annotated, Any, Callable, Generic, Optional, Sequence, Union
+from typing import Annotated, Any, Callable, Generic, Optional, Sequence
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi._compat import _normalize_errors
@@ -166,6 +166,7 @@ class Shield(Generic[U]):
         self._guard_func_is_async = is_coroutine_callable(shield_func)
         self._guard_func_params = signature(shield_func).parameters
         self.name = name or "unknown"
+        self.auto_error = auto_error
         self._exception_to_raise_if_fail = exception_to_raise_if_fail or HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Shield with name `{self.name}` blocks the request",
@@ -180,7 +181,9 @@ class Shield(Generic[U]):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         )
-        self.auto_error = auto_error
+        assert isinstance(self._default_response_to_return_if_fail, Response), (
+            "`default_response_to_return_if_fail` must be an instance of `Response`"
+        )
 
     def _raise_or_return_default_response(self):
         if self.auto_error:
@@ -304,16 +307,6 @@ async def inject_authenticated_entities_into_args_kwargs(
     return kwargs
 
 
-def search_args_kwargs_for_authenticated_depends(*args, **kwargs):
-    for idx, arg in enumerate(args):
-        if isinstance(arg, ShieldDepends):
-            yield (idx, arg)
-    for kw, kwarg in kwargs.items():
-        if isinstance(kwarg, ShieldDepends):
-            yield (kw, kwarg)
-    return ()
-
-
 def shield(
     shield_func: Optional[U] = None,
     /,
@@ -337,35 +330,3 @@ def shield(
         exception_to_raise_if_fail=exception_to_raise_if_fail,
         default_response_to_return_if_fail=default_response_to_return_if_fail,
     )
-
-
-def gather_signature_params_across_wrapped_endpoints(maybe_wrapped_fn: EndPointFunc):
-    yield from signature(maybe_wrapped_fn).parameters.values()
-    if hasattr(maybe_wrapped_fn, "__wrapped__"):
-        yield from gather_signature_params_across_wrapped_endpoints(
-            maybe_wrapped_fn.__wrapped__
-        )
-
-
-def patch_shields_for_openapi(
-    endpoint: Optional[EndPointFunc] = None,
-    /,
-    activated_when: Union[Callable[[], bool], bool] = lambda: True,
-):
-    if endpoint is None:
-        return lambda endpoint: patch_shields_for_openapi(
-            endpoint, activated_when=activated_when
-        )
-    if not getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or not (
-        activated_when() if callable(activated_when) else activated_when
-    ):
-        return endpoint
-    signature_params = gather_signature_params_across_wrapped_endpoints(endpoint)
-    endpoint.__signature__ = Signature(
-        rearrange_params(
-            merge_dedup_seq_params(
-                signature_params,
-            )
-        )
-    )
-    return endpoint
