@@ -33,8 +33,19 @@ A powerful, intuitive, and flexible authentication and authorization library for
 
 # Installation
 
+With `pip`:
 ```bash
 pip install fastapi-shield
+```
+
+With `uv`:
+```bash
+uv add fastapi-shield
+```
+
+With `poetry`:
+```bash
+poetry add fastapi-shield
 ```
 
 # Basic Usage
@@ -137,71 +148,99 @@ We're going to make the `@roles_shield(["user"])`.
 
 But before that, there's one point to note: one of the advantages of `fastapi-shield` is that it enables lazy injection of FastAPI's dependencies.
 
-In the signature of the endpoint: `async def get_all_products(db: Dict[str, Any]=Depends(get_db), username: str=ShieldedDepends(get_username_from_payload))`, the `db: Dict[str, Any]=Depends(get_db)` is only injected after `@roles_shield(["user"])` becomes 'unblocked', i.e. allowing the request to reach the endpoint `get_all_products`. Prior to that, if the request is blocked by any of the decoratored shields, e.g. `@auth_shield` and `@roles_shield(["user"])`, then the FastAPI's dependencies are not injected.
+In the signature of the endpoint: `async def get_all_products(db: Dict[str, Any]=Depends(get_db), username: str=ShieldedDepends(get_username_from_payload))`, the `db: Dict[str, Any]=Depends(get_db)` is only injected after `@roles_shield(["user"])` becomes 'unblocked', i.e. allowing the request to reach the endpoint `get_all_products`.
 
+Prior to that, if the request is blocked by any of the decoratored shields, e.g. `@auth_shield` and `@roles_shield(["user"])`, then the FastAPI's dependencies are not injected. We will discuss this in more detail later, on why this is an advantage compared to other decorators-based libraries.
 
-
-
+Let's see how the `@roles_shield(["user"])` is written.
 
 ```python
-from fastapi import FastAPI, Header
-from fastapi_shield import Shield, ShieldedDepends, shield
+# Create a simple roles shield
+def roles_shield(roles: list[str]):
+    """
+    A shield that validates a list of roles.
+    """
+    
+    @shield
+    def wrapper(payload = ShieldedDepends(get_payload_from_token)):
+        if any(role in payload["roles"] for role in roles):
+            return payload
+        return None
+    
+    return wrapper
+```
 
-app = FastAPI()
+The `roles_shield` function is a shield factory that creates a shield for role-based access control. It takes a list of roles as input and returns a shield function. 
 
-# Create a simple authentication shield
+The inner `wrapper` function of `roles_shield` uses `ShieldedDepends` to get the payload from the token, which contains user information including their roles.
+
+The shield then checks if any of the user's roles match the required roles using the `any()` function with a generator expression. 
+
+If there's a match, it returns the payload, allowing the request to proceed. If no matching role is found, it returns `None`, which blocks the request. 
+
+This pattern demonstrates how shields can be composed and parameterized to create flexible authorization rules. 
+
+### What is `ShieldedDepends`?
+
+`ShieldedDepends` is a mechanism to pass information from a `Shield` to a dependency to retrieve it.
+
+It is a specialized dependency injection class that extends FastAPI's `Security` class. `ShieldedDepends` is used to inject dependencies that should only be resolved if a shield allows the request to proceed. It takes a callable function as its `shielded_dependency` parameter.
+
+The `shielded_dependency` function:
+1. Can be synchronous or asynchronous (coroutine)
+2. Should accept parameters that can be resolved by FastAPI's dependency injection system
+3. Will only be executed when the shield is "unblocked" (when the shield function returns a truthy value)
+4. Can access request information and other dependencies just like regular FastAPI dependencies
+
+### How `ShieldedDepends` Passes Data Between Shields
+
+One powerful feature of `ShieldedDepends` is its ability to pass data between shields in a decorator chain, from top decorator to the lower ones.
+
+When a shield returns a value (other than `None`), that value can be captured and used by subsequent shields, via the `ShieldedDepends` dependencies specified in the function signature of the shield, or by the endpoint function itself via the same mechanism.
+
+When a shield is blocked, the `ShieldedDepends` instance returns itself instead of executing the dependency function, preventing unnecessary computation and database access. This lazy evaluation is one of the key advantages of the `fastapi-shield` library.
+
+For example, in our `get_payload_from_token` function (which is an argument to be passed into `ShieldedDepends` function; seen on the line `def wrapper(payload = ShieldedDepends(get_payload_from_token)): ...`):
+
+```python
+def get_payload_from_token(token: str):
+    if token == "admin_token":
+        return {"username": "Peter", "roles": ["admin", "user"]}
+    elif token == "user_token":
+        return {"username": "John", "roles": ["user"]}
+    return None
+```
+
+The `token` parameter will be passed by the guard function of the `shield` decorating it.
+
+```python
 @shield
 def auth_shield(api_token: str = Header()):
     """
     A basic shield that validates an API token.
     Returns the token if valid, otherwise returns None which blocks the request.
     """
-    if api_token == "valid_token":
+    if api_token in ("admin_token", "user_token"):
         return api_token
     return None
-
-# Create a role-based shield factory
-def roles_required(required_roles: list[str]):
-    @shield
-    def role_shield(token_data: dict = ShieldedDepends(auth_shield)):
-        user_roles = token_data.get("roles", [])
-        if any(role in user_roles for role in required_roles):
-            return token_data
-        return None
-    return role_shield
-
-# Create shortcut shields
-admin_shield = roles_required(["admin"])
-user_shield = roles_required(["user", "admin"])
-
-# Public endpoint
-@app.get("/public")
-async def public_endpoint():
-    return {"message": "This endpoint is public!"}
-
-# Protected endpoint - requires authentication
-@app.get("/protected")
-@auth_shield
-async def protected_endpoint(token: str = ShieldedDepends(lambda t: t)):
-    return {
-        "message": "This endpoint is protected!",
-        "token": token
-    }
-
-# Admin-only endpoint
-@app.get("/admin")
-@auth_shield
-@admin_shield
-async def admin_endpoint():
-    return {"message": "This endpoint is for admins only!"}
-
-# User-level endpoint
-@app.get("/user")
-@auth_shield
-@user_shield
-async def user_endpoint():
-    return {"message": "This endpoint is for users and admins!"}
 ```
+
+The guard function of `auth_shield` returns the `api_token` which is then passed into `get_payload_from_token` shielded dependency function of the `roles_shield`.
+
+```python
+@app.get("/products")
+@auth_shield
+@roles_shield(["user"])
+async def get_all_products(db: Dict[str, Any]=Depends(get_db), username: str=ShieldedDepends(get_username_from_payload)):
+    """Only user with role `user` can get their own product"""
+    products = list(map(lambda name: db["products"][name], db["users"][username]["products"]))
+    return {
+        "message": f"These are your products: {products}",
+    }
+```
+
+The `ShieldedDepends` ensures that the payload is only retrieved if previous shields in the chain (like `auth_shield`) have already passed.
+
 
 ## Advanced Example
 
@@ -254,15 +293,15 @@ Visit our documentation for more details:
 
 FastAPI Shield uses a layered decorator pattern to apply security checks:
 
-1. **Define Shields**: Create functions decorated with `@shield` that validate authentication or authorization
+1. **Define Shields**: Create functions decorated with `@shield` that blocks or passes requests after evaluating the guard function of the shield
 2. **Stack Shields**: Apply multiple shields to endpoints in the desired order
-3. **Access Protected Resources**: Use `ShieldedDepends` to access data from successful shields
+3. **Access Protected Resources**: Use `ShieldedDepends` to access data from successful shields and retrieve dependencies
 4. **Handle Failures**: Customize error responses when shield validation fails
 
 Each shield acts as an independent layer of security that can:
 - Allow the request to continue when it passes validation (returns a value)
-- Block the request when validation fails (returns None)
-- Pass state to dependent shields (via ShieldedDepends)
+- Block the request when validation fails (returns `None`)
+- Pass state to dependent shields (via `ShieldedDepends`)
 
 ## Development
 
@@ -296,7 +335,7 @@ pip install uv
 # Install `nox`
 uv add --dev nox
 
-# Or use `nox` as a tool
+# OR
 uv tool install nox
 
 # Run all tests
