@@ -39,7 +39,7 @@ pip install fastapi-shield
 
 # Basic Usage
 
-## Create your First Shield
+## 🛡️ Create your First Shield
 
 Let's create a simple `@auth_shield` to shield against unauthenticated requests! 🛡️
 
@@ -54,7 +54,7 @@ def auth_shield(api_token: str = Header()):
     A basic shield that validates an API token.
     Returns the token if valid, otherwise returns None which blocks the request.
     """
-    if api_token == "valid_token":
+    if api_token in ("admin_token", "user_token"):
         return api_token
     return None
 ```
@@ -78,22 +78,15 @@ Now let's see how our shield works in the wild! 🚀 When a user tries to access
 
 ```python
 from fastapi import FastAPI
-from db import get_db
 
 app = FastAPI()
 
-# Public endpoint
-@app.get("/public")
-async def public_endpoint():
-    return {"message": "This endpoint is public!"}
-
 # Protected endpoint - requires authentication
-@app.get("/protected")
+@app.get("/protected/{name}")
 @auth_shield # apply `@auth_shield`
-async def protected_endpoint(db: Dict[str, Any]=Depends(get_db)):
-    # `get_db` is only injected by FastAPI **after** the request made it through the `@auth_shield`!
+async def protected_endpoint(name: str):
     return {
-        "message": "This endpoint is protected!",
+        "message": f"Hello {name}. This endpoint is protected!",
     }
 ```
 
@@ -102,9 +95,21 @@ from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
-def test_unprotected():
+def test_protected():
+    client = TestClient(app)
+    response = client.get("/protected/John", headers={"API-TOKEN": "valid_token"})
+    assert response.status_code == 200
+    assert response.json() == {"message": "Hello John. This endpoint is protected!"}
 
-    client.get('/')
+
+def test_protected_unauthorized():
+    client = TestClient(app)
+    response = client.get("/protected/John", headers={"API-TOKEN": "invalid_token"})
+    assert response.status_code == 500
+    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+```
+
+From the above, we can see how the shield works in practice. The `auth_shield` decorator is applied to our endpoint, checking the API token in the request headers before allowing access to the protected endpoint. When a valid token is provided, the request proceeds normally and returns a friendly greeting. However, when an invalid token is sent, the shield blocks the request, returning a 500 error with a message indicating that the shield has prevented access. This demonstrates the power of shields as a clean, declarative way to implement authentication in FastAPI applications without cluttering your endpoint logic with authorization checks.
 
 <div align="center">
   <img src="./assets/pictures/IMG_20250423_003431_018.jpg" alt="Shield Congratulations" width="40%">
@@ -112,7 +117,31 @@ def test_unprotected():
   ### 🎉 Congratulations! You've made your First Wonderful Shield! 🎉
 </div>
 
-# To be continued...
+## Your Second Shield! 🛡️🛡️
+
+First, let's see what's the final endpoint is going to look like:
+
+```python
+@app.get("/products")
+@auth_shield
+@roles_shield(["user"])
+async def get_all_products(db: Dict[str, Any]=Depends(get_db), username: str=ShieldedDepends(get_username_from_payload)):
+    """Only user with role `user` can get their own product"""
+    products = list(map(lambda name: db["products"][name], db["users"][username]["products"]))
+    return {
+        "message": f"These are your products: {products}",
+    }
+```
+
+We're going to make the `@roles_shield(["user"])`.
+
+But before that, there's one point to note: one of the advantages of `fastapi-shield` is that it enables lazy injection of FastAPI's dependencies.
+
+In the signature of the endpoint: `async def get_all_products(db: Dict[str, Any]=Depends(get_db), username: str=ShieldedDepends(get_username_from_payload))`, the `db: Dict[str, Any]=Depends(get_db)` is only injected after `@roles_shield(["user"])` becomes 'unblocked', i.e. allowing the request to reach the endpoint `get_all_products`. Prior to that, if the request is blocked by any of the decoratored shields, e.g. `@auth_shield` and `@roles_shield(["user"])`, then the FastAPI's dependencies are not injected.
+
+
+
+
 
 ```python
 from fastapi import FastAPI, Header
