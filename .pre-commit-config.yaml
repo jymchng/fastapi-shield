@@ -1,0 +1,109 @@
+exclude: ^(poetry.lock|.idea/)
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    #Ruff version.
+    rev: v0.5.6
+    hooks:
+      #Run the linter.
+      - id: ruff
+        types_or: [ python, pyi, jupyter ]
+        args: [--fix, --exit-non-zero-on-fix]
+      #Run the formatter.
+      # - id: ruff-format
+      #   types_or: [ python, pyi, jupyter ]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-shebang-scripts-are-executable
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+      - id: debug-statements
+      - id: destroyed-symlinks
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: ^LICENSE|^\..*|\.html|\.csv|\.txt|\.svg|\.py$
+      - id: pretty-format-json
+        args: ["--autofix", "--no-ensure-ascii", "--no-sort-keys"]
+      # - id: requirements-txt-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: \.(html|svg)$
+
+  - repo: https://github.com/fredrikaverpil/creosote.git
+    rev: v3.0.1
+    hooks:
+      - id: creosote
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        additional_dependencies:
+          - tomli
+
+  - repo: https://github.com/pycqa/flake8
+    rev: "7.1.0"
+    hooks:
+      - id: flake8
+        additional_dependencies: [Flake8-pyproject]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: |
+            (?x)^(
+                tests/.*|
+                .*\.svg|
+                .*\.yml|
+                .*\.json
+            )$
+      - id: mixed-line-ending
+      - id: debug-statements
+      - id: check-ast
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+                .*\.md
+            )$
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+    - id: codespell
+      additional_dependencies:
+        - tomli
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.1
+    hooks:
+    - id: mypy
+      files: '(newtype)/.*\.py$'  # Single quote critical due to escape character '\' used in RegEx search string (see YAML - 7.3 Flow Scalar Styles)
+      args: [--config-file=./pyproject.toml, --ignore-missing-imports, --scripts-are-modules]
+      exclude: '(docs|tests)/.*\.py$'
+      additional_dependencies:
+          - "mypy>=1.0.0"
+          - "."  # Install the current package
+
+  - repo: local
+    hooks:
+      - id: nox-format
+        name: Run nox format
+        entry: nox -s format
+        language: system
+      - id: nox-check
+        name: Run nox check
+        entry: nox -s check
+        language: system
+      - id: nox-dev
+        name: Run nox dev
+        entry: nox -s dev
+        language: system
+        types: [python]
