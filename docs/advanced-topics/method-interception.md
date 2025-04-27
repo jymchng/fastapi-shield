@@ -1,704 +1,449 @@
-# Method Interception
+# Advanced Method Interception
 
-This section covers advanced method interception techniques using FastAPI Shield. Method interception allows you to modify, validate, or enhance request processing in sophisticated ways.
+FastAPI Shield provides powerful method interception capabilities that allow you to modify, validate, or enhance request processing in sophisticated ways. This guide explores advanced method interception techniques using FastAPI Shield.
 
-## Request Transformation Pipeline
+## Transformer Pattern
 
-Creating a pipeline of shields that progressively transform request data:
+The transformer pattern allows you to process and modify the request context through a series of transformers.
 
 ```python
-from fastapi import FastAPI, Request, Response, Depends, HTTPException, status
-from fastapi_shield import shield, ShieldedDepends
-from typing import Dict, Any, List, Optional, Callable
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
+from typing import NewType, Annotated, Optional, List, Dict, Any
 from pydantic import BaseModel
-import json
+from fastapi_shield import shield, ShieldedDepends
 import time
+import jwt
+from abc import ABC, abstractmethod
 
 app = FastAPI()
 
-# Request context model
+# Define a model to hold the request context
 class RequestContext(BaseModel):
+    request: Any  # FastAPI Request
     path: str
     method: str
     client_ip: str
-    timestamp: float
     headers: Dict[str, str]
-    query_params: Dict[str, str]
-    processed_by: List[str] = []
-    transformed_data: Dict[str, Any] = {}
+    params: Dict[str, Any] = {}
+    user_id: Optional[str] = None
+    roles: List[str] = []
+    claims: Dict[str, Any] = {}
+    is_authenticated: bool = False
+    start_time: float = 0.0
     
     class Config:
         arbitrary_types_allowed = True
 
-# Base transformer interface
-class RequestTransformer:
-    """Base class for request transformers"""
-    
-    def __init__(self, name: str):
-        self.name = name
-    
-    async def transform(self, context: RequestContext) -> RequestContext:
-        """
-        Transform the request context
-        
-        Args:
-            context: The current request context
-            
-        Returns:
-            The transformed context
-        """
-        # Mark this transformer as having processed the request
-        context.processed_by.append(self.name)
-        return context
-    
-    def create_shield(self) -> Callable:
-        """Create a shield function from this transformer"""
-        
-        @shield(name=self.name)
-        async def transformer_shield(request: Request) -> Optional[RequestContext]:
-            """Shield that applies the transformer"""
-            # Create initial context from request
-            headers = dict(request.headers)
-            query_params = dict(request.query_params)
-            
-            context = RequestContext(
-                path=request.url.path,
-                method=request.method,
-                client_ip=request.client.host,
-                timestamp=time.time(),
-                headers=headers,
-                query_params=query_params
-            )
-            
-            # Apply the transformation
-            return await self.transform(context)
-            
-        return transformer_shield
+# Create a transformed context type
+TransformedContext = NewType("TransformedContext", RequestContext)
 
-# Concrete transformers
+# Base transformer class
+class RequestTransformer(ABC):
+    @abstractmethod
+    def transform(self, context: RequestContext) -> TransformedContext:
+        pass
+        
+    def __call__(self, context: RequestContext) -> TransformedContext:
+        return self.transform(context)
+
+# Specific transformer implementations
 class LoggingTransformer(RequestTransformer):
-    """Transformer that logs request information"""
-    
-    def __init__(self, name: str = "LoggingTransformer"):
-        super().__init__(name)
-    
-    async def transform(self, context: RequestContext) -> RequestContext:
-        """Log request information"""
-        context = await super().transform(context)
-        
-        # In a real app, you would log to a file or database
-        print(f"Request to {context.path} from {context.client_ip} at {context.timestamp}")
-        
-        return context
+    def transform(self, context: RequestContext) -> TransformedContext:
+        context.start_time = time.time()
+        print(f"Request started: {context.method} {context.path} from {context.client_ip}")
+        return TransformedContext(context)
 
 class HeaderNormalizationTransformer(RequestTransformer):
-    """Transformer that normalizes header names"""
-    
-    def __init__(self, name: str = "HeaderNormalizationTransformer"):
-        super().__init__(name)
-    
-    async def transform(self, context: RequestContext) -> RequestContext:
-        """Normalize header names to lowercase with underscores"""
-        context = await super().transform(context)
-        
-        # Create normalized headers
-        normalized_headers = {}
-        for key, value in context.headers.items():
-            normalized_key = key.lower().replace('-', '_')
-            normalized_headers[normalized_key] = value
-        
-        # Store both original and normalized headers
-        context.transformed_data["original_headers"] = context.headers.copy()
-        context.headers = normalized_headers
-        
-        return context
+    def transform(self, context: RequestContext) -> TransformedContext:
+        # Normalize header keys to lowercase
+        context.headers = {k.lower(): v for k, v in context.headers.items()}
+        return TransformedContext(context)
 
 class AuthenticationTransformer(RequestTransformer):
-    """Transformer that extracts and validates authentication information"""
-    
-    def __init__(self, name: str = "AuthenticationTransformer"):
-        super().__init__(name)
-    
-    async def transform(self, context: RequestContext) -> RequestContext:
-        """Extract and validate authentication information"""
-        context = await super().transform(context)
+    def __init__(self, secret_key: str, algorithm: str = "HS256"):
+        self.secret_key = secret_key
+        self.algorithm = algorithm
         
-        # Check for API key in headers or query parameters
-        api_key = context.headers.get("x_api_key") or context.query_params.get("api_key")
+    def transform(self, context: RequestContext) -> TransformedContext:
+        # Check for Authorization header
+        auth_header = context.headers.get("authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return TransformedContext(context)
+            
+        token = auth_header[7:]  # Remove "Bearer " prefix
         
-        if not api_key:
-            # No API key found
-            return None
-        
-        # In a real app, you would validate the API key
-        valid_keys = ["key1", "key2", "key3"]
-        if api_key not in valid_keys:
-            return None
-        
-        # Store authentication information
-        context.transformed_data["auth"] = {
-            "authenticated": True,
-            "api_key": api_key,
-            "auth_time": time.time()
-        }
-        
-        return context
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            context.is_authenticated = True
+            context.user_id = payload.get("sub")
+            context.claims = payload
+            
+            # Extract roles if they exist in the token
+            if "roles" in payload and isinstance(payload["roles"], list):
+                context.roles = payload["roles"]
+                
+        except jwt.PyJWTError:
+            # Token invalid, keep default unauthenticated state
+            pass
+            
+        return TransformedContext(context)
 
 class UserDataTransformer(RequestTransformer):
-    """Transformer that loads user data based on authentication"""
-    
-    def __init__(self, name: str = "UserDataTransformer"):
-        super().__init__(name)
-    
-    async def transform(self, context: RequestContext) -> RequestContext:
-        """Load user data based on authentication"""
-        context = await super().transform(context)
-        
-        # Check if authenticated
-        auth_data = context.transformed_data.get("auth")
-        if not auth_data or not auth_data.get("authenticated"):
-            return None
-        
-        # In a real app, you would load user data from a database
-        api_key = auth_data.get("api_key")
-        user_data = {
-            "key1": {"user_id": 1, "username": "admin", "role": "admin"},
-            "key2": {"user_id": 2, "username": "editor", "role": "editor"},
-            "key3": {"user_id": 3, "username": "user", "role": "user"}
-        }.get(api_key)
-        
-        if not user_data:
-            return None
-        
-        # Store user data
-        context.transformed_data["user"] = user_data
-        
-        return context
+    def transform(self, context: RequestContext) -> TransformedContext:
+        if context.is_authenticated and context.user_id:
+            # Here you would typically load additional user data
+            # from your database or another service
+            
+            # Simulated user data
+            if context.user_id == "admin":
+                context.roles.append("admin")
+                
+        return TransformedContext(context)
 
 class RoleCheckTransformer(RequestTransformer):
-    """Transformer that checks if the user has a required role"""
-    
-    def __init__(self, required_role: str, name: str = None):
-        name = name or f"RoleCheckTransformer({required_role})"
-        super().__init__(name)
-        self.required_role = required_role
-    
-    async def transform(self, context: RequestContext) -> RequestContext:
-        """Check if the user has the required role"""
-        context = await super().transform(context)
+    def __init__(self, required_roles: List[str]):
+        self.required_roles = required_roles
         
-        # Check if user data is available
-        user_data = context.transformed_data.get("user")
-        if not user_data:
-            return None
-        
-        # Check if user has the required role
-        user_role = user_data.get("role")
-        if user_role != self.required_role and user_role != "admin":
-            return None
-        
-        return context
-
-# Create transformer instances
-logging_transformer = LoggingTransformer()
-header_normalization_transformer = HeaderNormalizationTransformer()
-authentication_transformer = AuthenticationTransformer()
-user_data_transformer = UserDataTransformer()
-admin_role_transformer = RoleCheckTransformer("admin")
-editor_role_transformer = RoleCheckTransformer("editor")
-
-# Create a transformer pipeline
-class TransformerPipeline:
-    """Pipeline of transformers that are applied in sequence"""
-    
-    def __init__(self, transformers: List[RequestTransformer], name: str = "TransformerPipeline"):
-        self.transformers = transformers
-        self.name = name
-    
-    def create_shield(self) -> Callable:
-        """Create a shield function from this pipeline"""
-        
-        @shield(name=self.name)
-        async def pipeline_shield(request: Request) -> Optional[RequestContext]:
-            """Shield that applies all transformers in the pipeline"""
-            # Create initial context from request
-            headers = dict(request.headers)
-            query_params = dict(request.query_params)
+    def transform(self, context: RequestContext) -> TransformedContext:
+        if not self.required_roles:
+            return TransformedContext(context)
             
-            context = RequestContext(
-                path=request.url.path,
-                method=request.method,
-                client_ip=request.client.host,
-                timestamp=time.time(),
-                headers=headers,
-                query_params=query_params
+        if not context.is_authenticated:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"}
             )
             
-            # Apply each transformer in sequence
-            for transformer in self.transformers:
-                context = await transformer.transform(context)
-                if context is None:
-                    return None
-            
-            return context
-            
-        return pipeline_shield
+        for role in self.required_roles:
+            if role not in context.roles:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Required role missing: {role}"
+                )
+                
+        return TransformedContext(context)
 
-# Create pipelines for different endpoint types
-base_pipeline = TransformerPipeline(
-    transformers=[logging_transformer, header_normalization_transformer],
-    name="BasePipeline"
+# Transformer pipeline
+class TransformerPipeline:
+    def __init__(self, transformers: List[RequestTransformer]):
+        self.transformers = transformers
+        
+    def process(self, context: RequestContext) -> TransformedContext:
+        current_context = context
+        for transformer in self.transformers:
+            current_context = transformer.transform(current_context)
+        return TransformedContext(current_context)
+
+# Shield to create and transform the request context
+@shield(name="Request Context Transformer")
+async def transform_request(request: Request) -> TransformedContext:
+    # Create initial context
+    headers = {k: v for k, v in request.headers.items()}
+    context = RequestContext(
+        request=request,
+        path=request.url.path,
+        method=request.method,
+        client_ip=request.client.host,
+        headers=headers
+    )
+    
+    # Create transformer pipeline
+    pipeline = TransformerPipeline([
+        LoggingTransformer(),
+        HeaderNormalizationTransformer(),
+        AuthenticationTransformer(secret_key="your-secret-key"),
+        UserDataTransformer()
+    ])
+    
+    # Process through pipeline
+    return pipeline.process(context)
+
+# Admin-only shield using role checking
+@shield(
+    name="Admin Required",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=403,
+        detail="Admin access required"
+    )
 )
+def admin_required(context: TransformedContext = ShieldedDepends(transform_request)) -> TransformedContext:
+    if not context.is_authenticated:
+        return None
+        
+    if "admin" not in context.roles:
+        return None
+        
+    return context
 
-auth_pipeline = TransformerPipeline(
-    transformers=[
-        logging_transformer,
-        header_normalization_transformer,
-        authentication_transformer,
-        user_data_transformer
-    ],
-    name="AuthPipeline"
-)
-
-admin_pipeline = TransformerPipeline(
-    transformers=[
-        logging_transformer,
-        header_normalization_transformer,
-        authentication_transformer,
-        user_data_transformer,
-        admin_role_transformer
-    ],
-    name="AdminPipeline"
-)
-
-editor_pipeline = TransformerPipeline(
-    transformers=[
-        logging_transformer,
-        header_normalization_transformer,
-        authentication_transformer,
-        user_data_transformer,
-        editor_role_transformer
-    ],
-    name="EditorPipeline"
-)
-
-# Apply pipelines to endpoints
-@app.get("/public")
-@base_pipeline.create_shield()
-async def public_endpoint(context: RequestContext = ShieldedDepends(base_pipeline.create_shield())):
-    """Public endpoint that doesn't require authentication"""
+# Example endpoints
+@app.get("/api/public")
+@transform_request
+async def public_endpoint(context: TransformedContext = ShieldedDepends(transform_request)):
     return {
-        "message": "Public endpoint",
-        "processed_by": context.processed_by,
-        "client_ip": context.client_ip
+        "message": "This is a public endpoint",
+        "authenticated": context.is_authenticated,
+        "user_id": context.user_id if context.is_authenticated else None
     }
 
-@app.get("/authenticated")
-@auth_pipeline.create_shield()
-async def authenticated_endpoint(context: RequestContext = ShieldedDepends(auth_pipeline.create_shield())):
-    """Authenticated endpoint that requires a valid API key"""
-    user_data = context.transformed_data.get("user", {})
+@app.get("/api/protected")
+@transform_request
+async def protected_endpoint(context: TransformedContext = ShieldedDepends(transform_request)):
+    if not context.is_authenticated:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+        
     return {
-        "message": f"Welcome, {user_data.get('username')}",
-        "user_id": user_data.get("user_id"),
-        "role": user_data.get("role")
+        "message": "This is a protected endpoint",
+        "user_id": context.user_id,
+        "roles": context.roles
     }
 
-@app.get("/admin")
-@admin_pipeline.create_shield()
-async def admin_endpoint(context: RequestContext = ShieldedDepends(admin_pipeline.create_shield())):
-    """Admin endpoint that requires admin role"""
-    user_data = context.transformed_data.get("user", {})
+@app.get("/api/admin")
+@transform_request
+@admin_required
+async def admin_endpoint(context: TransformedContext = ShieldedDepends(admin_required)):
     return {
-        "message": f"Admin panel accessed by {user_data.get('username')}",
-        "user_id": user_data.get("user_id")
-    }
-
-@app.get("/editor")
-@editor_pipeline.create_shield()
-async def editor_endpoint(context: RequestContext = ShieldedDepends(editor_pipeline.create_shield())):
-    """Editor endpoint that requires editor or admin role"""
-    user_data = context.transformed_data.get("user", {})
-    return {
-        "message": f"Editor panel accessed by {user_data.get('username')}",
-        "user_id": user_data.get("user_id")
+        "message": "This is an admin endpoint",
+        "user_id": context.user_id,
+        "roles": context.roles,
+        "all_claims": context.claims
     }
 ```
 
-## Aspect-Oriented Programming with Shields
+## Aspect-Oriented Programming with FastAPI Shield
 
-Using FastAPI Shield to implement Aspect-Oriented Programming patterns:
+Aspect-Oriented Programming (AOP) is a programming paradigm that aims to increase modularity by allowing the separation of cross-cutting concerns. FastAPI Shield can implement AOP concepts to handle concerns like logging, security, and performance monitoring.
 
 ```python
-from fastapi import FastAPI, Header, HTTPException, status, Request, Response
-from fastapi_shield import shield, ShieldedDepends
-from typing import Dict, Any, List, Optional, Callable, Union, TypeVar, Type
+from fastapi import FastAPI, Depends, HTTPException, Request, Response
+from typing import NewType, Annotated, Optional, List, Dict, Any, Callable, Type, TypeVar, Generic
 from pydantic import BaseModel
+from fastapi_shield import shield, ShieldedDepends
 import time
-import json
-import logging
-from functools import wraps
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("aspect_oriented_api")
+import traceback
+import functools
 
 app = FastAPI()
 
-# Type variable for method return types
+# Define a type variable for generic typing
 T = TypeVar('T')
 
-# Aspect base class
-class Aspect:
-    """
-    Base class for aspects in AOP pattern
-    
-    Aspects provide cross-cutting concerns like logging, security, etc.
-    """
-    
-    async def before(self, request: Request, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        Code to execute before the endpoint handler
+# Base Aspect class
+class Aspect(Generic[T]):
+    def pre_process(self, request: Request, *args, **kwargs) -> Dict[str, Any]:
+        """Process before the function execution"""
+        return {}
         
-        Args:
-            request: The FastAPI request
-            context: Context data passed between aspects
-            
-        Returns:
-            Updated context
-        """
-        return context or {}
-    
-    async def after(self, request: Request, response: Response, context: Dict[str, Any] = None) -> Response:
-        """
-        Code to execute after the endpoint handler
-        
-        Args:
-            request: The FastAPI request
-            response: The response from the endpoint handler
-            context: Context data from before phase
-            
-        Returns:
-            Potentially modified response
-        """
+    def post_process(self, request: Request, response: Any, context: Dict[str, Any]) -> Any:
+        """Process after the function execution"""
         return response
-    
-    async def around(
-        self, 
-        request: Request, 
-        handler: Callable[..., T], 
-        context: Dict[str, Any] = None
-    ) -> Union[T, Response]:
-        """
-        Code to execute around the endpoint handler (can short-circuit)
         
-        Args:
-            request: The FastAPI request
-            handler: The endpoint handler function
-            context: Context data from before phase
-            
-        Returns:
-            Result from handler or a custom response (short-circuit)
-        """
-        # Execute the handler
-        return await handler()
-    
-    async def after_exception(
-        self, 
-        request: Request, 
-        exception: Exception, 
-        context: Dict[str, Any] = None
-    ) -> Optional[Response]:
-        """
-        Code to execute when the endpoint handler raises an exception
-        
-        Args:
-            request: The FastAPI request
-            exception: The exception raised
-            context: Context data from before phase
-            
-        Returns:
-            Optional response to return instead of raising the exception
-        """
-        # By default, return None to let the exception propagate
-        return None
+    def handle_exception(self, request: Request, exc: Exception, context: Dict[str, Any]) -> Any:
+        """Handle exceptions raised during execution"""
+        raise exc
 
-# Concrete aspects
+# Concrete aspect implementations
 class LoggingAspect(Aspect):
-    """Aspect that logs requests and responses"""
-    
-    async def before(self, request: Request, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Log request information"""
-        context = await super().before(request, context)
+    def pre_process(self, request: Request, *args, **kwargs) -> Dict[str, Any]:
+        return {"start_time": time.time(), "path": request.url.path, "method": request.method}
         
-        # Add request start time to context
-        context["start_time"] = time.time()
-        context["request_id"] = context.get("request_id", str(time.time()))
-        
-        # Log request information
-        logger.info(
-            f"Request {context['request_id']}: {request.method} {request.url.path} "
-            f"from {request.client.host}"
-        )
-        
-        return context
-    
-    async def after(self, request: Request, response: Response, context: Dict[str, Any] = None) -> Response:
-        """Log response information"""
-        # Calculate request duration
-        start_time = context.get("start_time", 0)
-        duration = time.time() - start_time
-        
-        # Log response information
-        logger.info(
-            f"Response {context.get('request_id', '')}: {response.status_code} "
-            f"completed in {duration:.4f}s"
-        )
-        
-        # Add timing header to response
-        response.headers["X-Response-Time"] = f"{duration:.4f}"
-        
+    def post_process(self, request: Request, response: Any, context: Dict[str, Any]) -> Any:
+        duration = time.time() - context["start_time"]
+        print(f"Request completed: {context['method']} {context['path']} - {duration:.3f}s")
         return response
-    
-    async def after_exception(self, request: Request, exception: Exception, context: Dict[str, Any] = None) -> Optional[Response]:
-        """Log exception information"""
-        # Log exception
-        logger.error(
-            f"Exception {context.get('request_id', '')}: {type(exception).__name__} - {str(exception)}"
-        )
         
-        # Let the exception propagate
-        return None
+    def handle_exception(self, request: Request, exc: Exception, context: Dict[str, Any]) -> Any:
+        duration = time.time() - context["start_time"]
+        print(f"Error in request: {context['method']} {context['path']} - {duration:.3f}s")
+        print(f"Exception: {type(exc).__name__}: {str(exc)}")
+        raise exc
 
 class SecurityAspect(Aspect):
-    """Aspect that handles authentication and authorization"""
-    
-    def __init__(self, required_role: str = None):
-        self.required_role = required_role
-    
-    async def before(self, request: Request, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Authenticate the request and check permissions"""
-        context = await super().before(request, context)
+    def __init__(self, require_auth: bool = True):
+        self.require_auth = require_auth
         
-        # Extract API key from header
-        api_key = request.headers.get("x-api-key")
-        if not api_key:
-            context["auth_error"] = "Missing API key"
-            return context
+    def pre_process(self, request: Request, *args, **kwargs) -> Dict[str, Any]:
+        # Here you'd implement your authentication logic
+        auth_header = request.headers.get("Authorization", "")
+        is_authenticated = auth_header.startswith("Bearer ")
         
-        # In a real app, you would validate the API key against a database
-        # This is simplified for the example
-        user_data = {
-            "key1": {"user_id": 1, "role": "admin", "username": "admin"},
-            "key2": {"user_id": 2, "role": "editor", "username": "editor"},
-            "key3": {"user_id": 3, "role": "user", "username": "user1"}
-        }.get(api_key)
-        
-        if not user_data:
-            context["auth_error"] = "Invalid API key"
-            return context
-        
-        # Check role if required
-        if self.required_role and user_data.get("role") != self.required_role and user_data.get("role") != "admin":
-            context["auth_error"] = f"Requires role: {self.required_role}"
-            return context
-        
-        # Add user data to context
-        context["user"] = user_data
-        
-        return context
-    
-    async def around(self, request: Request, handler: Callable[..., T], context: Dict[str, Any] = None) -> Union[T, Response]:
-        """Short-circuit if authentication failed"""
-        # Check for authentication error
-        auth_error = context.get("auth_error")
-        if auth_error:
-            # Return 401 Unauthorized response
-            error_response = Response(
-                content=json.dumps({"detail": auth_error}),
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                media_type="application/json"
+        if self.require_auth and not is_authenticated:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"}
             )
-            return error_response
-        
-        # Proceed with handler
-        return await handler()
+            
+        return {"is_authenticated": is_authenticated}
 
 class PerformanceAspect(Aspect):
-    """Aspect that monitors and enforces performance constraints"""
-    
-    def __init__(self, timeout_seconds: float = 5.0):
-        self.timeout_seconds = timeout_seconds
-    
-    async def before(self, request: Request, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Initialize performance monitoring"""
-        context = await super().before(request, context)
+    def __init__(self, slow_threshold: float = 1.0):
+        self.slow_threshold = slow_threshold
         
-        # Add start time to context
-        context["perf_start_time"] = time.time()
+    def pre_process(self, request: Request, *args, **kwargs) -> Dict[str, Any]:
+        return {"start_time": time.time()}
         
-        return context
-    
-    async def after(self, request: Request, response: Response, context: Dict[str, Any] = None) -> Response:
-        """Add performance headers to response"""
-        # Calculate request duration
-        start_time = context.get("perf_start_time", 0)
-        duration = time.time() - start_time
-        
-        # Add performance headers
-        response.headers["X-Processing-Time"] = f"{duration:.4f}"
-        
-        # Log slow requests
-        if duration > self.timeout_seconds:
-            logger.warning(
-                f"Slow request {context.get('request_id', '')}: {request.method} {request.url.path} "
-                f"took {duration:.4f}s (timeout: {self.timeout_seconds}s)"
-            )
-        
+    def post_process(self, request: Request, response: Any, context: Dict[str, Any]) -> Any:
+        duration = time.time() - context["start_time"]
+        if duration > self.slow_threshold:
+            print(f"SLOW REQUEST: {request.method} {request.url.path} took {duration:.3f}s")
+            # In a real app, you might log this to monitoring
         return response
 
-# Factory for creating aspect-oriented shields
-def create_aop_shield(*aspects: Aspect):
-    """
-    Create a shield that applies multiple aspects to an endpoint
+# Factory function to create AOP shields
+def create_aop_shield(*aspects: Aspect) -> Type:
+    """Create a shield that applies the given aspects to the endpoint"""
     
-    Args:
-        *aspects: One or more aspects to apply
-        
-    Returns:
-        A shield function
-    """
-    
-    @shield(name="AOPShield")
-    async def aop_shield(request: Request) -> Dict[str, Any]:
-        """Shield that applies aspects to an endpoint"""
-        # Initialize context
+    @shield(name="AOP Shield")
+    async def aop_shield(request: Request) -> Request:
+        # AOP context dictionary to share data between aspects
         context = {}
         
-        # Apply before phase for all aspects
+        # Run pre-processing for all aspects
         for aspect in aspects:
-            context = await aspect.before(request, context)
+            try:
+                aspect_context = aspect.pre_process(request)
+                context.update(aspect_context)
+            except Exception as e:
+                # If an aspect raises an exception, let it handle it
+                return aspect.handle_exception(request, e, context)
         
-        # Return context for use in endpoint
-        return context
+        return request
     
     return aop_shield
 
 # Decorator for applying aspects to an endpoint
 def with_aspects(*aspects: Aspect):
-    """
-    Decorator that applies aspects to an endpoint
-    
-    Args:
-        *aspects: One or more aspects to apply
-        
-    Returns:
-        A decorator function
-    """
+    """Decorator to apply aspects to an endpoint"""
     
     def decorator(func: Callable):
-        @wraps(func)
-        async def wrapper(request: Request, context: Dict[str, Any] = ShieldedDepends(create_aop_shield(*aspects))):
+        # Create the shield from aspects
+        aop_shield = create_aop_shield(*aspects)
+        
+        @functools.wraps(func)
+        async def wrapper(request: Request = ShieldedDepends(aop_shield), *args, **kwargs):
+            # Create context for aspects
+            context = {}
+            
+            # Pre-processing (already done by the shield)
+            # But we can add additional details here if needed
+            
             try:
-                # Apply around phase for all aspects (in reverse order)
-                handler = func
-                for aspect in reversed(aspects):
-                    # Create a closure around the current handler
-                    current_handler = handler
-                    
-                    # Create new handler that applies the aspect
-                    async def aspect_handler():
-                        return await aspect.around(request, current_handler, context)
-                    
-                    handler = aspect_handler
+                # Call the original function
+                response = await func(request, *args, **kwargs)
                 
-                # Execute the wrapped handler
-                result = await handler()
-                
-                # Convert result to Response if needed
-                response = result if isinstance(result, Response) else Response(
-                    content=json.dumps(result),
-                    media_type="application/json"
-                )
-                
-                # Apply after phase for all aspects (in original order)
+                # Post-processing
                 for aspect in aspects:
-                    response = await aspect.after(request, response, context)
-                
+                    response = aspect.post_process(request, response, context)
+                    
                 return response
             except Exception as e:
-                # Apply after_exception phase for all aspects (in original order)
+                # Exception handling
                 for aspect in aspects:
-                    custom_response = await aspect.after_exception(request, e, context)
-                    if custom_response:
-                        return custom_response
+                    try:
+                        # Let each aspect handle the exception
+                        return aspect.handle_exception(request, e, context)
+                    except Exception:
+                        # If the aspect re-raises, continue to the next aspect
+                        continue
                 
-                # Re-raise the exception if no aspect handled it
+                # If no aspect handled the exception, re-raise it
                 raise
         
         return wrapper
     
     return decorator
 
-# Create aspect instances
-logging_aspect = LoggingAspect()
-auth_aspect = SecurityAspect()
-admin_aspect = SecurityAspect(required_role="admin")
-editor_aspect = SecurityAspect(required_role="editor")
-performance_aspect = PerformanceAspect(timeout_seconds=1.0)
-
-# Apply aspects to endpoints
-@app.get("/aop/public")
-@with_aspects(logging_aspect, performance_aspect)
-async def aop_public(request: Request, context: Dict[str, Any]):
-    """Public endpoint with logging and performance monitoring"""
-    # Simulate some work
+# Example of using aspects with FastAPI endpoints
+@app.get("/api/simple")
+@with_aspects(LoggingAspect(), PerformanceAspect(slow_threshold=0.2))
+async def simple_endpoint(request: Request):
+    # Simulate some processing time
     time.sleep(0.1)
-    
-    return {
-        "message": "Public endpoint",
-        "request_id": context.get("request_id")
-    }
+    return {"message": "This is a simple endpoint"}
 
-@app.get("/aop/authenticated")
-@with_aspects(logging_aspect, auth_aspect, performance_aspect)
-async def aop_authenticated(request: Request, context: Dict[str, Any]):
-    """Authenticated endpoint"""
-    # Get user data from context
-    user = context.get("user", {})
-    
-    return {
-        "message": f"Hello, {user.get('username')}",
-        "user_id": user.get("user_id"),
-        "role": user.get("role")
-    }
+@app.get("/api/secured")
+@with_aspects(SecurityAspect(), LoggingAspect(), PerformanceAspect())
+async def secured_endpoint(request: Request):
+    return {"message": "This is a secured endpoint"}
 
-@app.get("/aop/admin")
-@with_aspects(logging_aspect, admin_aspect, performance_aspect)
-async def aop_admin(request: Request, context: Dict[str, Any]):
-    """Admin-only endpoint"""
-    # Get user data from context
-    user = context.get("user", {})
-    
-    # Simulate complex operation
-    time.sleep(0.5)
-    
-    return {
-        "message": f"Admin area accessed by {user.get('username')}",
-        "user_id": user.get("user_id")
-    }
-
-@app.get("/aop/slow")
-@with_aspects(logging_aspect, auth_aspect, performance_aspect)
-async def aop_slow(request: Request, context: Dict[str, Any]):
-    """Endpoint that deliberately exceeds the performance timeout"""
-    # Simulate slow operation
-    time.sleep(2.0)
-    
-    return {
-        "message": "Slow operation completed",
-        "user": context.get("user", {}).get("username")
-    }
+@app.get("/api/error")
+@with_aspects(LoggingAspect(), PerformanceAspect())
+async def error_endpoint(request: Request):
+    # Deliberately cause an error
+    raise ValueError("This is a test error")
 ```
 
-These advanced method interception techniques demonstrate how FastAPI Shield can be used to implement sophisticated request processing patterns such as transformation pipelines and aspect-oriented programming. 
+## Advanced Method Interception with Context Managers
+
+For more complex scenarios, you can use context managers with FastAPI Shield to implement advanced method interception.
+
+```python
+from fastapi import FastAPI, Depends, HTTPException, Request
+from typing import NewType, Annotated, Optional, List, Dict, Any, Callable, AsyncContextManager
+from fastapi_shield import shield, ShieldedDepends
+from contextlib import asynccontextmanager
+import time
+import traceback
+
+app = FastAPI()
+
+# Context manager for monitoring endpoint execution
+@asynccontextmanager
+async def endpoint_monitor(request: Request):
+    start_time = time.time()
+    path = request.url.path
+    method = request.method
+    
+    print(f"Starting request: {method} {path}")
+    
+    # Setup complete, yield control back to the endpoint
+    try:
+        yield
+        # If we get here, the endpoint completed successfully
+        duration = time.time() - start_time
+        print(f"Request completed successfully: {method} {path} - {duration:.3f}s")
+    except Exception as e:
+        # If an exception occurs, log it
+        duration = time.time() - start_time
+        print(f"Error in request: {method} {path} - {duration:.3f}s")
+        print(f"Exception: {type(e).__name__}: {str(e)}")
+        print(traceback.format_exc())
+        # Re-raise the exception
+        raise
+
+# A shield that leverages the context manager
+@shield(name="Monitored Request")
+async def monitor_request(request: Request) -> Request:
+    # The context manager will be used in the endpoint itself
+    return request
+
+# Type annotation for a monitored request
+MonitoredRequest = NewType("MonitoredRequest", Request)
+
+# Example endpoint using the context manager
+@app.get("/api/monitored")
+@monitor_request
+async def monitored_endpoint(request: MonitoredRequest = ShieldedDepends(monitor_request)):
+    async with endpoint_monitor(request):
+        # Simulated processing
+        time.sleep(0.2)
+        
+        # Return the response
+        return {"message": "This is a monitored endpoint"}
+
+# Example of error handling with context manager
+@app.get("/api/monitored-error")
+@monitor_request
+async def monitored_error_endpoint(request: MonitoredRequest = ShieldedDepends(monitor_request)):
+    async with endpoint_monitor(request):
+        # Simulate an error
+        time.sleep(0.1)
+        raise ValueError("This is a test error in a monitored endpoint")
+```
+
+FastAPI Shield's method interception capabilities provide a powerful toolkit for creating robust, maintainable, and secure applications. By leveraging these advanced patterns, you can implement sophisticated cross-cutting concerns while keeping your code clean and modular. 
