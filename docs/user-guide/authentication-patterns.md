@@ -366,7 +366,6 @@ def authenticate_with_scopes(required_scopes: List[str] = []) -> AuthenticatedUs
             payload: dict = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username: Optional[str] = payload.get("sub")
             token_scopes: List[str] = payload.get("scopes", [])
-            print(f"token_scopes: {token_scopes}")
             
             if username is None:
                 raise credentials_exception
@@ -385,8 +384,6 @@ def authenticate_with_scopes(required_scopes: List[str] = []) -> AuthenticatedUs
             )
             
             # Check if user has all required scopes
-            print(f"required_scopes: {required_scopes}")
-            print(f"user.scopes: {user.scopes}")
             for scope in required_scopes:
                 if scope in user.scopes:
                     return AuthenticatedUser(user)
@@ -414,9 +411,6 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     
     # Filter requested scopes against available scopes
     scopes = [scope for scope in form_data.scopes if scope in user["scopes"]]
-    print("form_data.scopes:", form_data.scopes)
-    print("user:", user)
-    print(f"scopes: {scopes}")
     token_data = {
         "sub": user["username"],
         "scopes": scopes
