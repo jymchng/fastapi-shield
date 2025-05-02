@@ -172,11 +172,13 @@ def get_current_user(user: AuthenticatedUser = ShieldedDepends(lambda user: user
 JSON Web Tokens (JWT) offer a secure way to encode information:
 
 ```python
+# Found in: `examples/auth_jwt_two.py`
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.testclient import TestClient
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from typing import NewType, Annotated, Dict, Optional
+from typing import NewType, Optional
 from pydantic import BaseModel
-from fastapi_shield import shield, Shield
+from fastapi_shield import shield, ShieldedDepends
 import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
@@ -277,7 +279,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 # Use the shield in an endpoint
 @app.get("/users/me")
-def get_current_user(user: AuthenticatedUser = Depends(authenticate_jwt)):
+@authenticate_jwt
+def get_current_user(user: AuthenticatedUser = ShieldedDepends(lambda user: user)):
     return user
 ```
 
@@ -286,14 +289,16 @@ def get_current_user(user: AuthenticatedUser = Depends(authenticate_jwt)):
 OAuth2 is a standard protocol for authorization:
 
 ```python
+# Found in `examples/oauth_scopes_one.py`
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from typing import NewType, Annotated, Dict, Optional, List
+from typing import NewType, Optional, List
 from pydantic import BaseModel
-from fastapi_shield import shield, Shield
+from fastapi_shield import shield, ShieldedDepends
 import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
+from fastapi.testclient import TestClient
 
 app = FastAPI()
 
@@ -348,47 +353,53 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return encoded_jwt
 
 # Shield to validate JWT and authenticate user with scope checking
-@shield
-def authenticate_with_scopes(token: str = Depends(oauth2_scheme), required_scopes: List[str] = []) -> AuthenticatedUser:
+def authenticate_with_scopes(required_scopes: List[str] = []) -> AuthenticatedUser:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        token_scopes = payload.get("scopes", [])
-        
-        if username is None:
+    @shield
+    def inner_auth_shield(token: str = Depends(oauth2_scheme)) -> AuthenticatedUser:
+        try:
+            payload: dict = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username: Optional[str] = payload.get("sub")
+            token_scopes: List[str] = payload.get("scopes", [])
+            print(f"token_scopes: {token_scopes}")
+            
+            if username is None:
+                raise credentials_exception
+            
+            token_data = TokenData(username=username, scopes=token_scopes)
+            
+            user_data = USER_DB.get(token_data.username)
+            if not user_data:
+                raise credentials_exception
+            
+            user = User(
+                username=user_data["username"],
+                email=user_data["email"],
+                full_name=user_data["full_name"],
+                scopes=token_data.scopes
+            )
+            
+            # Check if user has all required scopes
+            print(f"required_scopes: {required_scopes}")
+            print(f"user.scopes: {user.scopes}")
+            for scope in required_scopes:
+                if scope in user.scopes:
+                    return AuthenticatedUser(user)
+            
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Not enough permissions. Required scope: {scope}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except jwt.PyJWTError:
             raise credentials_exception
         
-        token_data = TokenData(username=username, scopes=token_scopes)
-        
-        user_data = USER_DB.get(token_data.username)
-        if not user_data:
-            raise credentials_exception
-        
-        user = User(
-            username=user_data["username"],
-            email=user_data["email"],
-            full_name=user_data["full_name"],
-            scopes=token_data.scopes
-        )
-        
-        # Check if user has all required scopes
-        for scope in required_scopes:
-            if scope not in user.scopes:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Not enough permissions. Required scope: {scope}",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-        
-        return AuthenticatedUser(user)
-    except jwt.PyJWTError:
-        raise credentials_exception
+    return inner_auth_shield
 
 # Function to authenticate user and generate token
 @app.post("/token", response_model=Token)
@@ -403,7 +414,9 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     
     # Filter requested scopes against available scopes
     scopes = [scope for scope in form_data.scopes if scope in user["scopes"]]
-    
+    print("form_data.scopes:", form_data.scopes)
+    print("user:", user)
+    print(f"scopes: {scopes}")
     token_data = {
         "sub": user["username"],
         "scopes": scopes
@@ -415,21 +428,22 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
 
 # Use the shield in endpoints with different scope requirements
 @app.get("/users/me")
+@authenticate_with_scopes(required_scopes=["read:profile"])
 def get_current_user(
-    user: AuthenticatedUser = Depends(lambda: authenticate_with_scopes(required_scopes=["read:profile"]))
+    user: AuthenticatedUser = ShieldedDepends(lambda user: user)
 ):
     return user
 
 @app.get("/items")
+@authenticate_with_scopes(required_scopes=["read:items"])
 def get_items(
-    user: AuthenticatedUser = Depends(lambda: authenticate_with_scopes(required_scopes=["read:items"]))
 ):
     return {"items": [{"item_id": 1, "name": "Foo"}, {"item_id": 2, "name": "Bar"}]}
 
 @app.post("/items")
+@authenticate_with_scopes(required_scopes=["write:items"])
 def create_item(
     item: dict,
-    user: AuthenticatedUser = Depends(lambda: authenticate_with_scopes(required_scopes=["write:items"]))
 ):
     return {"item_id": 3, **item}
 ```
