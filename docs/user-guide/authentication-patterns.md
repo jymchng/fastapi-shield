@@ -7,12 +7,13 @@ FastAPI Shield provides powerful abstractions for implementing secure authentica
 Basic authentication is a simple authentication scheme built into the HTTP protocol. FastAPI Shield makes it easy to implement:
 
 ```python
+# Found in `examples/basic_auth_one.py`
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from typing import NewType, Annotated
-from fastapi_shield import shield, Shield
+from typing import NewType
+from fastapi_shield import shield, ShieldedDepends
 import secrets
-
+from fastapi.testclient import TestClient
 app = FastAPI()
 
 security = HTTPBasic()
@@ -47,7 +48,10 @@ def authenticate_user(credentials: HTTPBasicCredentials = Depends(security)) -> 
 
 # Use the shield in an endpoint
 @app.get("/profile")
-def get_profile(username: AuthenticatedUser = Depends(authenticate_user)):
+@authenticate_user # Use the shield as a decorator
+def get_profile(username: AuthenticatedUser = ShieldedDepends(lambda s: s)):
+    # `lambda s: s` because `authenticate_user` returns an instance of `AuthenticatedUser` 
+    # which is passed into the shielded dependency function of `ShieldedDepends`.
     # The user is authenticated at this point
     user_data = USER_DB.get(str(username))
     return {
@@ -61,11 +65,13 @@ def get_profile(username: AuthenticatedUser = Depends(authenticate_user)):
 Token-based authentication is widely used in modern APIs:
 
 ```python
+# Found in `/examples/auth_jwt_one.py`
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import NewType, Annotated, Dict, Optional
+from typing import NewType, Optional
 from pydantic import BaseModel
-from fastapi_shield import shield, Shield
+from fastapi_shield import shield, ShieldedDepends
+from fastapi.testclient import TestClient
 import jwt
 from datetime import datetime, timedelta
 
@@ -156,7 +162,8 @@ def login(username: str, password: str):
 
 # Use the shield in an endpoint
 @app.get("/users/me")
-def get_current_user(user: AuthenticatedUser = Depends(authenticate_token)):
+@authenticate_token
+def get_current_user(user: AuthenticatedUser = ShieldedDepends(lambda user: user)):
     return user
 ```
 
@@ -515,33 +522,21 @@ async def protected_route(user: AuthenticatedUser = Depends(authenticate)):
 
 ## Authentication Best Practices
 
-When implementing authentication with FastAPI Shield, consider these best practices:
+When implementing authentication with FastAPI Shield, it's crucial to follow security best practices to protect your application and user data.
 
-1. **Use HTTPS**: Always use HTTPS in production to encrypt sensitive data.
+Always use HTTPS in production to encrypt sensitive information during transmission. Never store plaintext passwords; instead, use secure hashing algorithms like bcrypt. 
 
-2. **Secure password storage**: Never store plaintext passwords. Use a secure hashing algorithm like bcrypt.
+For token-based authentication, implement proper token management by setting appropriate expiration times, creating a token revocation mechanism for logout functionality, and considering refresh tokens for long-lived sessions. 
 
-3. **Token management**:
-   - Set appropriate expiration times for tokens
-   - Implement token revocation for logout functionality
-   - Consider using refresh tokens for long-lived sessions
+Protect against brute force attacks by implementing rate limiting on authentication endpoints. Thoroughly validate all inputs, especially on authentication endpoints, and provide generic error messages that don't reveal whether a username exists in your system. 
 
-4. **Rate limiting**: Implement rate limiting on authentication endpoints to prevent brute force attacks.
+Implement comprehensive logging of authentication attempts while being careful not to log sensitive information like passwords. 
 
-5. **Validation**: Validate all inputs, especially on authentication endpoints.
+For applications requiring higher security, consider implementing multi-factor authentication. If using session-based authentication, ensure proper session management. Implement fine-grained access control with scopes or roles for authorization. 
 
-6. **Error messages**: Provide generic error messages that don't reveal if a username exists.
+Set appropriate security headers like `X-Content-Type-Options` and `Strict-Transport-Security`. 
 
-7. **Logging**: Log authentication attempts, but don't log sensitive information like passwords.
+Finally, regularly update your dependencies to patch security vulnerabilities. 
 
-8. **Multi-factor authentication**: Consider implementing MFA for sensitive operations.
+By following these patterns and best practices, you can build secure and flexible authentication systems in your FastAPI applications using FastAPI Shield.
 
-9. **Session management**: If using session-based authentication, implement proper session management.
-
-10. **Scope-based authorization**: Implement fine-grained access control with scopes or roles.
-
-11. **Security headers**: Set appropriate security headers like `X-Content-Type-Options` and `Strict-Transport-Security`.
-
-12. **Keep dependencies updated**: Regularly update your dependencies to patch security vulnerabilities.
-
-By following these patterns and best practices, you can implement secure and flexible authentication in your FastAPI applications using FastAPI Shield. 
