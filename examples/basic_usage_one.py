@@ -20,9 +20,8 @@ WINDOW_SECONDS = 60
     name="API Token Auth",
     auto_error=True,
     exception_to_raise_if_fail=HTTPException(
-        status_code=401,
-        detail="Invalid API token"
-    )
+        status_code=401, detail="Invalid API token"
+    ),
 )
 def auth_shield(api_token: str = Header()):
     valid_tokens = ["admin_token", "user_token"]
@@ -35,15 +34,16 @@ def auth_shield(api_token: str = Header()):
 def rate_limit_shield(request: Request):
     client_ip = request.client.host
     now = time.time()
-    
+
     # Remove expired timestamps
-    request_counts[client_ip] = [ts for ts in request_counts[client_ip] 
-                               if now - ts < WINDOW_SECONDS]
-    
+    request_counts[client_ip] = [
+        ts for ts in request_counts[client_ip] if now - ts < WINDOW_SECONDS
+    ]
+
     # Check if rate limit is exceeded
     if len(request_counts[client_ip]) >= MAX_REQUESTS:
         return None
-    
+
     # Add current timestamp and allow request
     request_counts[client_ip].append(now)
     return True
@@ -54,10 +54,12 @@ def rate_limit_shield(request: Request):
 async def protected_endpoint():
     return {"message": "This endpoint is protected by auth_shield"}
 
+
 @app.get("/rate-limited")
 @rate_limit_shield
 async def rate_limited_endpoint():
     return {"message": "This endpoint is protected by rate_limit_shield"}
+
 
 @app.get("/doubly-protected")
 @auth_shield
@@ -65,24 +67,29 @@ async def rate_limited_endpoint():
 async def doubly_protected_endpoint():
     return {"message": "This endpoint is protected by both shields"}
 
+
 # Tests
 
 client = TestClient(app)
+
 
 def test_protected_endpoint():
     response = client.get("/protected", headers={"API-Token": "admin_token"})
     assert response.status_code == 200, response.json()
     assert response.json() == {"message": "This endpoint is protected by auth_shield"}
 
+
 def test_rate_limited_endpoint():
     for _ in range(MAX_REQUESTS // 2):
         response = client.get("/rate-limited")
         assert response.status_code == 200, response.json()
 
+
 def test_doubly_protected_endpoint():
     response = client.get("/doubly-protected", headers={"API-Token": "admin_token"})
     assert response.status_code == 200, response.json()
     assert response.json() == {"message": "This endpoint is protected by both shields"}
+
 
 def test_rate_limited_endpoint_fails():
     for _ in range((MAX_REQUESTS // 2) - 1):
@@ -90,5 +97,6 @@ def test_rate_limited_endpoint_fails():
         assert response.status_code == 200, response.json()
     response = client.get("/rate-limited")
     assert response.status_code == 500, response.json()
+
 
 # python -m pytest examples/basic_usage_one.py

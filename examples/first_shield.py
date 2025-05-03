@@ -3,6 +3,7 @@ from fastapi import Header, Depends, FastAPI
 from fastapi_shield import shield, ShieldedDepends
 from fastapi.testclient import TestClient
 
+
 # Create a simple authentication shield
 @shield
 def auth_shield(api_token: str = Header()):
@@ -14,18 +15,19 @@ def auth_shield(api_token: str = Header()):
         return api_token
     return None
 
+
 # Create a simple roles shield
 def roles_shield(roles: list[str]):
     """
     A shield that validates a list of roles.
     """
-    
+
     @shield
-    def wrapper(payload = ShieldedDepends(get_payload_from_token)):
+    def wrapper(payload=ShieldedDepends(get_payload_from_token)):
         if any(role in payload["roles"] for role in roles):
             return payload
         return None
-    
+
     return wrapper
 
 
@@ -48,27 +50,19 @@ def get_db():
                 "username": "John",
                 "roles": ["user"],
                 "products": ["product_1"],
-                "token": "user_token"
+                "token": "user_token",
             },
             "Peter": {
                 "username": "Peter",
                 "roles": ["admin", "user"],
                 "products": ["product_2"],
-                "token": "admin_token"
-            }
+                "token": "admin_token",
+            },
         },
         "products": {
-            "product_1": {
-                "owner": "John",
-                "name": "Product 1",
-                "price": 100
-            },
-            "product_2": {
-                "owner": "Peter",
-                "name": "Product 2",
-                "price": 200
-            }
-        }
+            "product_1": {"owner": "John", "name": "Product 1", "price": 100},
+            "product_2": {"owner": "Peter", "name": "Product 2", "price": 200},
+        },
     }
 
 
@@ -77,7 +71,7 @@ app = FastAPI()
 
 # Protected endpoint - requires authentication
 @app.get("/protected/{name}")
-@auth_shield # apply `@auth_shield`
+@auth_shield  # apply `@auth_shield`
 async def protected_endpoint(name: str):
     # `get_db` is only injected by FastAPI **after** the request made it through the `@auth_shield`!
     return {
@@ -96,7 +90,9 @@ def test_protected_unauthorized():
     client = TestClient(app)
     response = client.get("/protected/John", headers={"API-TOKEN": "invalid_token"})
     assert response.status_code == 500
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def test_protected_roles():
@@ -109,33 +105,44 @@ def test_protected_roles():
 @app.get("/products")
 @auth_shield
 @roles_shield(["user"])
-async def get_all_products(db: Dict[str, Any]=Depends(get_db), username: str=ShieldedDepends(get_username_from_payload)):
+async def get_all_products(
+    db: Dict[str, Any] = Depends(get_db),
+    username: str = ShieldedDepends(get_username_from_payload),
+):
     """Only user with role `user` can get their own product"""
-    products = list(map(lambda name: db["products"][name], db["users"][username]["products"]))
+    products = list(
+        map(lambda name: db["products"][name], db["users"][username]["products"])
+    )
     return {
         "message": f"These are your products: {products}",
     }
-    
-    
+
+
 def test_get_all_products_john():
     client = TestClient(app)
     response = client.get("/products", headers={"API-TOKEN": "user_token"})
     assert response.status_code == 200, response.json()
-    assert response.json() == {"message": "These are your products: [{'owner': 'John', 'name': 'Product 1', 'price': 100}]"}, response.json()
-    
-    
+    assert response.json() == {
+        "message": "These are your products: [{'owner': 'John', 'name': 'Product 1', 'price': 100}]"
+    }, response.json()
+
+
 def test_get_all_products_peter():
     client = TestClient(app)
     response = client.get("/products", headers={"API-TOKEN": "admin_token"})
     assert response.status_code == 200, response.json()
-    assert response.json() == {"message": "These are your products: [{'owner': 'Peter', 'name': 'Product 2', 'price': 200}]"}
-    
+    assert response.json() == {
+        "message": "These are your products: [{'owner': 'Peter', 'name': 'Product 2', 'price': 200}]"
+    }
+
 
 def test_get_all_products_unauthorized():
     client = TestClient(app)
     response = client.get("/products", headers={"API-TOKEN": "invalid_token"})
     assert response.status_code == 500
-    assert response.json() == {'detail': 'Shield with name `unknown` blocks the request'}, response.json()
+    assert response.json() == {
+        "detail": "Shield with name `unknown` blocks the request"
+    }, response.json()
 
 
 def run_tests():

@@ -18,8 +18,16 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "
 from threading import Event
 from typing import Any, Callable
 
-from fastapi import (BackgroundTasks, Body, Depends, FastAPI, Header,
-                     HTTPException, Path, Request)
+from fastapi import (
+    BackgroundTasks,
+    Body,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Path,
+    Request,
+)
 from pydantic import BaseModel
 
 from fastapi_shield.openapi import patch_get_openapi
