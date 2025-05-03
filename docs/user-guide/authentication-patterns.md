@@ -447,11 +447,13 @@ def create_item(
 You can combine multiple authentication methods for flexibility:
 
 ```python
-from fastapi import FastAPI, Depends, HTTPException, status, Header, Request
+# Found in `examples/multi_auth_one.py`
+from fastapi import Cookie, FastAPI, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
-from typing import NewType, Annotated, Dict, Optional, List, Union
+from typing import NewType, Optional
 from pydantic import BaseModel
-from fastapi_shield import shield, Shield
+from fastapi_shield import shield, ShieldedDepends
+from fastapi.testclient import TestClient
 
 app = FastAPI()
 
@@ -489,10 +491,9 @@ async def validate_session_cookie(session_id: str) -> Optional[User]:
 # Shield for flexible authentication
 @shield
 async def authenticate(
-    request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
     x_api_key: Optional[str] = Header(None),
-    session: Optional[str] = Header(None)
+    session: Optional[str] = Cookie(None),
 ) -> AuthenticatedUser:
     # Try JWT authentication
     if token:
@@ -521,7 +522,8 @@ async def authenticate(
 
 # Use the shield in an endpoint
 @app.get("/protected")
-async def protected_route(user: AuthenticatedUser = Depends(authenticate)):
+@authenticate
+async def protected_route(user: AuthenticatedUser = ShieldedDepends(lambda user: user)):
     return {
         "message": f"Hello {user.username}! You are authenticated via {user.auth_method}",
         "user": user
