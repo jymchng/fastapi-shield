@@ -153,3 +153,5 @@ async def example_endpoint():
     # This code runs only if all shields pass
     return {"message": "All shields passed"}
 ``` 
+
+You can find the codes in the repository under the `examples` directory, named as `basic_usage_one.py`.
