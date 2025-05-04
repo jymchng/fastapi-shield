@@ -191,6 +191,7 @@ To understand the importance of this feature, let's examine a concrete example o
 **Traditional Approach with FastAPI Depends:**
 
 ```python
+# Found in `examples/lazy_depends_one.py`
 from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.testclient import TestClient
 from slowapi import Limiter
