@@ -136,41 +136,6 @@ async def create_item(request: Request, item: Item):
     return {"item": item_dict}
 ```
 
-### FastAPI-Shield's Superior Approach
-
-In contrast, FastAPI Shield addresses all these issues:
-
-```python
-from fastapi import FastAPI
-from fastapi_shield import shield, ShieldedDepends
-
-app = FastAPI()
-
-@shield(name="JWT Auth")
-def auth_shield(authorization: str = Header()):
-    # Authentication logic returning user data
-    return user_data
-
-@shield(name="Admin Check")
-def admin_shield(user = ShieldedDepends(auth_shield)):
-    if user.get("role") != "admin":
-        return None
-    return user
-
-@app.get("/admin/dashboard")
-@auth_shield
-@admin_shield
-async def admin_dashboard():
-    # Clean function signature - no request parameter required!
-    return {"stats": {"users": 100, "active": 42}}
-
-@app.get("/profile")
-@auth_shield
-async def get_profile(user = ShieldedDepends(lambda user: user)):
-    # Typed data injection when needed
-    return {"user_id": user["sub"], "profile": "..."}
-```
-
 ### Benefits of FastAPI-Shield over Custom Decorators
 
 FastAPI-Shield offers several key advantages over custom decorators: it eliminates the need for forced `request` parameters in endpoints unless they're genuinely needed for business logic; provides a consistent pattern for accessing shield data through `ShieldedDepends`; seamlessly integrates with FastAPI's type system and dependency injection for better type safety; maintains a clean separation of concerns by keeping authentication and validation logic contained within shields rather than scattered across decorators; and fully integrates with FastAPI's native exception handling system, ensuring consistent error responses throughout your application.
@@ -212,7 +177,10 @@ async def get_order_details(
 
 While at first glance writing your own decorators might seem appealing, FastAPI-Shield's design specifically for FastAPI applications provides a cleaner, more maintainable, and more flexible approach without sacrificing functionality.
 
-## Lazy Dependency Resolution: Efficiency by Design
+
+## Comparing to Other Decorators Based Frameworks (e.g. `slowapi`, `fastapi-decorators`)
+
+## 1. Lazy Dependency Resolution: Efficiency by Design
 
 One of the most significant advantages of FastAPI-Shield over alternatives like [`fastapi-decorators`](https://github.com/Minibrams/fastapi-decorators), or [`slowapi`](https://github.com/laurentS/slowapi) is its lazy dependency resolution mechanism. This feature can significantly improve performance and reduce unnecessary resource consumption in real-world applications.
 
@@ -417,7 +385,7 @@ This optimization leads to improved scalability, allowing your API to handle sub
 
 This is particularly valuable in microservice architectures where each unnecessary dependency resolution might involve network calls to other services.
 
-## Clean Endpoint Signatures & Data Flow with ShieldedDepends
+## 2. Clean Endpoint Signatures & Data Flow with ShieldedDepends
 
 FastAPI-Shield significantly improves code readability by keeping endpoint signatures clean and focused on their actual purpose, while still providing access to data from shields when needed.
 
@@ -635,7 +603,7 @@ async def get_user_profile(
     }
 ```
 
-## Visual Security Indicators
+## 3. Visual Security Indicators
 
 FastAPI-Shield provides immediate visual cues about an endpoint's security requirements through its decorators.
 
@@ -664,7 +632,7 @@ async def get_sensitive_data(
 
 In the traditional approach, security requirements are embedded within the function parameters, making them less immediately apparent and requiring developers to examine each dependency to understand the endpoint's security model.
 
-## Separation of Concerns
+## 4. Separation of Concerns
 
 FastAPI-Shield promotes a clearer separation of concerns in your codebase, following solid software engineering principles.
 
@@ -695,7 +663,7 @@ async def get_user_data():
     return {"user_data": "value"}
 ```
 
-## Composability and Reusability
+## 5. Composability and Reusability
 
 FastAPI-Shield excels at creating reusable security components that can be easily composed.
 
@@ -720,7 +688,7 @@ async def content_management():
 
 This composability allows for consistent security policies across your API without code duplication.
 
-## Error Handling
+## 6. Error Handling
 
 FastAPI-Shield provides a clean, declarative way to define error responses for security failures:
 
