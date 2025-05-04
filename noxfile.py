@@ -2,9 +2,10 @@ import contextlib
 import os
 import shutil
 from functools import wraps
+import pathlib
 
 import nox
-import nox.command
+import nox.command as nox_command
 from nox import session as nox_session
 from nox.project import load_toml
 from nox.sessions import Session
@@ -419,6 +420,7 @@ def test_development(session: Session):
 
 @session(
     dependency_group="dev",
+    default_posargs=[pathlib.Path(PROJECT_CODES_DIR)],
 )
 def format(session: Session):
     # clang-format only c files
@@ -427,7 +429,6 @@ def format(session: Session):
     import os
     # Check if the directory exists before trying to format files
     # Find the src directory or use parent directory
-    import pathlib
 
     # Look for src directory
     format_dir = pathlib.Path(PROJECT_CODES_DIR)
@@ -435,7 +436,7 @@ def format(session: Session):
     session.log(f"Using {format_dir} as the directory for formatting")
 
     # Format python files first
-    session.run("uv", "tool", "run", "ruff", "format", format_dir)
+    session.run("uv", "tool", "run", "ruff", "format")
 
     # Format c files
     c_files_path = format_dir
@@ -448,7 +449,7 @@ def format(session: Session):
     if not c_files:
         session.log(f"No C files found in {c_files_path}, skipping clang-format")
         return
-    session.run("uv", "tool", "run", "clang-format", "-i", *c_files)
+    nox_command.run(("uv", "tool", "run", "clang-format", "-i", *c_files))
 
 
 @session(dependency_group="dev", default_posargs=["check", ".", "--fix"])

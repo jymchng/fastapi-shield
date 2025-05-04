@@ -75,7 +75,7 @@ def test_admin_endpoint_without_token():
                     "api-token",
                 ],
                 "msg": "Field required",
-                'type': 'missing',
+                "type": "missing",
             }
         ],
     }
