@@ -135,7 +135,7 @@ def jwt_shield(authorization: str = Header()):
         return None
 
 @shield
-def admin_access(payload = ShieldedDepends(jwt_shield)):
+def admin_access(payload = ShieldedDepends(lambda payload: payload)):
     """Check if user has admin role in JWT payload"""
     if payload.get("role") == "admin":
         return payload
@@ -238,7 +238,7 @@ def validate_parameters(
 
 @app.get("/items")
 @validate_parameters
-async def list_items(params: dict = ShieldedDepends(validate_parameters)):
+async def list_items(params: dict = ShieldedDepends(lambda p: p)):
     # Use validated and normalized parameters
     return {
         "items": [f"Item {i}" for i in range(1, 6)],
