@@ -42,6 +42,8 @@ nav:
       - String Types: user-guide/string-types.md
       - Request Validation: user-guide/request-validation.md
       - API Examples: user-guide/examples.md
+      - Troubleshooting: user-guide/troubleshooting.md
+      - Comparison with Alternatives: user-guide/comparison_alternatives.md
   - Examples:
       - Basic Examples: examples/basic_examples.md
       - Authentication Examples: examples/authentication_examples.md
@@ -49,22 +51,32 @@ nav:
       - Advanced Examples: examples/advanced_examples.md
       - Real World Examples: examples/real_world.md
       - Using with Pydantic: examples/using_with_pydantic.md
-      - Complete Application: examples/complete_application.md
   - Advanced Topics:
       - Type Inheritance: advanced-topics/type-inheritance.md
       - Advanced Method Interception: advanced-topics/method-interception.md
-      - Rate Limiting: advanced-topics/rate-limiting.md
       - JWT Authentication: advanced-topics/jwt-authentication.md
-      - IP Restrictions: advanced-topics/ip-restrictions.md
-      - Shield Composition: advanced-topics/shield-composition.md
-      - Performance Optimization: advanced-topics/performance-optimization.md
+      - Dependency Injection: advanced-topics/dependency-injection.md
+      - Error Handling: advanced-topics/error-handling.md
+      - Background Tasks: advanced-topics/background-tasks.md
+      - Testing: advanced-topics/testing.md
+      - Performance: advanced-topics/performance.md
+      - Deployment: advanced-topics/deployment.md
+      - Production Deployment: advanced-topics/production-deployment.md
+      - Security Best Practices: advanced-topics/security-best-practices.md
   - API Reference:
-    - NewType: api/newtype.md
+      - Overview: api/index.md
+      - Shield: api/shield.md
+      - NewType: api/newtype.md
+      - Depends: api/depends.md
+      - Validators: api/validators.md
+      - Interceptors: api/interceptors.md
   - Development:
-    - Contributing: development/contributing.md
-    - Building: development/building.md
-    - Testing: development/testing.md
-    - Performance: development/performance.md
+      - Overview: development/index.md
+      - Contributing: development/contributing.md
+      - Building: development/building.md
+      - Testing: development/testing.md
+      - Architecture: development/architecture.md
+      - Roadmap: development/roadmap.md
 
 markdown_extensions:
   - admonition
@@ -88,7 +100,8 @@ plugins:
             show_bases: true
             find_stubs_package: true
             allow_inspection: false # to remove __file__ etc from c extension stubs
-          source:
-            - '**/*.pyi'
-            - '!**/*.so'  # Exclude .so files
-            - '!**/*.pyd'  # Exclude .so files
+            extra:
+              paths:
+                - '**/*.pyi'
+                - '!**/*.so'  # Exclude .so files
+                - '!**/*.pyd'  # Exclude .pyd files

@@ -109,4 +109,4 @@ async def user_endpoint():
     return {"message": "This endpoint is for users!"}
 ```
 
-This is just a basic introduction to FastAPI Shield. For more advanced usage, check out our [User Guide](/user-guide/basic-usage) and [Examples](/examples/basic_examples). 
+This is just a basic introduction to FastAPI Shield. For more advanced usage, check out our [User Guide](../user-guide/basic-usage.md) and [Examples](../examples/basic_examples.md). 

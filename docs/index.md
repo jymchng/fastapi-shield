@@ -1,7 +1,7 @@
 # FastAPI Shield
 
 <div align="center">
-<img src="../assets/logos/logo_hori_one.jpg" width="80%" height="20%">
+<img src="assets/logos/logo_hori_one.jpg" width="80%" height="20%">
 </div>
 
 A powerful, intuitive, and flexible authentication and authorization library for FastAPI applications. Stack your shields to create robust and customizable layers which effectively shields your endpoints from unwanted requests.
