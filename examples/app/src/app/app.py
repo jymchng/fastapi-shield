@@ -1,5 +1,5 @@
 from database import TOKENS_DB, get_all_products, get_product, get_user_by_username
-from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, status
+from fastapi import Body, FastAPI, HTTPException, Path, status
 from models import Product, TokenResponse, User
 from shields import (
     admin_required,
