@@ -1,3 +1,5 @@
+<!-- Examples Tested -->
+
 # Authentication Patterns
 
 FastAPI Shield provides powerful abstractions for implementing secure authentication in your FastAPI applications. This guide covers common authentication patterns and best practices.

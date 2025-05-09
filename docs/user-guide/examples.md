@@ -1,3 +1,5 @@
+<!-- Examples Tested -->
+
 # Examples
 
 This page contains example usage patterns for FastAPI Shield in common scenarios.
@@ -64,7 +66,7 @@ def role_shield(required_roles: list[str]):
     """Factory function to create a role-checking shield"""
     
     @shield(name=f"Role Check ({', '.join(required_roles)})")
-    def check_role(user_data = ShieldedDepends(auth_shield)):
+    def check_role(user_data: dict = ShieldedDepends(lambda user: user)):
         """Check if the user has any of the required roles"""
         user_roles = user_data.get("roles", [])
         if any(role in required_roles for role in user_roles):
@@ -110,7 +112,7 @@ from jwt.exceptions import PyJWTError
 app = FastAPI()
 
 # Configuration
-JWT_SECRET = "your-secret-key"  # In production, use a secure key
+JWT_SECRET = "test-secret-key"  # In production, use a secure key
 JWT_ALGORITHM = "HS256"
 
 @shield(
@@ -134,8 +136,8 @@ def jwt_shield(authorization: str = Header()):
     except PyJWTError:
         return None
 
-@shield
-def admin_access(payload = ShieldedDepends(lambda payload: payload)):
+@shield(name="Admin Access")
+def admin_access(payload: dict = ShieldedDepends(lambda payload: payload)):
     """Check if user has admin role in JWT payload"""
     if payload.get("role") == "admin":
         return payload
@@ -184,8 +186,10 @@ def rate_limit_shield(request: Request):
     now = time.time()
     
     # Remove expired timestamps
-    request_counts[client_ip] = [ts for ts in request_counts[client_ip] 
-                               if now - ts < WINDOW_SECONDS]
+    request_counts[client_ip] = [
+        ts for ts in request_counts[client_ip] 
+        if now - ts < WINDOW_SECONDS
+    ]
     
     # Check if rate limit is exceeded
     if len(request_counts[client_ip]) >= MAX_REQUESTS:
@@ -207,7 +211,7 @@ Validating request parameters with FastAPI Shield:
 
 ```python
 from fastapi import FastAPI, Query, HTTPException, status
-from fastapi_shield import shield
+from fastapi_shield import shield, ShieldedDepends
 from typing import Optional
 
 app = FastAPI()
@@ -229,8 +233,8 @@ def validate_parameters(
     
     # Create normalized parameters
     normalized = {
-        "page": max(1, page),  # Ensure page is at least 1
-        "per_page": max(1, min(per_page, 100)),  # Ensure per_page is between 1 and 100
+        "page": max(1, page),
+        "per_page": max(1, min(per_page, 100)),
         "sort_by": sort_by if sort_by in valid_sort_fields else "created_at"
     }
     
@@ -282,6 +286,122 @@ def ip_restriction_shield(request: Request):
 @ip_restriction_shield
 async def internal_api():
     return {"message": "Internal API endpoint"}
+```
+
+## Combined Shields Example
+
+Here's an example showcasing how to combine multiple shields for comprehensive protection:
+
+```python
+from fastapi import FastAPI, Header, Request, HTTPException, status, Query
+from fastapi_shield import shield, ShieldedDepends
+from typing import Optional
+import time
+from collections import defaultdict
+
+app = FastAPI(title="FastAPI Shield Combined Example")
+
+# ------------------ Authentication Shield ------------------
+VALID_API_TOKENS = {
+    "admin_token": {"user_id": "admin", "role": "admin"},
+    "user_token": {"user_id": "user1", "role": "user"}
+}
+
+@shield(
+    name="API Token Auth",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid API token"
+    )
+)
+def auth_shield(api_token: str = Header()):
+    """Shield that validates API tokens"""
+    if api_token in VALID_API_TOKENS:
+        return VALID_API_TOKENS[api_token]
+    return None
+
+# ------------------ Role-Based Access Shield ------------------
+@shield(
+    name="Admin Access",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Admin access required"
+    )
+)
+def admin_shield(user_data: dict = ShieldedDepends(lambda user: user)):
+    """Check if user has admin role"""
+    if user_data.get("role") == "admin":
+        return user_data
+    return None
+
+# ------------------ Rate Limiting Shield ------------------
+request_counts = defaultdict(list)
+MAX_REQUESTS = 3
+WINDOW_SECONDS = 60
+
+@shield(
+    name="Rate Limiter",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail=f"Rate limit exceeded. Maximum {MAX_REQUESTS} requests per {WINDOW_SECONDS} seconds.",
+        headers={"Retry-After": str(WINDOW_SECONDS)}
+    )
+)
+def rate_limit_shield(request: Request):
+    """Limit requests based on client IP"""
+    client_ip = request.client.host
+    now = time.time()
+    
+    # Remove expired timestamps
+    request_counts[client_ip] = [
+        ts for ts in request_counts[client_ip] 
+        if now - ts < WINDOW_SECONDS
+    ]
+    
+    # Check if rate limit is exceeded
+    if len(request_counts[client_ip]) >= MAX_REQUESTS:
+        return None
+    
+    # Add current timestamp and allow request
+    request_counts[client_ip].append(now)
+    return True
+
+# ------------------ Parameter Validation Shield ------------------
+@shield(
+    name="Parameters Validator",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid parameters"
+    )
+)
+def validate_parameters(
+    page: int = Query(1),
+    per_page: int = Query(10, ge=1, le=100),
+    sort_by: Optional[str] = Query(None)
+):
+    """Validate and normalize query parameters"""
+    valid_sort_fields = ["created_at", "updated_at", "name"]
+    
+    # Create normalized parameters
+    normalized = {
+        "page": max(1, page),
+        "per_page": max(1, min(per_page, 100)),
+        "sort_by": sort_by if sort_by in valid_sort_fields else "created_at"
+    }
+    
+    return normalized
+
+# ------------------ Combined Shield Endpoint ------------------
+@app.get("/admin-items")
+@rate_limit_shield
+@auth_shield
+@admin_shield
+@validate_parameters
+async def admin_items(params: dict = ShieldedDepends(lambda p: p)):
+    return {
+        "items": [f"Admin Item {i}" for i in range(1, 6)],
+        "pagination": params
+    }
 ```
 
 These examples showcase different ways to implement security and validation using FastAPI Shield. You can adapt and combine them to suit your application's needs. 
