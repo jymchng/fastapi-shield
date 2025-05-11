@@ -63,7 +63,7 @@ def validate_user_shield(user: UserCreate = Depends()):
 # Endpoint with Pydantic and Shield validation
 @app.post("/users", response_model=User)
 @validate_user_shield
-async def create_user(validated_user: UserCreate = ShieldedDepends(validate_user_shield)):
+async def create_user(validated_user: UserCreate = ShieldedDepends(lambda user: user)):
     """Create a new user with validated data"""
     # In a real app, you would save the user to a database
     # This is simplified for the example
@@ -186,7 +186,7 @@ async def validate_order_shield(order: Order = Depends()):
 # Endpoint with complex Pydantic validation + Shield
 @app.post("/orders")
 @validate_order_shield
-async def create_order(order_data: Dict[str, Any] = ShieldedDepends(validate_order_shield)):
+async def create_order(order_data: Dict[str, Any] = ShieldedDepends(lambda order: order)):
     """Create a new order with validated data"""
     # In a real app, you would save the order to a database
     # This is simplified for the example
@@ -306,7 +306,7 @@ def require_role(role: str):
             detail=f"Role {role} required"
         )
     )
-    async def role_shield(user: AuthenticatedUser = ShieldedDepends(jwt_auth_shield)) -> Optional[AuthenticatedUser]:
+    async def role_shield(user: AuthenticatedUser = ShieldedDepends(lambda user: user)) -> Optional[AuthenticatedUser]:
         """Check if user has the required role"""
         if user.has_role(role):
             return user
@@ -325,7 +325,7 @@ def require_permission(permission: str):
             detail=f"Permission {permission} required"
         )
     )
-    async def permission_shield(user: AuthenticatedUser = ShieldedDepends(jwt_auth_shield)) -> Optional[AuthenticatedUser]:
+    async def permission_shield(user: AuthenticatedUser = ShieldedDepends(lambda user: user)) -> Optional[AuthenticatedUser]:
         """Check if user has the required permission"""
         if user.has_permission(permission):
             return user

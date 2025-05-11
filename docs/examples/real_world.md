@@ -171,7 +171,7 @@ async def product_exists_shield(product_id: UUID = Path(...)):
 @shield(name="Order Owner")
 async def order_owner_shield(
     order_id: UUID = Path(...),
-    auth_data = ShieldedDepends(jwt_auth_shield)
+    auth_data = ShieldedDepends(lambda payload: payload)
 ):
     """Check if the user owns the order"""
     # In a real app, this would query a database
@@ -215,7 +215,7 @@ async def list_products(
 @app.get("/products/{product_id}", response_model=Product)
 @rate_limit_shield
 @product_exists_shield
-async def get_product(product: Product = ShieldedDepends(product_exists_shield)):
+async def get_product(product: Product = ShieldedDepends(lambda p: p)):
     """Get a specific product by ID"""
     return product
 
@@ -225,7 +225,7 @@ async def get_product(product: Product = ShieldedDepends(product_exists_shield))
 @require_permissions(["product:create"])
 async def create_product(
     product: Product, 
-    auth_data = ShieldedDepends(require_permissions(["product:create"]))
+    auth_data = ShieldedDepends(lambda data: data)
 ):
     """Create a new product"""
     # In a real app, this would save to a database
@@ -241,7 +241,7 @@ async def create_product(
 async def update_product(
     updated_product: Product,
     product: Product = ShieldedDepends(product_exists_shield),
-    auth_data = ShieldedDepends(require_permissions(["product:update"]))
+    auth_data = ShieldedDepends(lambda data: data)
 ):
     """Update an existing product"""
     # In a real app, this would update the database
@@ -255,8 +255,8 @@ async def update_product(
 @product_exists_shield
 @require_permissions(["product:delete"])
 async def delete_product(
-    product: Product = ShieldedDepends(product_exists_shield),
-    auth_data = ShieldedDepends(require_permissions(["product:delete"]))
+    product_id: int,
+    auth_data = ShieldedDepends(lambda data: data)
 ):
     """Delete a product"""
     # In a real app, this would delete from the database
@@ -268,7 +268,7 @@ async def delete_product(
 @app.get("/orders", response_model=List[Order])
 @rate_limit_shield
 @jwt_auth_shield
-async def list_orders(auth_data = ShieldedDepends(jwt_auth_shield)):
+async def list_orders(auth_data = ShieldedDepends(lambda d: d)):
     """List orders for the current user or all orders for admins/managers"""
     user_id = auth_data.get("user_id")
     user_roles = auth_data.get("roles", [])
@@ -286,7 +286,7 @@ async def list_orders(auth_data = ShieldedDepends(jwt_auth_shield)):
 @rate_limit_shield
 @jwt_auth_shield
 @order_owner_shield
-async def get_order(order: Order = ShieldedDepends(order_owner_shield)):
+async def get_order(order: Order = ShieldedDepends(lambda o: o)):
     """Get a specific order that the user owns or has permission to view"""
     return order
 
@@ -295,7 +295,7 @@ async def get_order(order: Order = ShieldedDepends(order_owner_shield)):
 @jwt_auth_shield
 async def create_order(
     order_items: List[OrderItem],
-    auth_data = ShieldedDepends(jwt_auth_shield)
+    auth_data = ShieldedDepends(lambda d: d)
 ):
     """Create a new order"""
     user_id = auth_data.get("user_id")

@@ -1,6 +1,6 @@
 <!-- Examples Tested -->
 
-# Examples
+# Simple Use Cases
 
 This page contains example usage patterns for FastAPI Shield in common scenarios.
 

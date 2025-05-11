@@ -51,18 +51,18 @@ nav:
       - Advanced Examples: examples/advanced_examples.md
       - Real World Examples: examples/real_world.md
       - Using with Pydantic: examples/using_with_pydantic.md
-  - Advanced Topics:
-      - Type Inheritance: advanced-topics/type-inheritance.md
-      - Advanced Method Interception: advanced-topics/method-interception.md
-      - JWT Authentication: advanced-topics/jwt-authentication.md
-      - Dependency Injection: advanced-topics/dependency-injection.md
-      - Error Handling: advanced-topics/error-handling.md
-      - Background Tasks: advanced-topics/background-tasks.md
-      - Testing: advanced-topics/testing.md
-      - Performance: advanced-topics/performance.md
-      - Deployment: advanced-topics/deployment.md
-      - Production Deployment: advanced-topics/production-deployment.md
-      - Security Best Practices: advanced-topics/security-best-practices.md
+  # - Advanced Topics:
+  #     - Type Inheritance: advanced-topics/type-inheritance.md
+  #     - Advanced Method Interception: advanced-topics/method-interception.md
+  #     - JWT Authentication: advanced-topics/jwt-authentication.md
+  #     - Dependency Injection: advanced-topics/dependency-injection.md
+  #     - Error Handling: advanced-topics/error-handling.md
+  #     - Background Tasks: advanced-topics/background-tasks.md
+  #     - Testing: advanced-topics/testing.md
+  #     - Performance: advanced-topics/performance.md
+  #     - Deployment: advanced-topics/deployment.md
+  #     - Production Deployment: advanced-topics/production-deployment.md
+  #     - Security Best Practices: advanced-topics/security-best-practices.md
   - API Reference:
       - Overview: api/index.md
       - Shield: api/shield.md
