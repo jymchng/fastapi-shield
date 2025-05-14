@@ -34,10 +34,10 @@ nav:
     - Quick Start: getting-started/quickstart.md
   - User Guide:
       - Basic Usage: user-guide/basic-usage.md
+      # Authentication Patterns Done
       - Authentication Patterns: user-guide/authentication-patterns.md
       - Role-Based Access Control: user-guide/rbac.md
       - Type Wrapping: user-guide/type-wrapping.md
-      - Method Interception: user-guide/method-interception.md
       - Custom Initialization: user-guide/custom-initialization.md
       - String Types: user-guide/string-types.md
       - Request Validation: user-guide/request-validation.md
@@ -46,23 +46,18 @@ nav:
       - Comparison with Alternatives: user-guide/comparison_alternatives.md
   - Examples:
       - Basic Examples: examples/basic_examples.md
+      # Basic Examples Done
       - Authentication Examples: examples/authentication_examples.md
       - Authorization Examples: examples/authorization_examples.md
       - Advanced Examples: examples/advanced_examples.md
       - Real World Examples: examples/real_world.md
       - Using with Pydantic: examples/using_with_pydantic.md
-  # - Advanced Topics:
-  #     - Type Inheritance: advanced-topics/type-inheritance.md
-  #     - Advanced Method Interception: advanced-topics/method-interception.md
-  #     - JWT Authentication: advanced-topics/jwt-authentication.md
-  #     - Dependency Injection: advanced-topics/dependency-injection.md
-  #     - Error Handling: advanced-topics/error-handling.md
-  #     - Background Tasks: advanced-topics/background-tasks.md
-  #     - Testing: advanced-topics/testing.md
-  #     - Performance: advanced-topics/performance.md
-  #     - Deployment: advanced-topics/deployment.md
-  #     - Production Deployment: advanced-topics/production-deployment.md
-  #     - Security Best Practices: advanced-topics/security-best-practices.md
+  - Advanced Topics:
+      - Type Inheritance: advanced-topics/type-inheritance.md
+      - JWT Authentication: advanced-topics/jwt-authentication.md
+      - Dependency Injection: advanced-topics/dependency-injection.md
+      - Method Interception: advanced-topics/method-interception.md
+      - Security Best Practices: advanced-topics/security-best-practices.md
   - API Reference:
       - Overview: api/index.md
       - Shield: api/shield.md

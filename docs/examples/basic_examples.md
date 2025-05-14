@@ -59,14 +59,14 @@ def auth_shield(api_token: str = Header()):
     return None
 
 @shield(name="Admin Shield")
-def admin_shield(user_data = ShieldedDepends(auth_shield)):
+def admin_shield(user_data = ShieldedDepends(lambda user: user)):
     """Check if the user has admin role"""
     if user_data["role"] == "admin":
         return user_data
     return None
 
 @shield(name="Editor Shield")
-def editor_shield(user_data = ShieldedDepends(auth_shield)):
+def editor_shield(user_data = ShieldedDepends(lambda user: user)):
     """Check if the user has editor role"""
     if user_data["role"] in ["admin", "editor"]:
         return user_data
@@ -86,7 +86,7 @@ async def editor_endpoint():
 
 @app.get("/all-users")
 @auth_shield
-async def all_users_endpoint(user_data = ShieldedDepends(auth_shield)):
+async def all_users_endpoint(user_data = ShieldedDepends(lambda user: user)):
     return {
         "message": f"Welcome, {user_data['role']}",
         "user_id": user_data["user_id"]
@@ -204,6 +204,8 @@ Customizing the response when a shield blocks the request:
 from fastapi import FastAPI, Path, Response, status
 from fastapi_shield import shield
 
+app = FastAPI()
+
 # Fake user database with subscription plans
 USER_DB = {
     "user1": {"subscription": "free"},
@@ -211,8 +213,6 @@ USER_DB = {
     "user3": {"subscription": "enterprise"},
     "user4": {"subscription": "unlimited"}
 }
-
-app = FastAPI()
 
 @shield(
     name="Feature Flag Shield",
@@ -223,7 +223,7 @@ app = FastAPI()
         status_code=status.HTTP_402_PAYMENT_REQUIRED
     )
 )
-def feature_flag_shield(user_id: str=Path()):
+def feature_flag_shield(user_id: str = Path(...)):
     """Check if the user's subscription plan includes the feature"""
     
     # Get user's subscription plan from the database
@@ -255,7 +255,7 @@ app = FastAPI()
 
 async def validate_token_async(token: str) -> bool:
     """Simulate an asynchronous token validation process"""
-    await asyncio.sleep(0.1)  # Simulate external API call
+    await asyncio.sleep(0.05)  # Simulate external API call
     return token.startswith("valid_")
 
 @shield(

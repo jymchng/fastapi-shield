@@ -115,7 +115,7 @@ def input_sanitizer(user_input: UserInput = Depends()):
 
 @app.post("/users")
 @input_sanitizer
-async def create_user(sanitized_input: SanitizedUserInput = ShieldedDepends(input_sanitizer)):
+async def create_user(sanitized_input: SanitizedUserInput = ShieldedDepends(lambda user: user)):
     # Use the sanitized input
     return {"message": f"User created with email {sanitized_input.normalized_email}"}
 ```

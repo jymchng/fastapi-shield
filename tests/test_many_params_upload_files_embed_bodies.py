@@ -1,5 +1,3 @@
-import os
-import sys
 from pathlib import Path as PathLibPath
 
 from fastapi import (
@@ -17,8 +15,6 @@ from fastapi import (
 )
 from fastapi.requests import HTTPConnection
 from fastapi.testclient import TestClient
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from typing import List
 
@@ -101,6 +97,7 @@ app = FastAPI()
 
 
 @app.post("/protected_with_shield/{username}/{product_name}/{big_name}/{big_house}")
+@auth_required_shield
 @auth_required_shield
 async def protected(
     g: str,
