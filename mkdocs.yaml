@@ -33,6 +33,7 @@ nav:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
   - User Guide:
+      # Basic Usage Done
       - Basic Usage: user-guide/basic-usage.md
       # Authentication Patterns Done
       - Authentication Patterns: user-guide/authentication-patterns.md

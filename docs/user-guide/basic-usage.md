@@ -28,9 +28,8 @@ from fastapi_shield import shield
     name="API Token Auth",
     auto_error=True,
     exception_to_raise_if_fail=HTTPException(
-        status_code=401,
-        detail="Invalid API token"
-    )
+        status_code=401, detail="Invalid API token"
+    ),
 )
 def auth_shield(api_token: str = Header()):
     valid_tokens = ["admin_token", "user_token"]
@@ -60,8 +59,9 @@ def rate_limit_shield(request: Request):
     now = time.time()
     
     # Remove expired timestamps
-    request_counts[client_ip] = [ts for ts in request_counts[client_ip] 
-                               if now - ts < WINDOW_SECONDS]
+    request_counts[client_ip] = [
+        ts for ts in request_counts[client_ip] if now - ts < WINDOW_SECONDS
+    ]
     
     # Check if rate limit is exceeded
     if len(request_counts[client_ip]) >= MAX_REQUESTS:
@@ -121,8 +121,8 @@ from fastapi_shield import shield
     exception_to_raise_if_fail=HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Access denied by custom shield",
-        headers={"X-Shield-Blocked": "true"}
-    )
+        headers={"X-Shield-Blocked": "true"},
+    ),
 )
 def custom_error_shield():
     return None  # Always block the request
@@ -132,9 +132,9 @@ def custom_error_shield():
     auto_error=False,
     default_response_to_return_if_fail=Response(
         content="Request blocked by shield",
-        media_type="text/plain",
-        status_code=status.HTTP_429_TOO_MANY_REQUESTS
-    )
+        media_type="text/plain; charset=utf-8",
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+    ),
 )
 def custom_response_shield():
     return None  # Always block the request
@@ -154,4 +154,16 @@ async def example_endpoint():
     return {"message": "All shields passed"}
 ``` 
 
-You can find the codes in the repository under the `examples` directory, named as `basic_usage_one.py`.
+## Default Error Responses
+
+If you don't specify a custom error response, the shield will respond with a default error:
+
+```
+{
+    "detail": "Shield with name `Shield Name` blocks the request"
+}
+```
+
+With a status code of 500.
+
+You can find the code in the repository under the `examples` directory, named as `basic_usage_one.py`.
