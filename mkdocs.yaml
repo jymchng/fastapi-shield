@@ -37,6 +37,7 @@ nav:
       - Basic Usage: user-guide/basic-usage.md
       # Authentication Patterns Done
       - Authentication Patterns: user-guide/authentication-patterns.md
+      # Custom Initialization Done
       - Custom Initialization: user-guide/custom-initialization.md
       - String Types: user-guide/string-types.md
       - Request Validation: user-guide/request-validation.md

@@ -1,3 +1,5 @@
+<!-- Examples Tested -->
+
 # Custom Initialization
 
 FastAPI Shield provides flexible ways to customize how shields are initialized and configured.
@@ -7,42 +9,85 @@ FastAPI Shield provides flexible ways to customize how shields are initialized a
 The shield factory pattern allows you to create reusable, configurable shields:
 
 ```python
-from fastapi import HTTPException, status
+from fastapi import FastAPI, Header, Depends, HTTPException, status
 from fastapi_shield import shield
+from typing import List, Optional
 
-def create_role_shield(required_roles: list[str], auto_error: bool = True):
-    """
-    Factory function that creates a role-based shield.
-    
-    Args:
-        required_roles: List of roles that are allowed to access the endpoint
-        auto_error: Whether to automatically raise an exception when the shield blocks a request
-        
-    Returns:
-        A shield function that checks if the user has one of the required roles
-    """
+app = FastAPI()
+
+# Mock user data for testing
+user_db = {
+    "user1": {"username": "user1", "roles": ["viewer"]},
+    "user2": {"username": "user2", "roles": ["editor", "viewer"]},
+    "admin": {"username": "admin", "roles": ["admin", "editor", "viewer"]}
+}
+
+# Dependency to extract token from header
+def get_token_from_header(authorization: str = Header(None)) -> Optional[str]:
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    return authorization.replace("Bearer ", "")
+
+# Dependency to get current user from token
+def get_current_user(token: str = Depends(get_token_from_header)) -> Optional[dict]:
+    if not token:
+        return None
+    return user_db.get(token)
+
+# Create a shield factory for role-based authorization
+def create_role_shield(allowed_roles: List[str], auto_error: bool = True):
+    """Factory function that creates a role-based shield"""
+    exception = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Access denied. Required roles: {allowed_roles}"
+    )
     
     @shield(
-        name=f"Role Shield ({', '.join(required_roles)})",
+        name=f"Role Shield ({', '.join(allowed_roles)})",
         auto_error=auto_error,
-        exception_to_raise_if_fail=HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access denied. Required roles: {required_roles}"
-        )
+        exception_to_raise_if_fail=exception
     )
-    def role_shield(user_data: dict = ShieldedDepends(get_user_data)):
-        user_roles = user_data.get("roles", [])
-        if any(role in required_roles for role in user_roles):
-            return user_data
+    def role_checker(user: Optional[dict] = Depends(get_current_user)) -> Optional[dict]:
+        if not user:
+            return None
+            
+        user_roles = user.get("roles", [])
+        for role in user_roles:
+            if role in allowed_roles:
+                return user
         return None
-        
-    return role_shield
+    
+    return role_checker
 
-# Usage
+# Create shields for different roles
 admin_shield = create_role_shield(["admin"])
 editor_shield = create_role_shield(["admin", "editor"])
 viewer_shield = create_role_shield(["admin", "editor", "viewer"])
-```
+non_auto_error_shield = create_role_shield(["admin"], auto_error=False)
+
+# Apply shields to endpoints
+@app.get("/admin")
+@admin_shield
+def admin_endpoint(user: dict = Depends(lambda x: x)):
+    return {"message": "Admin endpoint", "user": user["username"]}
+
+@app.get("/editor")
+@editor_shield
+def editor_endpoint(user: dict = Depends(lambda x: x)):
+    return {"message": "Editor endpoint", "user": user["username"]}
+
+@app.get("/viewer")
+@viewer_shield
+def viewer_endpoint(user: dict = Depends(lambda x: x)):
+    return {"message": "Viewer endpoint", "user": user["username"]}
+
+# Example with non-auto-error shield
+@app.get("/optional-admin")
+@non_auto_error_shield
+def optional_admin_endpoint(user: Optional[dict] = Depends(lambda x: x)):
+    if user and "admin" in user.get("roles", []):
+        return {"message": "Admin content", "is_admin": True}
+    return {"message": "Regular content", "is_admin": False}
 
 ## Shield Classes
 
