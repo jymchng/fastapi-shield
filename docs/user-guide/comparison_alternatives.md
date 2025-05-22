@@ -1,3 +1,5 @@
+<!--Examples tested-->
+
 # Comparison with Alternatives: Why FastAPI-Shield Stands Out
 
 In the evolving landscape of FastAPI extensions and middleware solutions, FastAPI-Shield brings a fresh approach to handling authentication, authorization, and request validation. This article explores how FastAPI-Shield compares to alternatives like standard FastAPI Depends, [`fastapi-decorators`](https://github.com/Minibrams/fastapi-decorators), and [`slowapi`](https://github.com/laurentS/slowapi), highlighting the key advantages that make it a compelling choice for modern API development.

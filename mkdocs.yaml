@@ -41,9 +41,9 @@ nav:
       - Custom Initialization: user-guide/custom-initialization.md
       # String Types Done
       - String Types: user-guide/string-types.md
+      # Request Validation Done
       - Request Validation: user-guide/request-validation.md
-      - API Examples: user-guide/examples.md
-      - Troubleshooting: user-guide/troubleshooting.md
+      # Comparison with Alternatives Done
       - Comparison with Alternatives: user-guide/comparison_alternatives.md
   - Examples:
       - Basic Examples: examples/basic_examples.md
