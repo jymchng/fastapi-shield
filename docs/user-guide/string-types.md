@@ -1,3 +1,5 @@
+<!-- Examples Tested -->
+
 # String Types
 
 FastAPI Shield provides special support for working with string types in your shields and endpoints.
@@ -116,9 +118,10 @@ async def email_endpoint():
 Pydantic provides powerful validation capabilities for strings that can be used with FastAPI Shield:
 
 ```python
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Body
 from fastapi_shield import shield, ShieldedDepends
 from pydantic import BaseModel, EmailStr, constr, HttpUrl
+from typing import Dict
 
 app = FastAPI()
 
@@ -129,18 +132,24 @@ class UserInput(BaseModel):
     bio: constr(max_length=200)
 
 @shield(name="User Input Validator")
-def validate_user_input(user: UserInput = Depends()):
+def validate_user_input(user: UserInput = Body()):
     """Shield that validates user input using Pydantic"""
     # If we get here, Pydantic has already validated the input
-    # We could perform additional checks if needed
+    # Return the user object for the endpoint to use
     return user
 
 @app.post("/users")
 @validate_user_input
-async def create_user(validated_user: UserInput = ShieldedDepends(validate_user_input)):
+async def create_user(validated_user: UserInput = ShieldedDepends(lambda user: user)):
+    # Handle both Pydantic v1 and v2
+    if hasattr(validated_user, "model_dump"):
+        user_dict = validated_user.model_dump()
+    else:
+        user_dict = validated_user.dict()
+    
     return {
         "message": "User created successfully",
-        "user": validated_user.dict()
+        "user": user_dict
     }
 ```
 
@@ -164,28 +173,25 @@ def sanitize_html_input(content: str = Form()):
     # Escape HTML special characters
     sanitized = html.escape(content)
     
-    # Return both original and sanitized content
-    return {
-        "original": content,
-        "sanitized": sanitized
-    }
+    # Return the sanitized content directly
+    return sanitized
 
 @app.post("/comments")
 @sanitize_html_input
-async def create_comment(sanitized_data: dict = ShieldedDepends(sanitize_html_input)):
+async def create_comment(sanitized_content: str = ShieldedDepends(lambda content: content)):
     # Use the sanitized content
     return {
         "message": "Comment created",
-        "content": sanitized_data["sanitized"]
+        "content": sanitized_content
     }
 ```
 
 ## Custom String Validation with Regular Expressions
 
-For more complex string validation, you can use regular expressions:
+For more complex string validation, you can use regular expressions with the Request object:
 
 ```python
-from fastapi import FastAPI, Path, Query, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi_shield import shield
 import re
 
@@ -202,9 +208,11 @@ def regex_shield(pattern: str, error_message: str):
             detail=error_message
         )
     )
-    def validator(value: str = Path(...)):
-        if compiled_pattern.match(value):
-            return value
+    def validator(request: Request):
+        # Get path parameter from request path directly
+        path = request.path_params.get("username") or request.path_params.get("product_id")
+        if path and compiled_pattern.match(path):
+            return path
         return None
         
     return validator
@@ -222,13 +230,13 @@ product_id_shield = regex_shield(
 
 @app.get("/users/{username}")
 @username_shield
-async def get_user(username: str = Path(...)):
+async def get_user(username: str):
     return {"message": f"Valid username: {username}"}
 
 @app.get("/products/{product_id}")
 @product_id_shield
-async def get_product(product_id: str = Path(...)):
+async def get_product(product_id: str):
     return {"message": f"Valid product ID: {product_id}"}
 ```
 
-These patterns provide powerful ways to work with string types in your FastAPI Shield applications. 
+These patterns provide powerful ways to work with string types in your FastAPI Shield applications. The examples above demonstrate the recommended approach to handle different string validation and transformation scenarios. 
