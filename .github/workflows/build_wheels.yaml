@@ -1,0 +1,157 @@
+name: Build Wheels
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build_sdist:
+    name: "sdist"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Build sdist
+        shell: bash
+        run: |
+          uv build --sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: dist/*.tar.gz
+
+  build_wheels:
+    name: "${{ matrix.os }} ${{ matrix.arch }} py${{ matrix.python-version }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        arch: [x86_64, x86, arm64, aarch64, ppc64le, s390x]
+        exclude:
+          # Windows exclusions
+          - os: windows-latest
+            arch: aarch64
+          - os: windows-latest
+            arch: ppc64le
+          - os: windows-latest
+            arch: s390x
+          - os: windows-latest
+            python-version: "3.8"
+            arch: arm64
+          # macOS exclusions
+          - os: macos-latest
+            arch: x86
+          - os: macos-latest
+            arch: aarch64
+          - os: macos-latest
+            arch: ppc64le
+          - os: macos-latest
+            arch: s390x
+          # Ubuntu exclusions
+          - os: ubuntu-latest
+            arch: arm64
+          - os: ubuntu-latest
+            arch: x86
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up QEMU
+        if: runner.os == 'Linux' && matrix.arch != 'x86_64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Set up python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          uv sync --no-dev
+
+      - name: Build wheel
+        shell: bash
+        env:
+          CIBW_ARCHS: ${{ matrix.arch }}
+        run: uv build --wheel
+
+      - name: Setup clean test environment
+        shell: bash
+        run: |
+          uv venv test-env
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            source test-env/Scripts/activate
+          else
+            source test-env/bin/activate
+          fi
+          uv pip install pytest pandas
+          uv pip install dist/*.whl
+
+      - name: Run tests
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            source test-env/Scripts/activate
+          else
+            source test-env/bin/activate
+          fi
+          python -m pytest tests/
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.arch }}-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+  upload_to_pypi:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: ["build_sdist", "build_wheels"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: wheels
+          pattern: wheels-*
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+          packages_dir: wheels/
+          skip_existing: true

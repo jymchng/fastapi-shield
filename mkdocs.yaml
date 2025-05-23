@@ -46,8 +46,9 @@ nav:
       # Comparison with Alternatives Done
       - Comparison with Alternatives: user-guide/comparison_alternatives.md
   - Examples:
-      - Basic Examples: examples/basic_examples.md
       # Basic Examples Done
+      - Basic Examples: examples/basic_examples.md
+      # Authentication Examples Done
       - Authentication Examples: examples/authentication_examples.md
       - Authorization Examples: examples/authorization_examples.md
       - Advanced Examples: examples/advanced_examples.md
