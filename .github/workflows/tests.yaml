@@ -98,7 +98,7 @@ jobs:
         env:
           PYTHONWARNINGS: ignore
         run: |
-          uv run python -m pytest tests/ -vv -s --no-cov
+          uv run python -m pytest tests/ -vv -s
 
         #----------------------------------------------
         #            make sure docs build
