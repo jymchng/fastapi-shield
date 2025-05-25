@@ -518,7 +518,7 @@ def test_oauth2_shield():
 
     # Test protected endpoint without token
     response = client.get("/users/me")
-    assert response.status_code == 401
+    assert response.status_code == 401, (response.status_code, response.json())
 
     # Test protected endpoint with token
     response = client.get(
@@ -531,7 +531,7 @@ def test_oauth2_shield():
 
     # Test admin endpoint with non-admin user
     response = client.get("/admin", headers={"Authorization": f"Bearer {access_token}"})
-    assert response.status_code == 500
+    assert response.status_code == 500, (response.status_code, response.json()) 
     assert response.json()["detail"] == "Shield with name `unknown` blocks the request"
 
     # Test with admin user
@@ -541,7 +541,7 @@ def test_oauth2_shield():
     admin_token = admin_login.json()["access_token"]
 
     response = client.get("/admin", headers={"Authorization": f"Bearer {admin_token}"})
-    assert response.status_code == 200
+    assert response.status_code == 200, (response.status_code, response.json())
     assert response.json()["message"] == "This is an admin endpoint"
     assert response.json()["user"]["username"] == "adminuser"
 

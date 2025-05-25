@@ -208,10 +208,18 @@ class Shield(Generic[U]):
             guard_func_args = {
                 k: v for k, v in kwargs.items() if k in self._guard_func_params
             }
-            if self._guard_func_is_async:
-                obj = await self._guard_func(**guard_func_args)
-            else:
-                obj = self._guard_func(**guard_func_args)
+            try:
+                if self._guard_func_is_async:
+                    obj = await self._guard_func(**guard_func_args)
+                else:
+                    obj = self._guard_func(**guard_func_args)
+            except Exception as e:
+                if not isinstance(e, HTTPException):
+                    raise HTTPException(
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Shield with name `{self.name}` failed: {e}",
+                    )
+                raise e
             if obj:
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong

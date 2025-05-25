@@ -48,7 +48,7 @@ async def jwt_auth_shield(authorization: str = Header()) -> Optional[Dict]:
         return None
 
 @shield(name="User Role Extraction")
-async def role_extraction_shield(payload = ShieldedDepends(jwt_auth_shield)) -> Optional[AuthData]:
+async def role_extraction_shield(payload = ShieldedDepends(lambda payload: payload)) -> Optional[AuthData]:
     """Extract user roles from the JWT payload and create AuthData object"""
     if not payload or "user_id" not in payload:
         return None
@@ -69,7 +69,7 @@ def require_role(role: str):
             detail=f"Requires role: {role}"
         )
     )
-    async def role_shield(auth_data: AuthData = ShieldedDepends(role_extraction_shield)) -> Optional[AuthData]:
+    async def role_shield(auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data)) -> Optional[AuthData]:
         if auth_data.has_role(role):
             return auth_data
         return None
@@ -86,7 +86,7 @@ def require_permission(permission: str):
             detail=f"Requires permission: {permission}"
         )
     )
-    async def permission_shield(auth_data: AuthData = ShieldedDepends(role_extraction_shield)) -> Optional[AuthData]:
+    async def permission_shield(auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data)) -> Optional[AuthData]:
         if auth_data.has_permission(permission):
             return auth_data
         return None
@@ -97,7 +97,7 @@ def require_permission(permission: str):
 @app.get("/user-profile")
 @jwt_auth_shield
 @role_extraction_shield
-async def user_profile(auth_data: AuthData = ShieldedDepends(role_extraction_shield)):
+async def user_profile(auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data)):
     return {
         "user_id": auth_data.user_id,
         "roles": auth_data.roles,
@@ -108,7 +108,7 @@ async def user_profile(auth_data: AuthData = ShieldedDepends(role_extraction_shi
 @jwt_auth_shield
 @role_extraction_shield
 @require_role("admin")
-async def admin_panel(auth_data: AuthData = ShieldedDepends(require_role("admin"))):
+async def admin_panel(auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data)):
     return {
         "message": "Welcome to admin panel",
         "user_id": auth_data.user_id
@@ -118,7 +118,7 @@ async def admin_panel(auth_data: AuthData = ShieldedDepends(require_role("admin"
 @jwt_auth_shield
 @role_extraction_shield
 @require_permission("manage_users")
-async def user_management(auth_data: AuthData = ShieldedDepends(require_permission("manage_users"))):
+async def user_management(auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data)):
     return {
         "message": "User management access granted",
         "user_id": auth_data.user_id
@@ -196,7 +196,7 @@ async def db_auth_shield(api_key: str = Header(), db = Depends(get_db)):
     return {"user_id": result["user_id"], "key": result["key"]}
 
 @shield(name="Permission Shield")
-async def permission_shield(auth_data = ShieldedDepends(db_auth_shield), db = Depends(get_db)):
+async def permission_shield(auth_data = ShieldedDepends(lambda auth_data: auth_data), db = Depends(get_db)):
     """Load user permissions from database"""
     if not auth_data:
         return None
@@ -223,7 +223,7 @@ def require_db_permission(required_permission: str):
             detail=f"Requires permission: {required_permission}"
         )
     )
-    async def permission_check(user: User = ShieldedDepends(permission_shield)):
+    async def permission_check(user: User = ShieldedDepends(lambda auth_data: auth_data)):
         user_permissions = [p.permission for p in user.permissions]
         if required_permission in user_permissions:
             return user
@@ -234,7 +234,7 @@ def require_db_permission(required_permission: str):
 @app.get("/db-protected")
 @db_auth_shield
 @permission_shield
-async def db_protected_endpoint(user: User = ShieldedDepends(permission_shield)):
+async def db_protected_endpoint(user: User = ShieldedDepends(lambda auth_data: auth_data)):
     return {
         "message": "Access granted via database authentication",
         "user_id": user.id,
@@ -245,7 +245,7 @@ async def db_protected_endpoint(user: User = ShieldedDepends(permission_shield))
 @db_auth_shield
 @permission_shield
 @require_db_permission("admin_access")
-async def admin_access_endpoint(user: User = ShieldedDepends(require_db_permission("admin_access"))):
+async def admin_access_endpoint(user: User = ShieldedDepends(lambda auth_data: auth_data)):
     return {
         "message": "Admin access granted",
         "user_id": user.id
@@ -389,7 +389,7 @@ def require_oauth2_role(role: str):
             detail=f"Role {role} required"
         )
     )
-    async def role_check(oauth_data = ShieldedDepends(oauth2_shield)):
+    async def role_check(oauth_data = ShieldedDepends(lambda payload: payload)):
         token_data = oauth_data["token_data"]
         if role in token_data.roles:
             return oauth_data
