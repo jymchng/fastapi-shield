@@ -540,6 +540,8 @@ class TestDynamicShieldConfiguration:
         }
         json.dump(self.initial_config, self.config_file)
         self.config_file.flush()
+        # Explicitly close the file handle to avoid Windows permission issues
+        self.config_file.close()
 
         # Shield configuration loading function
         def load_shield_config():
@@ -587,8 +589,33 @@ class TestDynamicShieldConfiguration:
         self.load_shield_config = load_shield_config
 
     def teardown_method(self):
-        """Clean up temporary files"""
-        os.unlink(self.config_path)
+        """Clean up temporary files with Windows-compatible error handling"""
+        try:
+            # Ensure file is closed if it's still open
+            if hasattr(self, 'config_file') and not self.config_file.closed:
+                self.config_file.close()
+        except Exception:
+            pass  # Ignore close errors
+        
+        try:
+            # Attempt to delete the file
+            if hasattr(self, 'config_path') and os.path.exists(self.config_path):
+                os.unlink(self.config_path)
+        except (PermissionError, OSError) as e:
+            # On Windows, sometimes the file is still locked
+            # Try a few more times with a small delay
+            import time
+            for attempt in range(3):
+                try:
+                    time.sleep(0.1)
+                    os.unlink(self.config_path)
+                    break
+                except (PermissionError, OSError):
+                    if attempt == 2:  # Last attempt
+                        # If we still can't delete it, that's okay for tests
+                        # The temp directory will be cleaned up eventually
+                        pass
+                    continue
 
     def update_config(self, new_config):
         """Helper method to update the config file"""
