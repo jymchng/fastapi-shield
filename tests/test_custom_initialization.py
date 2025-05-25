@@ -546,7 +546,7 @@ class TestDynamicShieldConfiguration:
             try:
                 with open(self.config_path, "r") as f:
                     return json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
+            except (FileNotFoundError, json.JSONDecodeError, PermissionError):
                 # Return default config if file not found or invalid
                 return {
                     "enabled": True,
