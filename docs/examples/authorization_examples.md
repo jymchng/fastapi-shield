@@ -49,13 +49,13 @@ def validate_user_id(user_id: str) -> UserId:
 
 # Get user with roles from database
 @shield
-def get_user(user_id: UserId = ShieldedDepends(validate_user_id)) -> User:
+def get_user(user_id: UserId = ShieldedDepends(lambda user_id: user_id)) -> User:
     user_data = USERS_DB.get(user_id, {})
     return User(id=user_id, roles=[Role(r) for r in user_data.get("roles", [])])
 
 # Check if user has the required role
 @shield
-def has_role(required_role: Role, user: User = ShieldedDepends(get_user)) -> User:
+def has_role(required_role: Role, user: User = ShieldedDepends(lambda user_id: user_id)) -> User:
     if required_role not in user.roles:
         raise HTTPException(
             status_code=403, 
