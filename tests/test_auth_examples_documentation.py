@@ -35,12 +35,12 @@ def test_api_key_authentication():
     def api_key_shield(api_key: str = Header(alias="X-API-Key")):
         if not api_key.startswith("sk_test_"):
             return None
-            
+
         # Check if the API key exists in our database
         for username, key in API_KEYS.items():
             if secrets.compare_digest(key, api_key):
                 return username
-        
+
         # API key not found
         return None
 
@@ -49,54 +49,42 @@ def test_api_key_authentication():
     async def protected_route():
         return {
             "message": "Hello! You accessed a protected route.",
-            "data": "This is sensitive data that requires authentication."
+            "data": "This is sensitive data that requires authentication.",
         }
 
     @app.get("/api/profile")
     @api_key_shield
     async def get_profile():
-        return {
-            "subscription": "premium",
-            "account_type": "business"
-        }
+        return {"subscription": "premium", "account_type": "business"}
 
     # Create a test client
     client = TestClient(app)
 
     # Test with valid API key for user1
     response = client.get(
-        "/api/protected",
-        headers={"X-API-Key": "sk_test_abcdefghijklmnopqrstuvwxyz"}
+        "/api/protected", headers={"X-API-Key": "sk_test_abcdefghijklmnopqrstuvwxyz"}
     )
     assert response.status_code == 200
     assert response.json() == {
         "message": "Hello! You accessed a protected route.",
-        "data": "This is sensitive data that requires authentication."
+        "data": "This is sensitive data that requires authentication.",
     }
 
     # Test with valid API key for user2
     response = client.get(
-        "/api/profile",
-        headers={"X-API-Key": "sk_test_zyxwvutsrqponmlkjihgfedcba"}
+        "/api/profile", headers={"X-API-Key": "sk_test_zyxwvutsrqponmlkjihgfedcba"}
     )
     assert response.status_code == 200
-    assert response.json() == {
-        "subscription": "premium",
-        "account_type": "business"
-    }
+    assert response.json() == {"subscription": "premium", "account_type": "business"}
 
     # Test with invalid API key format
-    response = client.get(
-        "/api/protected",
-        headers={"X-API-Key": "invalid_key_format"}
-    )
+    response = client.get("/api/protected", headers={"X-API-Key": "invalid_key_format"})
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid API key"}
 
     # Test with invalid API key (correct format but not in database)
     response = client.get(
-        "/api/protected",
-        headers={"X-API-Key": "sk_test_invalid_but_correct_format"}
+        "/api/protected", headers={"X-API-Key": "sk_test_invalid_but_correct_format"}
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid API key"}
@@ -130,28 +118,28 @@ def test_basic_authentication():
     def basic_auth_shield(authorization: str = Header()):
         if not authorization or not authorization.startswith("Basic "):
             return None
-        
+
         auth_data = authorization.replace("Basic ", "")
         try:
             decoded = base64.b64decode(auth_data).decode("ascii")
             username, password = decoded.split(":")
         except Exception:
             return None
-        
+
         # Validate username format
         if len(username) < 3:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username must be at least 3 characters",
             )
-        
+
         # Validate password format
         if len(password) < 8:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password must be at least 8 characters",
             )
-        
+
         # Check if user exists and password is correct
         if username not in USERS:
             raise HTTPException(
@@ -159,9 +147,9 @@ def test_basic_authentication():
                 detail="Invalid username",
                 headers={"WWW-Authenticate": "Basic"},
             )
-        
+
         correct_password = USERS[username]
-        
+
         # Use secrets.compare_digest to prevent timing attacks
         if not secrets.compare_digest(password, correct_password):
             raise HTTPException(
@@ -169,15 +157,13 @@ def test_basic_authentication():
                 detail="Invalid password",
                 headers={"WWW-Authenticate": "Basic"},
             )
-        
+
         return username
 
     @app.get("/users/me")
     @basic_auth_shield
     async def get_current_user_info():
-        return {
-            "message": "You are authenticated!"
-        }
+        return {"message": "You are authenticated!"}
 
     # Admin access shield (checks if authenticated user is admin)
     @shield(
@@ -199,7 +185,7 @@ def test_basic_authentication():
     async def admin_panel():
         return {
             "message": "Welcome to the admin panel",
-            "secret_stats": {"total_users": 2, "active_users": 1}
+            "secret_stats": {"total_users": 2, "active_users": 1},
         }
 
     # Create a test client
@@ -208,51 +194,34 @@ def test_basic_authentication():
     # Test with valid admin credentials
     admin_creds = base64.b64encode(b"admin:strongpassword").decode("ascii")
     response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Basic {admin_creds}"}
+        "/users/me", headers={"Authorization": f"Basic {admin_creds}"}
     )
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "You are authenticated!"
-    }
+    assert response.json() == {"message": "You are authenticated!"}
 
     # Test admin endpoint with admin credentials
-    response = client.get(
-        "/admin",
-        headers={"Authorization": f"Basic {admin_creds}"}
-    )
+    response = client.get("/admin", headers={"Authorization": f"Basic {admin_creds}"})
     assert response.status_code == 200
     assert response.json() == {
         "message": "Welcome to the admin panel",
-        "secret_stats": {"total_users": 2, "active_users": 1}
+        "secret_stats": {"total_users": 2, "active_users": 1},
     }
 
     # Test with valid user credentials
     user_creds = base64.b64encode(b"user:userpassword").decode("ascii")
-    response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Basic {user_creds}"}
-    )
+    response = client.get("/users/me", headers={"Authorization": f"Basic {user_creds}"})
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "You are authenticated!"
-    }
+    assert response.json() == {"message": "You are authenticated!"}
 
     # Test admin endpoint with non-admin credentials
-    response = client.get(
-        "/admin",
-        headers={"Authorization": f"Basic {user_creds}"}
-    )
+    response = client.get("/admin", headers={"Authorization": f"Basic {user_creds}"})
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "Only admin users can access this resource"
-    }
+    assert response.json() == {"detail": "Only admin users can access this resource"}
 
     # Test with invalid password
     invalid_creds = base64.b64encode(b"admin:wrongpassword").decode("ascii")
     response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Basic {invalid_creds}"}
+        "/users/me", headers={"Authorization": f"Basic {invalid_creds}"}
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid password"}
@@ -260,8 +229,7 @@ def test_basic_authentication():
     # Test with invalid username
     invalid_creds = base64.b64encode(b"nobody:password").decode("ascii")
     response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Basic {invalid_creds}"}
+        "/users/me", headers={"Authorization": f"Basic {invalid_creds}"}
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid username"}
@@ -269,8 +237,7 @@ def test_basic_authentication():
     # Test with short username
     invalid_creds = base64.b64encode(b"a:password").decode("ascii")
     response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Basic {invalid_creds}"}
+        "/users/me", headers={"Authorization": f"Basic {invalid_creds}"}
     )
     assert response.status_code == 400
     assert "Username must be at least 3 characters" in response.json()["detail"]
@@ -351,47 +318,49 @@ def test_jwt_authentication():
             return None
 
         token = authorization.replace("Bearer ", "")
-        
+
         if not token or len(token) < 10:
             return None
-        
+
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username = payload.get("sub")
-            
+
             if username is None:
                 return None
-                
+
             user = get_user(USERS_DB, username)
-            
+
             if user is None:
                 return None
-                
+
             return {
                 "username": user.username,
                 "email": user.email,
-                "disabled": user.disabled
+                "disabled": user.disabled,
             }
         except jwt.PyJWTError:
             return None
 
     # Endpoints
     @app.post("/token")
-    async def login_for_access_token(username: str = Header(), password: str = Header()):
+    async def login_for_access_token(
+        username: str = Header(), password: str = Header()
+    ):
         user = authenticate_user(USERS_DB, username, password)
-        
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
+
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": user.username}, expires_delta=access_token_expires
         )
-        
+
         return {"access_token": access_token, "token_type": "bearer"}
 
     @app.get("/users/me")
@@ -402,9 +371,7 @@ def test_jwt_authentication():
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Inactive user",
             )
-        return {
-            "message": "You are authenticated and active!"
-        }
+        return {"message": "You are authenticated and active!"}
 
     @app.get("/users/me/items")
     @jwt_auth_shield
@@ -416,7 +383,7 @@ def test_jwt_authentication():
             )
         return [
             {"item_id": "1", "owner": "current_user"},
-            {"item_id": "2", "owner": "current_user"}
+            {"item_id": "2", "owner": "current_user"},
         ]
 
     # Create a test client
@@ -424,65 +391,52 @@ def test_jwt_authentication():
 
     # Test with valid credentials - johndoe
     response = client.post(
-        "/token", 
-        headers={"username": "johndoe", "password": "secret"}
+        "/token", headers={"username": "johndoe", "password": "secret"}
     )
     assert response.status_code == 200
     assert "access_token" in response.json()
     assert response.json()["token_type"] == "bearer"
-    
+
     # Store the token for future requests
     token = response.json()["access_token"]
-    
+
     # Test /users/me endpoint with valid token
-    response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "You are authenticated and active!"
-    }
-    
+    assert response.json() == {"message": "You are authenticated and active!"}
+
     # Test /users/me/items endpoint with valid token
     response = client.get(
-        "/users/me/items",
-        headers={"Authorization": f"Bearer {token}"}
+        "/users/me/items", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
     assert response.json() == [
         {"item_id": "1", "owner": "current_user"},
-        {"item_id": "2", "owner": "current_user"}
+        {"item_id": "2", "owner": "current_user"},
     ]
-    
+
     # Test with invalid token
     response = client.get(
-        "/users/me",
-        headers={"Authorization": "Bearer invalid_token"}
+        "/users/me", headers={"Authorization": "Bearer invalid_token"}
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Could not validate credentials"}
-    
+
     # Test with disabled user - alice
-    response = client.post(
-        "/token", 
-        headers={"username": "alice", "password": "alice"}
-    )
+    response = client.post("/token", headers={"username": "alice", "password": "alice"})
     assert response.status_code == 200
-    
+
     alice_token = response.json()["access_token"]
-    
+
     response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Bearer {alice_token}"}
+        "/users/me", headers={"Authorization": f"Bearer {alice_token}"}
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Inactive user"}
-    
+
     # Test with non-existent user
     response = client.post(
-        "/token", 
-        headers={"username": "nonexistent", "password": "password"}
+        "/token", headers={"username": "nonexistent", "password": "password"}
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Incorrect username or password"}
@@ -543,30 +497,30 @@ def test_oauth2_authentication():
             return None
 
         token = authorization.replace("Bearer ", "")
-        
+
         if not token or len(token) < 10:
             return None
-            
+
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             sub = payload.get("sub")
             scopes = payload.get("scopes", [])
-            
+
             if sub is None:
                 return None
-            
+
             if sub not in USERS:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User not found",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             user = USERS[sub].copy()
-            
+
             # Update user's scopes based on token
             user["scopes"] = scopes
-            
+
             return user
         except jwt.PyJWTError:
             return None
@@ -582,19 +536,19 @@ def test_oauth2_authentication():
     async def auth_callback(code: str, state: Optional[str] = None):
         # In a real app, you would exchange the code for a token with the OAuth provider
         # For this example, we'll create a mock token
-        
+
         # Mock user ID (in a real app, this would come from the OAuth provider)
         user_id = "user1"
-        
+
         # Create a token with the user's ID and scopes
         token_data = {
             "sub": user_id,
             "scopes": USERS[user_id]["scopes"],
         }
-        
+
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(token_data, access_token_expires)
-        
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
@@ -610,9 +564,7 @@ def test_oauth2_authentication():
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not enough permissions. Required scope: read:profile",
             )
-        return {
-            "message": "Profile accessed successfully"
-        }
+        return {"message": "Profile accessed successfully"}
 
     @app.get("/users/me/email")
     @oauth2_token_shield
@@ -623,13 +575,13 @@ def test_oauth2_authentication():
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not enough permissions. Required scope: read:email",
             )
-        return {
-            "message": "Email accessed successfully"
-        }
+        return {"message": "Email accessed successfully"}
 
     @app.put("/users/me")
     @oauth2_token_shield
-    async def update_my_profile(user: dict = ShieldedDepends(lambda u: u), full_name: Optional[str] = None):
+    async def update_my_profile(
+        user: dict = ShieldedDepends(lambda u: u), full_name: Optional[str] = None
+    ):
         # Check if user has required scope
         if "write:profile" not in user.get("scopes", []):
             raise HTTPException(
@@ -638,7 +590,7 @@ def test_oauth2_authentication():
             )
         return {
             "message": "Profile updated successfully",
-            "full_name": full_name or "Default Name"
+            "full_name": full_name or "Default Name",
         }
 
     # Create a test client
@@ -670,30 +622,22 @@ def test_oauth2_authentication():
     token = create_access_token(token_data)
 
     # Test /users/me endpoint (requires read:profile)
-    response = client.get(
-        "/users/me", 
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "Profile accessed successfully"
-    }
+    assert response.json() == {"message": "Profile accessed successfully"}
 
     # Test /users/me/email endpoint (requires read:email)
     response = client.get(
-        "/users/me/email", 
-        headers={"Authorization": f"Bearer {token}"}
+        "/users/me/email", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "Email accessed successfully"
-    }
+    assert response.json() == {"message": "Email accessed successfully"}
 
     # Test /users/me endpoint with PUT (requires write:profile)
     response = client.put(
-        "/users/me", 
+        "/users/me",
         headers={"Authorization": f"Bearer {token}"},
-        params={"full_name": "John Updated"}
+        params={"full_name": "John Updated"},
     )
     assert response.status_code == 403
     assert "Not enough permissions" in response.json()["detail"]
@@ -707,9 +651,9 @@ def test_oauth2_authentication():
 
     # Test profile update with user2
     response = client.put(
-        "/users/me", 
+        "/users/me",
         headers={"Authorization": f"Bearer {token2}"},
-        params={"full_name": "Jane Updated"}
+        params={"full_name": "Jane Updated"},
     )
     assert response.status_code == 200
     assert response.json()["full_name"] == "Jane Updated"
@@ -717,8 +661,7 @@ def test_oauth2_authentication():
 
     # Test with invalid token
     response = client.get(
-        "/users/me", 
-        headers={"Authorization": "Bearer invalid.token"}
+        "/users/me", headers={"Authorization": "Bearer invalid.token"}
     )
     assert response.status_code == 401
 
@@ -746,7 +689,7 @@ def test_mfa_authentication():
             "full_name": "John Doe",
             "disabled": False,
             "mfa_enabled": True,
-            "mfa_secret": "JBSWY3DPEHPK3PXP"
+            "mfa_secret": "JBSWY3DPEHPK3PXP",
         },
         "janedoe": {
             "username": "janedoe",
@@ -754,7 +697,7 @@ def test_mfa_authentication():
             "email": "jane@example.com",
             "full_name": "Jane Doe",
             "disabled": False,
-            "mfa_enabled": False
+            "mfa_enabled": False,
         },
     }
 
@@ -769,12 +712,12 @@ def test_mfa_authentication():
     def authenticate_user(username, password):
         if username not in USERS_DB:
             return None
-        
+
         user = USERS_DB[username]
-        
+
         if not verify_password(password, user["hashed_password"]):
             return None
-            
+
         return user
 
     def create_token(data, expires_delta=None):
@@ -788,17 +731,17 @@ def test_mfa_authentication():
         # For this example, we'll accept any 6-digit code
         if not user["mfa_enabled"]:
             return True
-            
+
         # We'll simulate TOTP verification by accepting any code for this example
         return len(mfa_code) == 6 and mfa_code.isdigit()
 
     def generate_mfa_token(username):
         # Generate a random token
         mfa_token = secrets.token_urlsafe(32)
-        
+
         # Store the token -> username mapping
         MFA_TOKENS[mfa_token] = username
-        
+
         return mfa_token
 
     # JWT authentication shield with MFA verification
@@ -815,35 +758,35 @@ def test_mfa_authentication():
             )
 
         token = authorization.replace("Bearer ", "")
-        
+
         if not token or len(token) < 10:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Not authenticated",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
+
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username = payload.get("sub")
             mfa_verified = payload.get("mfa_verified", False)
-            
+
             if username is None:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Not authenticated",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-                
+
             if username not in USERS_DB:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User not found",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-                
+
             user = USERS_DB[username]
-            
+
             # If MFA is enabled but not verified, raise a specific exception
             if user["mfa_enabled"] and not mfa_verified:
                 raise HTTPException(
@@ -851,7 +794,7 @@ def test_mfa_authentication():
                     detail="MFA verification required",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-                
+
             return user
         except jwt.PyJWTError:
             raise HTTPException(
@@ -876,36 +819,40 @@ def test_mfa_authentication():
 
     # Endpoints
     @app.post("/token")
-    async def login_for_access_token(username: str = Header(), password: str = Header()):
+    async def login_for_access_token(
+        username: str = Header(), password: str = Header()
+    ):
         user = authenticate_user(username, password)
-        
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         # Create a token that indicates if MFA is required
         token_data = {
             "sub": user["username"],
-            "mfa_verified": not user["mfa_enabled"],  # Set to True if MFA is not enabled
+            "mfa_verified": not user[
+                "mfa_enabled"
+            ],  # Set to True if MFA is not enabled
         }
-        
+
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_token(token_data, access_token_expires)
-        
+
         response_data = {
             "access_token": access_token,
             "token_type": "bearer",
-            "requires_mfa": user["mfa_enabled"]
+            "requires_mfa": user["mfa_enabled"],
         }
-        
+
         # If MFA is required, add an MFA token
         if user["mfa_enabled"]:
             mfa_token = generate_mfa_token(user["username"])
             response_data["mfa_token"] = mfa_token
-        
+
         return response_data
 
     # MFA token validation shield
@@ -929,82 +876,71 @@ def test_mfa_authentication():
         # Since the shields have already validated the MFA token and code,
         # we can just return success. In a real app, you would:
         # 1. Validate the MFA code against the user's TOTP secret
-        # 2. Generate a new fully-authenticated JWT token  
+        # 2. Generate a new fully-authenticated JWT token
         # 3. Invalidate the MFA token
-        return {
-            "message": "MFA verification endpoint called"
-        }
+        return {"message": "MFA verification endpoint called"}
 
     @app.get("/users/me")
     @jwt_mfa_shield
     async def read_users_me(user: dict = ShieldedDepends(lambda u: u)):
         if user.get("disabled"):
             raise HTTPException(status_code=400, detail="Inactive user")
-        return {
-            "message": "You are authenticated!"
-        }
+        return {"message": "You are authenticated!"}
 
     @app.post("/users/me/enable-mfa")
     @jwt_mfa_shield
     async def enable_mfa(user: dict = ShieldedDepends(lambda u: u)):
         if user.get("disabled"):
             raise HTTPException(status_code=400, detail="Inactive user")
-        return {
-            "message": "MFA would be enabled"
-        }
+        return {"message": "MFA would be enabled"}
 
     # Create a test client
     client = TestClient(app)
 
     # Test login for user without MFA (janedoe)
     response = client.post(
-        "/token",
-        headers={"username": "janedoe", "password": "janedoe"}
+        "/token", headers={"username": "janedoe", "password": "janedoe"}
     )
     assert response.status_code == 200
     assert "access_token" in response.json()
     assert response.json()["token_type"] == "bearer"
     assert response.json()["requires_mfa"] is False
     assert "mfa_token" not in response.json()
-    
+
     # Save the token for later use
     jane_token = response.json()["access_token"]
 
     # Test login for user with MFA (johndoe)
     response = client.post(
-        "/token",
-        headers={"username": "johndoe", "password": "johndoe"}
+        "/token", headers={"username": "johndoe", "password": "johndoe"}
     )
     assert response.status_code == 200
     assert "access_token" in response.json()
     assert response.json()["token_type"] == "bearer"
     assert response.json()["requires_mfa"] is True
     assert "mfa_token" in response.json()
-    
+
     # Save the pre-MFA token and MFA token
     john_pre_mfa_token = response.json()["access_token"]
     mfa_token = response.json()["mfa_token"]
 
     # Test accessing protected endpoint without MFA verification (should fail)
     response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Bearer {john_pre_mfa_token}"}
+        "/users/me", headers={"Authorization": f"Bearer {john_pre_mfa_token}"}
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "MFA verification required"
 
     # Test accessing protected endpoint with non-MFA user (janedoe)
     response = client.get(
-        "/users/me",
-        headers={"Authorization": f"Bearer {jane_token}"}
+        "/users/me", headers={"Authorization": f"Bearer {jane_token}"}
     )
     assert response.status_code == 200
     assert response.json()["message"] == "You are authenticated!"
 
     # Test MFA verification endpoint
     response = client.post(
-        "/verify-mfa",
-        headers={"mfa-token": mfa_token, "mfa-code": "123456"}
+        "/verify-mfa", headers={"mfa-token": mfa_token, "mfa-code": "123456"}
     )
     assert response.status_code == 200, response.json()
     assert response.json()["message"] == "MFA verification endpoint called"
@@ -1012,15 +948,14 @@ def test_mfa_authentication():
     # Test with invalid MFA code format
     response = client.post(
         "/verify-mfa",
-        headers={"mfa-token": mfa_token, "mfa-code": "12345"}  # Only 5 digits
+        headers={"mfa-token": mfa_token, "mfa-code": "12345"},  # Only 5 digits
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "MFA code must be a 6-digit number"
 
     # Test with invalid MFA token
     response = client.post(
-        "/verify-mfa",
-        headers={"mfa-token": "invalid_token", "mfa-code": "123456"}
+        "/verify-mfa", headers={"mfa-token": "invalid_token", "mfa-code": "123456"}
     )
     assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid MFA token" 
+    assert response.json()["detail"] == "Invalid MFA token"

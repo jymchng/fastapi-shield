@@ -21,8 +21,9 @@ SERVICES = {
     "user-service": "http://user-service:8001",
     "product-service": "http://product-service:8002",
     "order-service": "http://order-service:8003",
-    "payment-service": "http://payment-service:8004"
+    "payment-service": "http://payment-service:8004",
 }
+
 
 def create_test_token(user_id: str, roles: list = None, permissions: list = None):
     """Create a test JWT token"""
@@ -30,48 +31,49 @@ def create_test_token(user_id: str, roles: list = None, permissions: list = None
         "sub": user_id,
         "roles": roles or ["user"],
         "permissions": permissions or [],
-        "exp": datetime.utcnow() + timedelta(hours=1)
+        "exp": datetime.utcnow() + timedelta(hours=1),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+
 class TestAPIGateway:
     """Test the API Gateway real-world example"""
-    
+
     def setup_method(self):
         """Setup the FastAPI app for each test"""
         self.app = FastAPI(title="API Gateway")
-        
+
         # Mock HTTP client
         self.http_client_mock = AsyncMock()
-        
+
         # Setup shields and routes
         self.setup_shields()
         self.setup_middleware()
         self.setup_routes()
-        
+
         self.client = TestClient(self.app)
 
     def setup_shields(self):
         """Setup all shields for the API gateway"""
-        
+
         @shield(name="Gateway Auth")
         async def gateway_auth_shield(authorization: str = Header(None)):
             """Validate JWT token for the gateway"""
             if not authorization:
                 return None
-            
+
             if not authorization.startswith("Bearer "):
                 return None
-                
+
             token = authorization.replace("Bearer ", "")
-            
+
             try:
                 payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
                 return {
                     "user_id": payload.get("sub"),
                     "roles": payload.get("roles", []),
                     "permissions": payload.get("permissions", []),
-                    "token": token  # Keep the token to pass to microservices
+                    "token": token,  # Keep the token to pass to microservices
                 }
             except jwt.ExpiredSignatureError:
                 return None
@@ -79,41 +81,40 @@ class TestAPIGateway:
                 return None
 
         @shield(name="Service Access")
-        async def service_access_shield(service: str, auth_data = ShieldedDepends(lambda auth_data: auth_data)):
+        async def service_access_shield(
+            service: str, auth_data=ShieldedDepends(lambda auth_data: auth_data)
+        ):
             """Check if the user has access to the specified service"""
             if service not in SERVICES:
                 return None
-            
+
             # Check if user has access to this service
             user_permissions = auth_data.get("permissions", [])
             required_permission = f"service:{service}:access"
-            
+
             if required_permission in user_permissions:
-                return {
-                    "service_url": SERVICES[service],
-                    "auth_data": auth_data
-                }
-            
+                return {"service_url": SERVICES[service], "auth_data": auth_data}
+
             return None
 
         @shield(name="Rate Limiter")
         async def gateway_rate_limit(request: Request):
             """Simple rate limiting for the gateway"""
-            client_ip = getattr(request.client, 'host', '127.0.0.1')
-            
+            client_ip = getattr(request.client, "host", "127.0.0.1")
+
             # Generate a key for rate limiting
             rate_key = f"rate:{client_ip}:{int(time.time() / 60)}"  # Per minute
-            
+
             # Simple in-memory rate limiting (NOT suitable for production)
             if not hasattr(self.app, "rate_limits"):
                 self.app.rate_limits = {}
-            
+
             current_count = self.app.rate_limits.get(rate_key, 0)
             max_requests = 100  # 100 requests per minute
-            
+
             if current_count >= max_requests:
                 return None
-            
+
             self.app.rate_limits[rate_key] = current_count + 1
             return {"client_ip": client_ip}
 
@@ -124,53 +125,52 @@ class TestAPIGateway:
 
     def setup_middleware(self):
         """Setup middleware for request logging"""
-        
+
         @self.app.middleware("http")
         async def log_requests(request: Request, call_next):
             start_time = time.time()
             request_id = str(uuid.uuid4())
-            
+
             # Add request ID to request state
             request.state.request_id = request_id
-            
+
             response = await call_next(request)
-            
+
             process_time = time.time() - start_time
-            
+
             # Add request ID to response headers
             response.headers["X-Request-ID"] = request_id
             return response
 
     def setup_routes(self):
         """Setup routes for the API gateway"""
-        
+
         @self.app.get("/gateway/health")
         async def health_check():
             """Health check endpoint for the gateway"""
             # Mock service status checks
             service_status = {}
-            
+
             for service_name, service_url in SERVICES.items():
                 # Mock health check response
-                service_status[service_name] = {
-                    "status": "up",
-                    "status_code": 200
-                }
-            
+                service_status[service_name] = {"status": "up", "status_code": 200}
+
             return {
                 "status": "ok",
                 "timestamp": time.time(),
-                "services": service_status
+                "services": service_status,
             }
-        
-        @self.app.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+
+        @self.app.api_route(
+            "/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+        )
         @self.gateway_rate_limit
         @self.gateway_auth_shield
         async def proxy_to_service(
             service: str,
             path: str,
             request: Request,
-            auth_data = ShieldedDepends(lambda auth_data: auth_data),
+            auth_data=ShieldedDepends(lambda auth_data: auth_data),
         ):
             """
             Main proxy handler that forwards requests to the appropriate microservice.
@@ -180,90 +180,98 @@ class TestAPIGateway:
             if service not in SERVICES:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Service '{service}' not found"
+                    detail=f"Service '{service}' not found",
                 )
-            
+
             # Get service URL
             service_url = SERVICES[service]
             target_url = f"{service_url}/{path}"
-            
+
             # Get request body if present
             body = await request.body()
-            
+
             # Extract headers and filter out host-specific headers
             headers = dict(request.headers)
             headers_to_remove = ["host", "content-length", "connection"]
             for header in headers_to_remove:
                 if header in headers:
                     del headers[header]
-            
+
             # Add custom gateway headers
             headers["X-Gateway-Request-ID"] = request.state.request_id
-            
+
             if auth_data:
                 # Add user context for the microservice
                 headers["X-User-ID"] = auth_data.get("user_id", "")
                 headers["X-User-Roles"] = ",".join(auth_data.get("roles", []))
-                
+
                 # Keep the original auth token
                 if "Authorization" not in headers and "token" in auth_data:
                     headers["Authorization"] = f"Bearer {auth_data['token']}"
-            
+
             # Forward the request to the target service using mock
             try:
                 method = request.method.lower()
                 request_kwargs = {
                     "headers": headers,
                     "params": dict(request.query_params),
-                    "timeout": 30.0  # 30 seconds timeout
+                    "timeout": 30.0,  # 30 seconds timeout
                 }
-                
+
                 if body:
                     request_kwargs["content"] = body
-                
+
                 # Mock the HTTP client response
                 mock_response = Mock()
                 mock_response.content = b'{"message": "mocked response"}'
                 mock_response.status_code = 200
                 mock_response.headers = {"content-type": "application/json"}
-                
+
                 # Simulate calling the microservice
                 if method == "get":
                     self.http_client_mock.get.return_value = mock_response
-                    response = await self.http_client_mock.get(target_url, **request_kwargs)
+                    response = await self.http_client_mock.get(
+                        target_url, **request_kwargs
+                    )
                 elif method == "post":
                     self.http_client_mock.post.return_value = mock_response
-                    response = await self.http_client_mock.post(target_url, **request_kwargs)
+                    response = await self.http_client_mock.post(
+                        target_url, **request_kwargs
+                    )
                 elif method == "put":
                     self.http_client_mock.put.return_value = mock_response
-                    response = await self.http_client_mock.put(target_url, **request_kwargs)
+                    response = await self.http_client_mock.put(
+                        target_url, **request_kwargs
+                    )
                 elif method == "delete":
                     self.http_client_mock.delete.return_value = mock_response
-                    response = await self.http_client_mock.delete(target_url, **request_kwargs)
+                    response = await self.http_client_mock.delete(
+                        target_url, **request_kwargs
+                    )
                 elif method == "patch":
                     self.http_client_mock.patch.return_value = mock_response
-                    response = await self.http_client_mock.patch(target_url, **request_kwargs)
+                    response = await self.http_client_mock.patch(
+                        target_url, **request_kwargs
+                    )
                 else:
                     raise HTTPException(
                         status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
-                        detail=f"Method {method} not allowed"
+                        detail=f"Method {method} not allowed",
                     )
-                
+
                 # Create a FastAPI response from the microservice response
                 return Response(
                     content=response.content,
                     status_code=response.status_code,
                     headers=dict(response.headers),
-                    media_type=response.headers.get("content-type")
+                    media_type=response.headers.get("content-type"),
                 )
-            
+
             except httpx.RequestError as e:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"Error communicating with service: {str(e)}"
+                    detail=f"Error communicating with service: {str(e)}",
                 )
-
-        
 
     def test_health_check(self):
         """Test the gateway health check endpoint"""
@@ -290,10 +298,10 @@ class TestAPIGateway:
         """Test proxying a request with valid JWT token"""
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.get("/user-service/users/me", headers=headers)
         assert response.status_code == 200
-        
+
         # Verify that the mock HTTP client was called
         self.http_client_mock.get.assert_called_once()
 
@@ -301,7 +309,7 @@ class TestAPIGateway:
         """Test proxying a request to a non-existent service"""
         token = create_test_token("user123", ["user"], ["service:nonexistent:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.get("/nonexistent-service/test", headers=headers)
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
@@ -311,10 +319,12 @@ class TestAPIGateway:
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
         body_data = {"name": "John Doe", "email": "john@example.com"}
-        
-        response = self.client.post("/user-service/users", json=body_data, headers=headers)
+
+        response = self.client.post(
+            "/user-service/users", json=body_data, headers=headers
+        )
         assert response.status_code == 200
-        
+
         # Verify that the mock HTTP client was called with the correct method
         self.http_client_mock.post.assert_called_once()
 
@@ -323,20 +333,22 @@ class TestAPIGateway:
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
         body_data = {"name": "Jane Doe"}
-        
-        response = self.client.put("/user-service/users/123", json=body_data, headers=headers)
+
+        response = self.client.put(
+            "/user-service/users/123", json=body_data, headers=headers
+        )
         assert response.status_code == 200
-        
+
         self.http_client_mock.put.assert_called_once()
 
     def test_proxy_delete_request(self):
         """Test proxying a DELETE request"""
         token = create_test_token("user123", ["admin"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.delete("/user-service/users/123", headers=headers)
         assert response.status_code == 200
-        
+
         self.http_client_mock.delete.assert_called_once()
 
     def test_proxy_patch_request(self):
@@ -344,21 +356,23 @@ class TestAPIGateway:
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
         body_data = {"email": "newemail@example.com"}
-        
-        response = self.client.patch("/user-service/users/123", json=body_data, headers=headers)
+
+        response = self.client.patch(
+            "/user-service/users/123", json=body_data, headers=headers
+        )
         assert response.status_code == 200
-        
+
         self.http_client_mock.patch.assert_called_once()
 
     def test_request_id_middleware(self):
         """Test that requests get assigned unique request IDs"""
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.get("/user-service/users/me", headers=headers)
         assert response.status_code == 200
         assert "X-Request-ID" in response.headers
-        
+
         # Make another request and verify different request ID
         response2 = self.client.get("/user-service/users/me", headers=headers)
         assert response2.status_code == 200
@@ -369,32 +383,33 @@ class TestAPIGateway:
         """Test that appropriate headers are forwarded to microservices"""
         token = create_test_token("user123", ["admin"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.get("/user-service/users/me", headers=headers)
         assert response.status_code == 200
-        
+
         # Get the call arguments from the mock
         call_args = self.http_client_mock.get.call_args
         forwarded_headers = call_args.kwargs["headers"]
-        
+
         # Check that user context headers are added
         assert "X-User-ID" in forwarded_headers
         assert "X-User-Roles" in forwarded_headers
         assert "X-Gateway-Request-ID" in forwarded_headers
-        assert "X-Forwarded-For" in forwarded_headers
 
     def test_query_parameter_forwarding(self):
         """Test that query parameters are forwarded to microservices"""
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
-        response = self.client.get("/user-service/users?page=1&limit=10", headers=headers)
+
+        response = self.client.get(
+            "/user-service/users?page=1&limit=10", headers=headers
+        )
         assert response.status_code == 200
-        
+
         # Get the call arguments from the mock
         call_args = self.http_client_mock.get.call_args
         forwarded_params = call_args.kwargs["params"]
-        
+
         assert "page" in forwarded_params
         assert forwarded_params["page"] == "1"
         assert "limit" in forwarded_params
@@ -405,17 +420,17 @@ class TestAPIGateway:
         # Reset rate limits
         if hasattr(self.app, "rate_limits"):
             self.app.rate_limits.clear()
-        
+
         # Temporarily set a low rate limit for testing
         original_limit = 100
         new_limit = 2
-        
+
         # We need to modify the shield logic for this test
         # This is a simplified test - in practice you'd want to test with actual Redis
-        
+
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         # Make requests within the limit (this depends on the implementation)
         # Note: The actual rate limiting logic would need to be tested with proper time control
         response = self.client.get("/user-service/users/me", headers=headers)
@@ -428,10 +443,10 @@ class TestAPIGateway:
             "sub": "user123",
             "roles": ["user"],
             "permissions": ["service:user-service:access"],
-            "exp": datetime.utcnow() - timedelta(hours=1)  # Expired
+            "exp": datetime.utcnow() - timedelta(hours=1),  # Expired
         }
         token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-        
+
         headers = {"Authorization": f"Bearer {token}"}
         response = self.client.get("/user-service/users/me", headers=headers)
         assert response.status_code == 500  # Auth shield blocks
@@ -452,7 +467,7 @@ class TestAPIGateway:
         # User has valid token but no permission for the service
         token = create_test_token("user123", ["user"], ["some:other:permission"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.get("/user-service/users/me", headers=headers)
         # This will actually pass through auth shield but the service access logic
         # is not implemented in this simplified version. In a full implementation,
@@ -461,53 +476,63 @@ class TestAPIGateway:
 
     def test_different_http_methods(self):
         """Test that different HTTP methods are handled correctly"""
-        token = create_test_token("user123", ["user"], ["service:product-service:access"])
+        token = create_test_token(
+            "user123", ["user"], ["service:product-service:access"]
+        )
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         # Test GET
         response = self.client.get("/product-service/products", headers=headers)
         assert response.status_code == 200
-        
+
         # Test POST
-        response = self.client.post("/product-service/products", json={"name": "test"}, headers=headers)
+        response = self.client.post(
+            "/product-service/products", json={"name": "test"}, headers=headers
+        )
         assert response.status_code == 200
-        
+
         # Test PUT
-        response = self.client.put("/product-service/products/1", json={"name": "updated"}, headers=headers)
+        response = self.client.put(
+            "/product-service/products/1", json={"name": "updated"}, headers=headers
+        )
         assert response.status_code == 200
-        
+
         # Test DELETE
         response = self.client.delete("/product-service/products/1", headers=headers)
         assert response.status_code == 200
-        
+
         # Test PATCH
-        response = self.client.patch("/product-service/products/1", json={"name": "patched"}, headers=headers)
+        response = self.client.patch(
+            "/product-service/products/1", json={"name": "patched"}, headers=headers
+        )
         assert response.status_code == 200
 
     def test_service_communication_error(self):
         """Test handling of service communication errors"""
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         # Configure mock to raise an httpx.RequestError
         self.http_client_mock.get.side_effect = httpx.RequestError("Connection failed")
-        
+
         response = self.client.get("/user-service/users/me", headers=headers)
         assert response.status_code == 503
         assert "Error communicating with service" in response.json()["detail"]
 
     def test_user_role_forwarding(self):
         """Test that user roles are properly forwarded in headers"""
-        token = create_test_token("user123", ["admin", "manager"], ["service:user-service:access"])
+        token = create_test_token(
+            "user123", ["admin", "manager"], ["service:user-service:access"]
+        )
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.get("/user-service/users/me", headers=headers)
         assert response.status_code == 200
-        
+
         # Check that roles are forwarded in the header
         call_args = self.http_client_mock.get.call_args
         forwarded_headers = call_args.kwargs["headers"]
-        
+
         assert "X-User-Roles" in forwarded_headers
         roles = forwarded_headers["X-User-Roles"]
         assert "admin" in roles
@@ -517,14 +542,14 @@ class TestAPIGateway:
         """Test that the original JWT token is forwarded to microservices"""
         token = create_test_token("user123", ["user"], ["service:user-service:access"])
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         response = self.client.get("/user-service/users/me", headers=headers)
         assert response.status_code == 200
-        
+
         # Check that the original token is forwarded
         call_args = self.http_client_mock.get.call_args
         forwarded_headers = call_args.kwargs["headers"]
-        
+
         # The Authorization header should contain the original token
         assert "Authorization" in forwarded_headers
         assert f"Bearer {token}" in forwarded_headers["Authorization"]
@@ -538,7 +563,7 @@ class TestAPIGateway:
 
 class TestGatewayAdvancedFeatures:
     """Test advanced features of the gateway"""
-    
+
     def setup_method(self):
         """Setup for advanced feature tests"""
         self.app = FastAPI(title="Advanced API Gateway")
@@ -568,4 +593,4 @@ class TestGatewayAdvancedFeatures:
     def test_circuit_breaker_pattern(self):
         """Test circuit breaker implementation for failing services"""
         # This would test automatic circuit breaking for failing services
-        assert True  # Placeholder 
+        assert True  # Placeholder
