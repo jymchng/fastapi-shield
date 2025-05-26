@@ -1,607 +1,566 @@
+<!--Examples tested-->
+
 # Dependency Injection with FastAPI Shield
 
-FastAPI Shield integrates seamlessly with FastAPI's dependency injection system, extending its capabilities with type-based validation and transformation. This guide explores advanced dependency injection patterns using FastAPI Shield.
+FastAPI Shield provides a powerful dependency injection system that extends FastAPI's built-in dependency injection with shield-based validation and transformation. This guide explores how to use shields with dependencies based on the actual implementation patterns.
 
-## Basic Dependency Injection
+## Understanding Shield Architecture
 
-FastAPI's built-in dependency injection system allows you to declare dependencies that will be provided to your endpoint functions:
+FastAPI Shield works by decorating endpoints with shields that:
+1. Execute before the endpoint function
+2. Can validate, transform, or block requests
+3. Pass validated data to the endpoint via `ShieldedDepends`
 
-```python
-from fastapi import FastAPI, Depends, HTTPException
-from typing import Annotated
+The key components are:
+- `@shield` decorator: Creates a shield function that validates/transforms data
+- `ShieldedDepends`: A dependency that receives data from shield functions
+- Shield composition: Multiple shields can be chained together
 
-app = FastAPI()
+## Basic Shield with Dependencies
 
-def get_query_parameter(q: str = None):
-    if q:
-        return q
-    return "Default value"
-
-@app.get("/items/")
-def read_items(query_param: Annotated[str, Depends(get_query_parameter)]):
-    return {"query_param": query_param}
-```
-
-FastAPI Shield enhances this system by adding type-based validation and transformation:
+Here's how shields work with dependencies:
 
 ```python
-from fastapi import FastAPI, Depends, HTTPException
-from typing import NewType, Annotated
+from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi_shield import shield, ShieldedDepends
+from typing import Optional
 
 app = FastAPI()
 
-# Define a sanitized query type
-SanitizedQuery = NewType("SanitizedQuery", str)
-
-# Create a shield to sanitize and validate the query
-@shield(name="Sanitize Query")
-def sanitize_query(q: str = None) -> SanitizedQuery:
-    if q is None:
-        return SanitizedQuery("Default value")
-    
-    # Remove any potentially dangerous characters
-    sanitized = q.strip().replace(";", "")
-    
-    # Validate length
-    if len(sanitized) > 100:
-        raise HTTPException(status_code=400, detail="Query too long")
-    
-    return SanitizedQuery(sanitized)
-
-@app.get("/items/")
-@sanitize_query
-def read_items(q: SanitizedQuery = ShieldedDepends(sanitize_query)):
-    return {"query": q}
-```
-
-## Composite Dependencies
-
-You can create complex dependency chains with FastAPI Shield:
-
-```python
-from fastapi import FastAPI, Depends, HTTPException
-from typing import NewType, Annotated, Dict, Optional
-from pydantic import BaseModel
-from fastapi_shield import shield, ShieldedDepends
-import time
-
-app = FastAPI()
-
-# Define models and types
-class UserContext(BaseModel):
-    user_id: Optional[str] = None
-    is_authenticated: bool = False
-    last_active: float = 0
-
-AuthenticatedContext = NewType("AuthenticatedContext", UserContext)
-RateLimitedContext = NewType("RateLimitedContext", AuthenticatedContext)
-
-# Base context provider
-@shield(name="Base Context")
-def get_base_context() -> UserContext:
-    # In a real app, this might come from a request object
-    # or be populated based on a token or session
-    return UserContext(
-        last_active=time.time()
-    )
-
-# Authentication shield
-@shield(name="Authenticate Context")
-def authenticate_context(context: UserContext = ShieldedDepends(get_base_context)) -> AuthenticatedContext:
-    # In a real app, check authentication from a token or session
-    if context.user_id is None:
-        # Mock authentication - normally you'd validate a token
-        context.user_id = "user123"
-        context.is_authenticated = True
-    
-    if not context.is_authenticated:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required"
-        )
-    
-    return AuthenticatedContext(context)
-
-# Rate limiting shield
-@shield(name="Rate Limit Context")
-def rate_limit_context(context: AuthenticatedContext = ShieldedDepends(authenticate_context)) -> RateLimitedContext:
-    # Simple in-memory rate limiting (use Redis in production)
-    user_id = context.user_id
-    current_time = time.time()
-    
-    # In a real app, check against a rate limit store
-    # Here we just pass through
-    
-    return RateLimitedContext(context)
-
-# Use the full dependency chain
-@app.get("/protected-resource")
-@get_base_context
-@authenticate_context
-@rate_limit_context
-async def get_protected_resource(context: RateLimitedContext = ShieldedDepends(rate_limit_context)):
-    return {
-        "user_id": context.user_id,
-        "authenticated": context.is_authenticated,
-        "last_active": context.last_active
-    }
-```
-
-## Dependency Injection with Shields
-
-FastAPI Shield provides the `ShieldedDepends` class that combines Depends with shield functionality:
-
-```python
-from fastapi import FastAPI, Query
-from typing import NewType, Annotated, Optional
-from fastapi_shield import shield, ShieldedDepends
-
-app = FastAPI()
-
-# Define a validated page type
-ValidatedPage = NewType("ValidatedPage", int)
-ValidatedLimit = NewType("ValidatedLimit", int)
-
-# Shields for pagination parameters
-@shield(name="Validate Page")
-def validate_page(page: int = Query(1)) -> ValidatedPage:
-    if page < 1:
-        page = 1
-    return ValidatedPage(page)
-
-@shield(name="Validate Limit")
-def validate_limit(limit: int = Query(10)) -> ValidatedLimit:
-    if limit < 1:
-        limit = 1
-    if limit > 100:
-        limit = 100
-    return ValidatedLimit(limit)
-
-# Use shields on endpoints
-@app.get("/items")
-@validate_page
-@validate_limit
-def get_items(
-    page: ValidatedPage = ShieldedDepends(validate_page),
-    limit: ValidatedLimit = ShieldedDepends(validate_limit)
-):
-    # Calculate pagination
-    skip = (page - 1) * limit
-    
-    # Get items with pagination
-    return {
-        "pagination": {"skip": skip, "limit": limit},
-        "items": [{"id": i} for i in range(skip, skip + limit)]
-    }
-```
-
-## Scoped Dependencies with ShieldDepends
-
-FastAPI Shield provides `ShieldedDepends` for creating scoped dependencies:
-
-```python
-from fastapi import FastAPI, Depends, HTTPException
-from typing import NewType, Annotated, List, Dict, Optional
-from pydantic import BaseModel
-from fastapi_shield import shield, ShieldedDepends
-import time
-
-app = FastAPI()
-
-# Models
-class User(BaseModel):
-    user_id: str
-    username: str
-    is_admin: bool = False
-    scopes: List[str] = []
-
-# Types
-AuthenticatedUser = NewType("AuthenticatedUser", User)
-AdminUser = NewType("AdminUser", AuthenticatedUser)
-
-# Mock user database
-USERS = {
-    "user1": User(user_id="user1", username="Regular User", scopes=["read:items"]),
-    "admin1": User(user_id="admin1", username="Admin User", is_admin=True, 
-                   scopes=["read:items", "write:items", "admin:panel"])
+# Mock database
+USERS_DB = {
+    "user1": {"username": "user1", "email": "user1@example.com", "roles": ["user"]},
+    "admin1": {"username": "admin1", "email": "admin1@example.com", "roles": ["admin", "user"]},
 }
 
-# Base authentication shield
-@shield(name="Authenticate")
-def authenticate(user_id: str) -> AuthenticatedUser:
-    if user_id not in USERS:
-        raise HTTPException(status_code=401, detail="User not authenticated")
-    return AuthenticatedUser(USERS[user_id])
+def get_database():
+    """Dependency that provides database access"""
+    return USERS_DB
 
-# Admin check shield
-@shield(name="Ensure Admin")
-def ensure_admin(user: AuthenticatedUser = ShieldedDepends(lambda user: user)) -> AdminUser:
-    if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return AdminUser(user)
+def validate_token(token: str) -> bool:
+    """Helper function to validate tokens"""
+    return token in ["valid_user_token", "valid_admin_token"]
 
-# Scope check shield
-@shield(name="Check Scope")
-def check_scope(
-    user: AuthenticatedUser = ShieldedDepends(authenticate), 
-    required_scope: str = "read:items"
-) -> AuthenticatedUser:
-    if required_scope not in user.scopes:
-        raise HTTPException(
-            status_code=403, 
-            detail=f"Missing required scope: {required_scope}"
-        )
-    return user
+def get_user_from_token(token: str) -> Optional[str]:
+    """Helper function to extract username from token"""
+    if token == "valid_user_token":
+        return "user1"
+    elif token == "valid_admin_token":
+        return "admin1"
+    return None
 
-# Use shields on endpoints
-@app.get("/admin-panel")
-@authenticate
-@ensure_admin
-def admin_panel(user_id: str = "admin1", admin: AdminUser = ShieldedDepends(ensure_admin)):
-    return {"message": f"Welcome to the admin panel, {admin.username}"}
-
-@app.get("/items")
-@authenticate
-@check_scope
-def read_items(user_id: str = "user1", user: AuthenticatedUser = ShieldedDepends(check_scope)):
-    return {"message": f"Reading items for {user.username}", "items": [{"id": 1, "name": "Item 1"}]}
-
-# Create a factory function for a shield with specific scope
-def require_scope(scope_name: str):
-    """Create a shield that checks for a specific scope"""
+# Authentication shield
+@shield(name="Authentication Shield")
+def auth_shield(authorization: str = Header()) -> Optional[str]:
+    """Shield that validates authorization header and returns token"""
+    if not authorization.startswith("Bearer "):
+        return None
     
-    @shield(name=f"Require {scope_name} Scope")
-    def scope_shield(
-        user: AuthenticatedUser = ShieldedDepends(authenticate), 
-    ) -> AuthenticatedUser:
-        if scope_name not in user.scopes:
-            raise HTTPException(
-                status_code=403, 
-                detail=f"Missing required scope: {scope_name}"
-            )
-        return user
-        
-    return scope_shield
+    token = authorization.replace("Bearer ", "")
+    if validate_token(token):
+        return token
+    return None
 
-write_items_shield = require_scope("write:items")
+# User data retrieval function (used with ShieldedDepends)
+def get_user_data(
+    token: str,  # This comes from the shield
+    db: dict = Depends(get_database)  # This is a regular FastAPI dependency
+) -> dict:
+    """Function that gets user data using token from shield and database dependency"""
+    username = get_user_from_token(token)
+    if username and username in db:
+        return db[username]
+    raise HTTPException(status_code=404, detail="User not found")
 
-@app.post("/items")
-@authenticate
-@write_items_shield
-def create_item(
-    item: dict, 
-    user_id: str = "admin1",
-    user: AuthenticatedUser = ShieldedDepends(write_items_shield)
+# Endpoint using shield and ShieldedDepends
+@app.get("/profile")
+@auth_shield
+async def get_profile(
+    user: dict = ShieldedDepends(get_user_data)
 ):
-    return {"message": f"Creating item for {user.username}", "item": item}
-```
-
-## Contextual Dependency Injection
-
-FastAPI Shield allows you to create context-aware dependencies:
-
-```python
-from fastapi import FastAPI, Depends, HTTPException, Request
-from typing import NewType, Annotated, Dict, Optional, Callable
-from pydantic import BaseModel
-from fastapi_shield import shield, ShieldedDepends
-import time
-from datetime import datetime
-
-app = FastAPI()
-
-# Context model
-class RequestContext(BaseModel):
-    request_id: str
-    timestamp: float
-    user_id: Optional[str] = None
-    is_admin: bool = False
-    
-# Create a context dependency
-@shield(name="Get Request Context")
-async def get_request_context(request: Request) -> RequestContext:
-    # In a real app, extract from request headers, auth tokens, etc.
-    return RequestContext(
-        request_id=f"req_{int(time.time())}",
-        timestamp=time.time(),
-        user_id=request.headers.get("X-User-Id"),
-        is_admin=request.headers.get("X-Is-Admin") == "true"
-    )
-
-# Create a logger that depends on context
-def get_logger(context: RequestContext = ShieldedDepends(get_request_context)):
-    def log(level: str, message: str):
-        timestamp = datetime.fromtimestamp(context.timestamp).isoformat()
-        print(f"[{timestamp}] [{level}] [{context.request_id}] {message}")
-    
-    return log
-
-# Use context in endpoint
-@app.get("/items/{item_id}")
-@get_request_context
-async def get_item(
-    item_id: int,
-    context: RequestContext = ShieldedDepends(get_request_context),
-    logger: Callable = Depends(get_logger)
-):
-    logger("INFO", f"Retrieving item {item_id}")
-    
-    # Check permissions
-    if item_id > 100 and not context.is_admin:
-        logger("ERROR", f"User {context.user_id} attempted to access restricted item {item_id}")
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    logger("INFO", f"Successfully retrieved item {item_id}")
-    
+    """Endpoint that requires authentication and returns user profile"""
     return {
-        "item_id": item_id,
-        "name": f"Item {item_id}",
-        "request_id": context.request_id,
-        "user_id": context.user_id
+        "username": user["username"],
+        "email": user["email"],
+        "roles": user["roles"]
     }
 ```
 
-## Database Dependency Injection
+## Shield Composition and Chaining
 
-Integrate FastAPI Shield with database connections:
+Shields can be composed to create complex validation chains:
 
 ```python
-from fastapi import FastAPI, Depends, HTTPException
-from typing import NewType, Annotated, List, Dict, Generator
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, HTTPException
 from fastapi_shield import shield, ShieldedDepends
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from typing import List, Optional
 
 app = FastAPI()
 
-# Database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Database model
-class ItemDB(Base):
-    __tablename__ = "items"
+# Authentication shield (first in chain)
+@shield(name="JWT Auth")
+def jwt_auth_shield(authorization: str = Header()) -> Optional[dict]:
+    """Validates JWT token and returns payload"""
+    if not authorization.startswith("Bearer "):
+        return None
     
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    description = Column(String)
+    token = authorization.replace("Bearer ", "")
+    # In real app, decode JWT here
+    if token == "valid_jwt_token":
+        return {
+            "user_id": "user123",
+            "username": "john_doe",
+            "roles": ["user", "admin"],
+            "permissions": ["read:profile", "write:profile"]
+        }
+    return None
 
-# Pydantic model
-class Item(BaseModel):
-    id: int
-    name: str
-    description: Optional[str] = None
+# Role validation shield (second in chain)
+def require_role(required_role: str):
+    """Factory function that creates role-checking shields"""
     
-    class Config:
-        orm_mode = True
-
-# Create the database tables
-Base.metadata.create_all(bind=engine)
-
-# Define a validated database session type
-ValidatedDBSession = NewType("ValidatedDBSession", Session)
-
-# Shield to provide and validate database session
-@shield(name="Database Connection")
-def get_db() -> ValidatedDBSession:
-    db = SessionLocal()
-    try:
-        # Test database connection
-        db.execute("SELECT 1")
-        return ValidatedDBSession(db)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database connection error: {str(e)}"
+    @shield(
+        name=f"Role Check ({required_role})",
+        exception_to_raise_if_fail=HTTPException(
+            status_code=403,
+            detail=f"Role '{required_role}' required"
         )
+    )
+    def role_shield(
+        payload: dict = ShieldedDepends(lambda payload: payload)  # Gets data from previous shield
+    ) -> Optional[dict]:
+        """Shield that checks if user has required role"""
+        user_roles = payload.get("roles", [])
+        if required_role in user_roles:
+            return payload
+        return None
+    
+    return role_shield
 
-# Use the database session in endpoints
-@app.get("/items/", response_model=List[Item])
-@get_db
-def read_items(
-    skip: int = 0, 
-    limit: int = 100, 
-    db: ValidatedDBSession = ShieldedDepends(get_db)
-):
-    items = db.query(ItemDB).offset(skip).limit(limit).all()
-    return items
+# Permission validation shield (third in chain)
+def require_permission(required_permission: str):
+    """Factory function that creates permission-checking shields"""
+    
+    @shield(
+        name=f"Permission Check ({required_permission})",
+        exception_to_raise_if_fail=HTTPException(
+            status_code=403,
+            detail=f"Permission '{required_permission}' required"
+        )
+    )
+    def permission_shield(
+        payload: dict = ShieldedDepends(lambda payload: payload)  # Gets data from previous shield
+    ) -> Optional[dict]:
+        """Shield that checks if user has required permission"""
+        user_permissions = payload.get("permissions", [])
+        if required_permission in user_permissions:
+            return payload
+        return None
+    
+    return permission_shield
 
-@app.get("/items/{item_id}", response_model=Item)
-@get_db
-def read_item(
-    item_id: int, 
-    db: ValidatedDBSession = ShieldedDepends(get_db)
+# Create specific shield instances
+admin_role_shield = require_role("admin")
+write_permission_shield = require_permission("write:profile")
+
+# Endpoint with multiple shields
+@app.get("/admin-profile")
+@jwt_auth_shield
+@admin_role_shield
+async def admin_profile(
+    user_data: dict = ShieldedDepends(lambda payload: payload)
 ):
-    item = db.query(ItemDB).filter(ItemDB.id == item_id).first()
-    if item is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return item
+    """Endpoint requiring JWT auth and admin role"""
+    return {
+        "message": "Admin profile access granted",
+        "user_id": user_data["user_id"],
+        "username": user_data["username"]
+    }
+
+@app.post("/update-profile")
+@jwt_auth_shield
+@write_permission_shield
+async def update_profile(
+    profile_data: dict,
+    user_data: dict = ShieldedDepends(lambda payload: payload)
+):
+    """Endpoint requiring JWT auth and write permission"""
+    return {
+        "message": "Profile updated",
+        "user_id": user_data["user_id"],
+        "updated_data": profile_data
+    }
 ```
 
-## Async Dependency Injection
+## Working with Pydantic Models
 
-FastAPI Shield works seamlessly with async dependencies:
+FastAPI Shield integrates seamlessly with Pydantic for data validation:
 
 ```python
-from fastapi import FastAPI, Depends, HTTPException
-from typing import NewType, Annotated, List, Dict, Optional
-from pydantic import BaseModel
+from fastapi import FastAPI, Body, HTTPException
 from fastapi_shield import shield, ShieldedDepends
-import httpx
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List
+
+app = FastAPI()
+
+# Pydantic models
+class UserInput(BaseModel):
+    username: str = Field(..., min_length=3, max_length=20)
+    email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
+    full_name: Optional[str] = None
+    age: int = Field(..., ge=13, le=120)
+
+class ValidatedUser(BaseModel):
+    username: str
+    email: str
+    full_name: Optional[str]
+    age: int
+    is_valid: bool = True
+    validation_notes: List[str] = []
+
+# Shield that validates and transforms user data
+@shield(
+    name="User Validator",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=400,
+        detail="User validation failed"
+    )
+)
+def validate_user_shield(user_input: UserInput = Body()) -> Optional[ValidatedUser]:
+    """Shield that performs additional validation beyond Pydantic"""
+    
+    # Check for reserved usernames
+    reserved_usernames = ["admin", "system", "root", "api"]
+    if user_input.username.lower() in reserved_usernames:
+        return None
+    
+    # Check email domain restrictions
+    allowed_domains = ["company.com", "partner.org"]
+    email_domain = user_input.email.split("@")[1]
+    if email_domain not in allowed_domains:
+        return None
+    
+    # Create validated user with additional metadata
+    validated_user = ValidatedUser(
+        username=user_input.username,
+        email=user_input.email,
+        full_name=user_input.full_name,
+        age=user_input.age,
+        validation_notes=["Email domain approved", "Username available"]
+    )
+    
+    return validated_user
+
+# Function to enrich user data (used with ShieldedDepends)
+def enrich_user_data(validated_user: ValidatedUser) -> dict:
+    """Function that enriches validated user data"""
+    return {
+        "user": validated_user.dict(),
+        "account_type": "premium" if validated_user.age >= 18 else "standard",
+        "welcome_message": f"Welcome, {validated_user.username}!",
+        "next_steps": ["verify_email", "complete_profile"]
+    }
+
+@app.post("/register")
+@validate_user_shield
+async def register_user(
+    enriched_data: dict = ShieldedDepends(enrich_user_data)
+):
+    """Endpoint that registers a user with validation and enrichment"""
+    return {
+        "message": "User registered successfully",
+        "data": enriched_data
+    }
+```
+
+## Database Integration with Shields
+
+Here's how to integrate shields with database operations:
+
+```python
+from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi_shield import shield, ShieldedDepends
+from typing import Optional, Dict, Any
 import asyncio
 
 app = FastAPI()
 
-# External API data model
-class ExternalAPIData(BaseModel):
-    api_id: str
-    data: Dict[str, any]
-    timestamp: float
+# Mock database
+USERS_DB = {
+    "user1": {"id": 1, "username": "user1", "active": True, "role": "user"},
+    "admin1": {"id": 2, "username": "admin1", "active": True, "role": "admin"},
+    "inactive1": {"id": 3, "username": "inactive1", "active": False, "role": "user"},
+}
 
-# Define a validated API data type
-ValidatedAPIData = NewType("ValidatedAPIData", ExternalAPIData)
+async def get_database():
+    """Async database dependency"""
+    # Simulate database connection
+    await asyncio.sleep(0.01)
+    return USERS_DB
 
-# Shield to fetch and validate external API data
-@shield(name="External API Data")
-async def get_external_api_data(api_id: str) -> ValidatedAPIData:
-    # In a real app, fetch from an external API
-    async with httpx.AsyncClient() as client:
-        try:
-            # Simulated external API call
-            await asyncio.sleep(0.1)  # Simulate network delay
-            
-            # Normally you would do:
-            # response = await client.get(f"https://api.example.com/data/{api_id}")
-            # response.raise_for_status()
-            # data = response.json()
-            
-            # Simulated response
-            data = {
-                "value": 42,
-                "name": f"Resource {api_id}",
-                "status": "active"
-            }
-            
-            return ValidatedAPIData(
-                ExternalAPIData(
-                    api_id=api_id,
-                    data=data,
-                    timestamp=asyncio.get_event_loop().time()
-                )
-            )
-        except httpx.HTTPError as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Error fetching external API data: {str(e)}"
-            )
-
-# Cache for API responses
-cache = {}
-
-@shield(name="Cached API Data")
-async def get_cached_api_data(
-    api_id: str,
-    max_age: int = 60
-) -> ValidatedAPIData:
-    current_time = asyncio.get_event_loop().time()
+# Authentication shield with database lookup
+@shield(name="Database Auth")
+async def db_auth_shield(
+    api_key: str = Header(),
+    db: Dict[str, Any] = Depends(get_database)
+) -> Optional[dict]:
+    """Shield that authenticates user against database"""
     
-    # Check cache
-    if api_id in cache:
-        if current_time - cache[api_id].timestamp < max_age:
-            return cache[api_id]
-    
-    # Get fresh data using the shield
-    data = await get_external_api_data(api_id)
-    
-    # Update cache
-    cache[api_id] = data
-    
-    return data
-
-# Use the async shield in an endpoint
-@app.get("/external-data/{api_id}")
-@get_cached_api_data
-async def read_external_data(
-    api_id: str, 
-    data: ValidatedAPIData = ShieldedDepends(get_cached_api_data)
-):
-    return {
-        "api_id": data.api_id,
-        "data": data.data,
-        "cached_at": data.timestamp
+    # Simple API key to username mapping
+    api_key_mapping = {
+        "user1_key": "user1",
+        "admin1_key": "admin1",
+        "inactive1_key": "inactive1"
     }
+    
+    username = api_key_mapping.get(api_key)
+    if not username:
+        return None
+    
+    user = db.get(username)
+    if not user or not user["active"]:
+        return None
+    
+    return user
+
+# Function to get user permissions (used with ShieldedDepends)
+async def get_user_permissions(
+    user: dict,  # Comes from shield
+    db: Dict[str, Any] = Depends(get_database)  # Database dependency
+) -> dict:
+    """Function that retrieves user permissions from database"""
+    
+    # Mock permission lookup
+    permissions_map = {
+        "user": ["read:own_data"],
+        "admin": ["read:own_data", "read:all_data", "write:all_data"]
+    }
+    
+    permissions = permissions_map.get(user["role"], [])
+    
+    return {
+        "user": user,
+        "permissions": permissions,
+        "can_read_all": "read:all_data" in permissions,
+        "can_write_all": "write:all_data" in permissions
+    }
+
+@app.get("/user-data")
+@db_auth_shield
+async def get_user_data(
+    user_info: dict = ShieldedDepends(get_user_permissions)
+):
+    """Endpoint that returns user data based on permissions"""
+    
+    if user_info["can_read_all"]:
+        # Admin can see all users
+        return {
+            "message": "All user data",
+            "data": list(USERS_DB.values()),
+            "user": user_info["user"]
+        }
+    else:
+        # Regular user can only see their own data
+        return {
+            "message": "Your user data",
+            "data": user_info["user"],
+            "permissions": user_info["permissions"]
+        }
 ```
 
-## Conditional Dependencies
+## Advanced Shield Patterns
 
-FastAPI Shield allows you to create dependencies that execute conditionally:
+### Conditional Shield Execution
 
 ```python
-from fastapi import FastAPI, Depends, HTTPException, Query
-from typing import NewType, Annotated, Optional, Callable
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, Query
 from fastapi_shield import shield, ShieldedDepends
+from typing import Optional
 
 app = FastAPI()
 
-# Define feature flag types
-FeatureFlags = NewType("FeatureFlags", dict)
-
-# Shield to get feature flags
-@shield(name="Feature Flags")
-def get_feature_flags(user_id: Optional[str] = None) -> FeatureFlags:
-    # In a real app, fetch from a feature flag service or database
-    flags = {
-        "new_ui": True,
-        "advanced_search": False,
-        "beta_features": user_id in ["beta_tester1", "admin"]
+# Feature flag shield
+@shield(name="Feature Flag Check")
+def feature_flag_shield(
+    feature: str = Query(...),
+    user_type: str = Header(default="regular")
+) -> Optional[dict]:
+    """Shield that checks if feature is enabled for user type"""
+    
+    feature_flags = {
+        "beta_feature": ["premium", "admin"],
+        "experimental_api": ["admin"],
+        "new_ui": ["regular", "premium", "admin"]
     }
-    return FeatureFlags(flags)
+    
+    allowed_user_types = feature_flags.get(feature, [])
+    if user_type in allowed_user_types:
+        return {
+            "feature": feature,
+            "user_type": user_type,
+            "access_granted": True
+        }
+    return None
 
-# Factory function to create feature requirement shields
-def feature_required(feature_name: str):
-    @shield(name=f"Require {feature_name}")
-    def feature_shield(flags: FeatureFlags = ShieldedDepends(get_feature_flags)):
-        if not flags.get(feature_name, False):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Feature '{feature_name}' is not enabled for your account"
-            )
-        return True
-    return feature_shield
-
-# Create shield instances for specific features
-advanced_search_shield = feature_required("advanced_search")
-beta_features_shield = feature_required("beta_features")
-
-# Use conditional shields in endpoints
-@app.get("/advanced-search")
-@get_feature_flags
-@advanced_search_shield
-def advanced_search(
-    query: str,
-    user_id: Optional[str] = None,
-    _: bool = ShieldedDepends(advanced_search_shield)
+@app.get("/feature/{feature_name}")
+@feature_flag_shield
+async def access_feature(
+    feature_name: str,
+    access_info: dict = ShieldedDepends(lambda info: info)
 ):
-    return {"results": f"Advanced search results for: {query}"}
-
-@app.get("/beta-features")
-@get_feature_flags
-@beta_features_shield
-def beta_features(
-    user_id: str = Query(...),  # Required for the feature flag check
-    _: bool = ShieldedDepends(beta_features_shield)
-):
-    return {"message": "Welcome to beta features", "user_id": user_id}
+    """Endpoint that provides access to features based on user type"""
+    return {
+        "message": f"Access granted to {access_info['feature']}",
+        "user_type": access_info["user_type"],
+        "feature_data": f"Data for {feature_name}"
+    }
 ```
 
-## Best Practices for Dependency Injection
+### Error Handling in Shields
 
-When using dependency injection with FastAPI Shield, consider these best practices:
+```python
+from fastapi import FastAPI, HTTPException, Header
+from fastapi_shield import shield, ShieldedDepends
+from typing import Optional
 
-1. **Apply as Decorators**: Use shields as decorators on the routes that require them.
+app = FastAPI()
 
-2. **Consistent Parameter Names**: Keep parameter names consistent between your shield function and endpoint function.
+# Shield with custom error handling
+@shield(
+    name="Rate Limit Shield",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=429,
+        detail="Rate limit exceeded",
+        headers={"Retry-After": "60"}
+    )
+)
+def rate_limit_shield(
+    x_client_id: str = Header()
+) -> Optional[dict]:
+    """Shield that implements rate limiting"""
+    
+    # Mock rate limiting logic
+    rate_limits = {
+        "client1": {"requests": 5, "window": 60},
+        "client2": {"requests": 100, "window": 60}
+    }
+    
+    if x_client_id not in rate_limits:
+        return None
+    
+    # In real implementation, check against Redis or similar
+    # For demo, always allow
+    return {
+        "client_id": x_client_id,
+        "rate_limit": rate_limits[x_client_id]
+    }
 
-3. **Use ShieldedDepends**: Use `ShieldedDepends` rather than direct function calls when composing shields.
+@app.get("/api/data")
+@rate_limit_shield
+async def get_api_data(
+    client_info: dict = ShieldedDepends(lambda info: info)
+):
+    """Rate-limited API endpoint"""
+    return {
+        "data": "API response data",
+        "client": client_info["client_id"],
+        "rate_limit": client_info["rate_limit"]
+    }
+```
 
-4. **Shield Factory Functions**: Create shield factory functions that return parametrized shields.
+## Best Practices
 
-5. **Provide Names**: Always give your shields descriptive names for better debugging and logging.
+### 1. Shield Naming and Organization
 
-6. **Shield Composition**: Apply multiple shields to a route as multiple decorators, not by calling them directly.
+```python
+# Good: Descriptive shield names
+@shield(name="JWT Authentication")
+def jwt_auth_shield(token: str = Header()) -> Optional[dict]:
+    pass
 
-7. **Dependency Hierarchy**: Design a clear hierarchy of dependencies to avoid circular dependencies.
+@shield(name="Admin Role Check")
+def admin_role_shield(user: dict = ShieldedDepends(lambda u: u)) -> Optional[dict]:
+    pass
 
-8. **Error Handling**: Provide clear error messages when dependencies fail to resolve.
+# Good: Shield factory functions for reusability
+def require_role(role: str):
+    @shield(name=f"Require {role} Role")
+    def role_shield(user: dict = ShieldedDepends(lambda u: u)) -> Optional[dict]:
+        return user if role in user.get("roles", []) else None
+    return role_shield
+```
 
-9. **Scoped Cleanup**: For resources like database connections, ensure proper cleanup.
+### 2. Proper ShieldedDepends Usage
 
-10. **Type Safety**: Use `NewType` to create explicit types for your dependencies.
+```python
+# Correct: Use lambda functions to pass data from shields
+@app.get("/endpoint")
+@auth_shield
+async def endpoint(
+    user_data: dict = ShieldedDepends(lambda user: user)  # Gets data from auth_shield
+):
+    pass
 
-By following these patterns and best practices, you can create a modular, maintainable, and type-safe application architecture with FastAPI Shield. 
+# Correct: Use functions for complex dependency resolution
+def get_user_with_permissions(user_data: dict, db = Depends(get_db)) -> dict:
+    # Complex logic here
+    return enriched_user_data
+
+@app.get("/endpoint")
+@auth_shield
+async def endpoint(
+    user: dict = ShieldedDepends(get_user_with_permissions)
+):
+    pass
+```
+
+### 3. Shield Composition Order
+
+```python
+# Correct order: Authentication -> Authorization -> Business Logic
+@app.get("/admin-endpoint")
+@jwt_auth_shield          # 1. Authenticate user
+@admin_role_shield        # 2. Check admin role
+@rate_limit_shield        # 3. Apply rate limiting
+async def admin_endpoint(
+    user: dict = ShieldedDepends(lambda user: user)
+):
+    pass
+```
+
+### 4. Error Handling
+
+```python
+# Good: Specific error messages and status codes
+@shield(
+    name="Permission Check",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=403,
+        detail="Insufficient permissions for this operation",
+        headers={"X-Required-Permission": "admin:write"}
+    )
+)
+def permission_shield(user: dict = ShieldedDepends(lambda u: u)) -> Optional[dict]:
+    return user if "admin:write" in user.get("permissions", []) else None
+```
+
+### 5. Testing Shields
+
+```python
+# Test shields independently
+def test_auth_shield():
+    # Test shield logic directly
+    result = auth_shield.__wrapped__("Bearer valid_token")
+    assert result is not None
+    
+    result = auth_shield.__wrapped__("Bearer invalid_token")
+    assert result is None
+
+# Test shield composition
+def test_endpoint_with_shields(client):
+    response = client.get("/protected", headers={"Authorization": "Bearer valid_token"})
+    assert response.status_code == 200
+```
+
+This documentation reflects the actual implementation patterns used in FastAPI Shield, showing how shields work as decorators that validate requests and pass data to endpoints via `ShieldedDepends`. 
