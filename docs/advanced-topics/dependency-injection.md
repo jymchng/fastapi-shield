@@ -216,7 +216,7 @@ def authenticate(user_id: str) -> AuthenticatedUser:
 
 # Admin check shield
 @shield(name="Ensure Admin")
-def ensure_admin(user: AuthenticatedUser = ShieldedDepends(authenticate)) -> AdminUser:
+def ensure_admin(user: AuthenticatedUser = ShieldedDepends(lambda user: user)) -> AdminUser:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return AdminUser(user)

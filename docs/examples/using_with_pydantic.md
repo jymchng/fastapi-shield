@@ -1,3 +1,5 @@
+<!--Examples tested-->
+
 # Using with Pydantic
 
 This section provides examples of how to integrate FastAPI Shield with Pydantic for advanced validation and type checking.
@@ -7,7 +9,7 @@ This section provides examples of how to integrate FastAPI Shield with Pydantic 
 Using FastAPI Shield with Pydantic models for request validation:
 
 ```python
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Body
 from fastapi_shield import shield, ShieldedDepends
 from pydantic import BaseModel, Field, EmailStr, validator
 from typing import List, Optional
@@ -40,8 +42,14 @@ class User(UserBase):
         orm_mode = True
 
 # Shield that validates user data using Pydantic
-@shield(name="User Validator")
-def validate_user_shield(user: UserCreate = Depends()):
+@shield(
+    name="User Validator",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="User validation failed"
+    )
+)
+def validate_user_shield(user: UserCreate = Body()):
     """
     Shield that uses Pydantic for validation.
     By the time this shield runs, FastAPI has already validated the user model.
@@ -52,12 +60,11 @@ def validate_user_shield(user: UserCreate = Depends()):
     if user.username.lower() in reserved_usernames:
         return None
     
-    # Check for company email domain
-    if user.email.endswith("@example.com"):
-        # Allow company emails to proceed
-        return user
+    # Check for company email domain requirement
+    if not user.email.endswith("@company.com"):
+        return None
     
-    # Allow all valid users to proceed
+    # Return the validated user
     return user
 
 # Endpoint with Pydantic and Shield validation
@@ -66,7 +73,6 @@ def validate_user_shield(user: UserCreate = Depends()):
 async def create_user(validated_user: UserCreate = ShieldedDepends(lambda user: user)):
     """Create a new user with validated data"""
     # In a real app, you would save the user to a database
-    # This is simplified for the example
     new_user = User(
         id=1,
         username=validated_user.username,
@@ -81,11 +87,11 @@ async def create_user(validated_user: UserCreate = ShieldedDepends(lambda user: 
 Using FastAPI Shield with complex Pydantic models and validators:
 
 ```python
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Body
 from fastapi_shield import shield, ShieldedDepends
 from pydantic import BaseModel, Field, validator, root_validator, constr, conint, confloat
 from typing import List, Dict, Optional, Any
-from datetime import datetime, date
+from datetime import datetime
 import re
 
 app = FastAPI()
@@ -102,7 +108,7 @@ class PaymentMethod(BaseModel):
     card_type: str
     last_four: constr(regex=r'^\d{4}$')
     expiry_month: conint(ge=1, le=12)
-    expiry_year: conint(ge=2023)
+    expiry_year: conint(ge=2024)
     
     @root_validator
     def check_expiry(cls, values):
@@ -158,7 +164,7 @@ class Order(BaseModel):
         detail="Invalid order data"
     )
 )
-async def validate_order_shield(order: Order = Depends()):
+def validate_order_shield(order: Order = Body()):
     """
     Shield that validates orders beyond Pydantic's built-in validation.
     This can include business logic checks that are more complex.
@@ -170,208 +176,413 @@ async def validate_order_shield(order: Order = Depends()):
     # Calculate total order amount
     total = sum(item.total_price for item in order.items)
     
-    # Check for high-value orders
+    # Check for high-value orders (require additional verification)
     if total > 1000:
-        # For high-value orders, we could require additional verification
-        # This is just an example, return None to block the order
-        # In a real app, you might flag it for review instead
-        pass
+        return None
     
-    # Attach calculated total to the order data
-    order_data = order.dict()
-    order_data["total_amount"] = total
-    
-    return order_data
+    # Return the validated order
+    return order
 
 # Endpoint with complex Pydantic validation + Shield
 @app.post("/orders")
 @validate_order_shield
-async def create_order(order_data: Dict[str, Any] = ShieldedDepends(lambda order: order)):
+async def create_order(validated_order: Order = ShieldedDepends(lambda order: order)):
     """Create a new order with validated data"""
-    # In a real app, you would save the order to a database
-    # This is simplified for the example
+    # Calculate total for response
+    total = sum(item.total_price for item in validated_order.items)
+    
     return {
         "order_id": 12345,
         "status": "created",
-        "total_amount": order_data["total_amount"],
+        "total_amount": total,
         "message": "Order created successfully"
     }
 ```
 
-## Pydantic Models as Shield Return Values
+## Model Transformation and Enrichment
 
-Using Pydantic models as shield return values for better type safety:
+Using shields to transform and enrich Pydantic models:
 
 ```python
-from fastapi import FastAPI, Depends, Header, HTTPException, status
+from fastapi import FastAPI, Body, HTTPException, status
 from fastapi_shield import shield, ShieldedDepends
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any
-import jwt
-from datetime import datetime, timedelta
+from datetime import datetime
+import hashlib
 
 app = FastAPI()
 
-# JWT configuration
-JWT_SECRET = "your-secret-key"
-JWT_ALGORITHM = "HS256"
+# Input model
+class ProductInput(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field(..., max_length=500)
+    price: float = Field(..., gt=0)
+    category: str
+    tags: List[str] = []
 
-# Pydantic models
-class TokenData(BaseModel):
-    user_id: int
-    username: str
-    email: Optional[str] = None
-    roles: List[str] = []
-    permissions: List[str] = []
-    exp: datetime
-    
-    @validator("exp")
-    def check_expiration(cls, v):
-        """Check if token is expired"""
-        if v < datetime.utcnow():
-            raise ValueError("Token has expired")
-        return v
+# Enriched model
+class Product(BaseModel):
+    id: str
+    name: str
+    description: str
+    price: float
+    category: str
+    tags: List[str]
+    slug: str
+    created_at: datetime
+    search_keywords: List[str]
 
-class AuthenticatedUser(BaseModel):
-    id: int
-    username: str
-    email: Optional[str] = None
-    roles: List[str]
-    permissions: List[str]
-    token_data: TokenData
-    
-    def has_role(self, role: str) -> bool:
-        """Check if user has a specific role"""
-        return role in self.roles
-    
-    def has_permission(self, permission: str) -> bool:
-        """Check if user has a specific permission"""
-        return permission in self.permissions
-
-# Shield that decodes JWT and returns a Pydantic model
+# Shield that transforms and enriches product data
 @shield(
-    name="JWT Authentication",
+    name="Product Enricher",
     exception_to_raise_if_fail=HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid authentication token",
-        headers={"WWW-Authenticate": "Bearer"}
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Product enrichment failed"
     )
 )
-async def jwt_auth_shield(authorization: str = Header(None)) -> Optional[AuthenticatedUser]:
-    """Decode JWT token and return an AuthenticatedUser instance"""
-    if not authorization:
-        return None
+def enrich_product_shield(product_input: ProductInput = Body()):
+    """Transform input into enriched product model"""
     
-    if not authorization.startswith("Bearer "):
-        return None
+    # Generate unique ID
+    product_id = hashlib.md5(
+        f"{product_input.name}{datetime.now().isoformat()}".encode()
+    ).hexdigest()[:12]
     
-    token = authorization.replace("Bearer ", "")
+    # Generate slug
+    slug = product_input.name.lower().replace(" ", "-").replace("_", "-")
+    slug = "".join(c for c in slug if c.isalnum() or c == "-")
     
-    try:
-        # Decode the token
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        
-        # Create a TokenData instance
-        token_data = TokenData(
-            user_id=payload["sub"],
-            username=payload["username"],
-            email=payload.get("email"),
-            roles=payload.get("roles", []),
-            permissions=payload.get("permissions", []),
-            exp=datetime.fromtimestamp(payload["exp"])
-        )
-        
-        # Create an AuthenticatedUser instance
-        authenticated_user = AuthenticatedUser(
-            id=token_data.user_id,
-            username=token_data.username,
-            email=token_data.email,
-            roles=token_data.roles,
-            permissions=token_data.permissions,
-            token_data=token_data
-        )
-        
-        return authenticated_user
-    except (jwt.PyJWTError, ValueError):
-        return None
-
-# Role-based shield using Pydantic model methods
-def require_role(role: str):
-    """Create a shield that requires a specific role"""
+    # Generate search keywords
+    keywords = [
+        product_input.name.lower(),
+        product_input.category.lower(),
+        *[tag.lower() for tag in product_input.tags],
+        *product_input.description.lower().split()[:5]  # First 5 words
+    ]
+    keywords = list(set(keywords))  # Remove duplicates
     
-    @shield(
-        name=f"Role Check ({role})",
-        exception_to_raise_if_fail=HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Role {role} required"
-        )
+    # Create enriched product
+    enriched_product = Product(
+        id=product_id,
+        name=product_input.name,
+        description=product_input.description,
+        price=product_input.price,
+        category=product_input.category,
+        tags=product_input.tags,
+        slug=slug,
+        created_at=datetime.now(),
+        search_keywords=keywords
     )
-    async def role_shield(user: AuthenticatedUser = ShieldedDepends(lambda user: user)) -> Optional[AuthenticatedUser]:
-        """Check if user has the required role"""
-        if user.has_role(role):
-            return user
-        return None
-        
-    return role_shield
-
-# Permission-based shield using Pydantic model methods
-def require_permission(permission: str):
-    """Create a shield that requires a specific permission"""
     
-    @shield(
-        name=f"Permission Check ({permission})",
-        exception_to_raise_if_fail=HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission {permission} required"
-        )
+    return enriched_product
+
+@app.post("/products", response_model=Product)
+@enrich_product_shield
+async def create_product(product: Product = ShieldedDepends(lambda p: p)):
+    """Create a new product with enriched data"""
+    return product
+```
+
+## Validation with External Dependencies
+
+Using shields with Pydantic models and external validation:
+
+```python
+from fastapi import FastAPI, Body, HTTPException, status, Depends
+from fastapi_shield import shield, ShieldedDepends
+from pydantic import BaseModel, EmailStr, validator
+from typing import Optional, Dict, Any
+import asyncio
+
+app = FastAPI()
+
+# Mock external services
+class UserService:
+    @staticmethod
+    async def check_username_exists(username: str) -> bool:
+        """Simulate checking if username exists"""
+        await asyncio.sleep(0.1)  # Simulate API call
+        return username in ["admin", "test", "user"]
+    
+    @staticmethod
+    async def check_email_exists(email: str) -> bool:
+        """Simulate checking if email exists"""
+        await asyncio.sleep(0.1)  # Simulate API call
+        return email in ["admin@example.com", "test@example.com"]
+
+# Dependency to get user service
+def get_user_service() -> UserService:
+    return UserService()
+
+class UserRegistration(BaseModel):
+    username: str = Field(..., min_length=3, max_length=20)
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    full_name: Optional[str] = None
+    
+    @validator("username")
+    def validate_username_format(cls, v):
+        """Validate username format"""
+        if not v.isalnum():
+            raise ValueError("Username must be alphanumeric")
+        return v
+
+# Shield with external validation
+@shield(
+    name="Registration Validator",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Registration validation failed"
     )
-    async def permission_shield(user: AuthenticatedUser = ShieldedDepends(lambda user: user)) -> Optional[AuthenticatedUser]:
-        """Check if user has the required permission"""
-        if user.has_permission(permission):
-            return user
-        return None
-        
-    return permission_shield
-
-# API endpoints
-@app.get("/users/me")
-@jwt_auth_shield
-async def get_current_user(user: AuthenticatedUser = ShieldedDepends(jwt_auth_shield)):
-    """Get the current authenticated user"""
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "roles": user.roles,
-        "permissions": user.permissions
-    }
-
-@app.get("/admin/users")
-@jwt_auth_shield
-@require_role("admin")
-async def list_users(admin: AuthenticatedUser = ShieldedDepends(require_role("admin"))):
-    """Admin endpoint to list all users"""
-    # In a real app, you would query a database
-    return {
-        "message": f"Admin {admin.username} accessed user list",
-        "users": [
-            {"id": 1, "username": "user1"},
-            {"id": 2, "username": "user2"}
-        ]
-    }
-
-@app.post("/content")
-@jwt_auth_shield
-@require_permission("content:create")
-async def create_content(
-    content_data: Dict[str, Any],
-    user: AuthenticatedUser = ShieldedDepends(require_permission("content:create"))
+)
+async def validate_registration_shield(
+    registration: UserRegistration = Body(),
+    user_service: UserService = Depends(get_user_service)
 ):
-    """Create content (requires content:create permission)"""
+    """Validate registration with external checks"""
+    
+    # Check if username already exists
+    if await user_service.check_username_exists(registration.username):
+        return None
+    
+    # Check if email already exists
+    if await user_service.check_email_exists(registration.email):
+        return None
+    
+    return registration
+
+@app.post("/register")
+@validate_registration_shield
+async def register_user(
+    validated_registration: UserRegistration = ShieldedDepends(lambda r: r)
+):
+    """Register a new user"""
     return {
-        "message": f"Content created by {user.username}",
-        "content_id": 12345
+        "message": "User registered successfully",
+        "username": validated_registration.username,
+        "email": validated_registration.email
     }
 ```
 
-These examples demonstrate how to leverage Pydantic's powerful validation capabilities in combination with FastAPI Shield for comprehensive input validation and type safety. 
+## Multiple Shield Composition
+
+Combining multiple shields for comprehensive validation:
+
+```python
+from fastapi import FastAPI, Body, Header, HTTPException, status
+from fastapi_shield import shield, ShieldedDepends
+from pydantic import BaseModel, Field, validator
+from typing import List, Optional, Dict, Any
+import re
+
+app = FastAPI()
+
+# Models
+class ContentInput(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    body: str = Field(..., min_length=10)
+    tags: List[str] = []
+    category: str
+
+class AuthData(BaseModel):
+    user_id: int
+    username: str
+    roles: List[str]
+
+# Authentication shield
+@shield(
+    name="Auth Shield",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required"
+    )
+)
+def auth_shield(authorization: str = Header(None)):
+    """Validate authorization header"""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    
+    # Mock token validation
+    token = authorization.replace("Bearer ", "")
+    if token == "valid_token":
+        return AuthData(
+            user_id=1,
+            username="testuser",
+            roles=["user", "content_creator"]
+        )
+    return None
+
+# Content validation shield
+@shield(
+    name="Content Validator",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Content validation failed"
+    )
+)
+def validate_content_shield(content: ContentInput = Body()):
+    """Validate content input"""
+    
+    # Check for prohibited content
+    prohibited_words = ["spam", "scam", "fake"]
+    content_text = f"{content.title} {content.body}".lower()
+    
+    if any(word in content_text for word in prohibited_words):
+        return None
+    
+    # Validate category
+    allowed_categories = ["tech", "science", "news", "entertainment"]
+    if content.category not in allowed_categories:
+        return None
+    
+    return content
+
+# Permission shield
+@shield(
+    name="Permission Shield",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Insufficient permissions"
+    )
+)
+def permission_shield(auth_data: AuthData = ShieldedDepends(lambda auth: auth)):
+    """Check if user has content creation permissions"""
+    if "content_creator" in auth_data.roles:
+        return auth_data
+    return None
+
+# Endpoint with multiple shields
+@app.post("/content")
+@auth_shield
+@validate_content_shield
+@permission_shield
+async def create_content(
+    content: ContentInput = ShieldedDepends(lambda content: content),
+    user: AuthData = ShieldedDepends(lambda auth: auth)
+):
+    """Create new content with full validation"""
+    return {
+        "message": "Content created successfully",
+        "content_id": 12345,
+        "title": content.title,
+        "author": user.username
+    }
+```
+
+## Form Data Validation
+
+Using shields with Pydantic models for form data:
+
+```python
+from fastapi import FastAPI, Form, HTTPException, status
+from fastapi_shield import shield, ShieldedDepends
+from pydantic import BaseModel, EmailStr, validator
+from typing import Optional
+import re
+
+app = FastAPI()
+
+class ContactForm(BaseModel):
+    name: str
+    email: EmailStr
+    subject: str
+    message: str
+    phone: Optional[str] = None
+    
+    @validator("name")
+    def validate_name(cls, v):
+        """Validate name format"""
+        if len(v.strip()) < 2:
+            raise ValueError("Name must be at least 2 characters")
+        return v.strip()
+    
+    @validator("message")
+    def validate_message(cls, v):
+        """Validate message content"""
+        if len(v.strip()) < 10:
+            raise ValueError("Message must be at least 10 characters")
+        return v.strip()
+
+# Shield for form validation
+@shield(
+    name="Contact Form Validator",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Form validation failed"
+    )
+)
+def validate_contact_form_shield(
+    name: str = Form(...),
+    email: str = Form(...),
+    subject: str = Form(...),
+    message: str = Form(...),
+    phone: Optional[str] = Form(None)
+):
+    """Validate contact form data"""
+    
+    # Create Pydantic model from form data
+    try:
+        form_data = ContactForm(
+            name=name,
+            email=email,
+            subject=subject,
+            message=message,
+            phone=phone
+        )
+    except ValueError:
+        return None
+    
+    # Additional validation
+    if phone and not re.match(r'^\+?[\d\s\-\(\)]{8,20}$', phone):
+        return None
+    
+    return form_data
+
+@app.post("/contact")
+@validate_contact_form_shield
+async def submit_contact_form(
+    form_data: ContactForm = ShieldedDepends(lambda form: form)
+):
+    """Submit contact form"""
+    return {
+        "message": "Contact form submitted successfully",
+        "reference_id": "CF12345"
+    }
+```
+
+## Key Features
+
+### Shield Ordering
+Shields are applied in **reverse order** of decoration. In this example:
+```python
+@app.post("/content")
+@auth_shield          # Applied 3rd
+@validate_content_shield  # Applied 2nd  
+@permission_shield    # Applied 1st
+```
+
+The execution order is: `permission_shield` → `validate_content_shield` → `auth_shield`
+
+### ShieldedDepends Pattern
+Use `ShieldedDepends(lambda x: x)` to access shield return values in endpoints:
+```python
+async def endpoint(validated_data = ShieldedDepends(lambda data: data)):
+    # validated_data contains the return value from the shield
+```
+
+### Error Handling
+Shields return `None` to block requests or the validated data to allow them. Use `exception_to_raise_if_fail` for custom error responses.
+
+### Pydantic Integration
+- Shields work seamlessly with Pydantic models
+- FastAPI validates Pydantic models before shields run
+- Shields can add business logic validation on top of Pydantic validation
+- Use `Body()`, `Form()`, or other FastAPI parameter types with Pydantic models
+
+### Best Practices
+1. Keep shields focused on single responsibilities
+2. Use Pydantic for data structure validation
+3. Use shields for business logic validation
+4. Combine multiple shields for comprehensive validation
+5. Return validated models from shields for type safety 

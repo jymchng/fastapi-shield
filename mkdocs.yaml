@@ -54,6 +54,7 @@ nav:
       - Advanced Examples: examples/advanced_examples.md
       # Real World Examples Done
       - Real World Examples: examples/real_world.md
+      # Using with Pydantic Done
       - Using with Pydantic: examples/using_with_pydantic.md
   - Advanced Topics:
       - Type Inheritance: advanced-topics/type-inheritance.md
