@@ -7,7 +7,7 @@ import time
 
 # Constants moved to module level
 MAX_REQUESTS = 5
-WINDOW_SECONDS = 0.25
+WINDOW_SECONDS = 0.5
 
 
 def create_app():

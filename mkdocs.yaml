@@ -61,7 +61,9 @@ nav:
       - JWT Authentication: advanced-topics/jwt-authentication.md
       # Dependency Injection Done
       - Dependency Injection: advanced-topics/dependency-injection.md
+      # Method Interception Done
       - Method Interception: advanced-topics/method-interception.md
+      # Security Best Practices Done
       - Security Best Practices: advanced-topics/security-best-practices.md
   - API Reference:
       - Overview: api/index.md
