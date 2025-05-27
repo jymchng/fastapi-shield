@@ -57,7 +57,6 @@ nav:
       # Using with Pydantic Done
       - Using with Pydantic: examples/using_with_pydantic.md
   - Advanced Topics:
-      - Type Inheritance: advanced-topics/type-inheritance.md
       # JWT Authentication Done
       - JWT Authentication: advanced-topics/jwt-authentication.md
       # Dependency Injection Done
@@ -66,13 +65,6 @@ nav:
       - Method Interception: advanced-topics/method-interception.md
       # Security Best Practices Done
       - Security Best Practices: advanced-topics/security-best-practices.md
-  - API Reference:
-      - Overview: api/index.md
-      - Shield: api/shield.md
-      - NewType: api/newtype.md
-      - Depends: api/depends.md
-      - Validators: api/validators.md
-      - Interceptors: api/interceptors.md
   - Development:
       - Overview: development/index.md
       - Contributing: development/contributing.md
