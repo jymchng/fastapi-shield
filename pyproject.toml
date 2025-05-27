@@ -66,6 +66,7 @@ dev = [
     "pylint>=3.3.6",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-xdist>=3.7.0",
     "python-multipart>=0.0.5",
     "slowapi>=0.1.9",
     "unicorn>=2.0.0",
