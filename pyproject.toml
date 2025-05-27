@@ -19,8 +19,12 @@ exclude = [
     "scripts",
     "scripts/*",
     "noxfile.py",
-    ".gitignore",
     "LICENSE",
+    "README.md",
+    ".github/*",
+    ".pre-commit-config.yaml",
+    "requirements-dev.txt",
+    "mkdocs.yaml",
 ]
 
 [build-system]
