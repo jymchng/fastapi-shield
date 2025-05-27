@@ -702,7 +702,7 @@ def version_sync(session: Session):
     with open(init_file, "w") as f:
         f.write(updated_content)
 
-    session.log(f"✅ Synced version to {pyproject_version} in {init_file}")
+    session.log(f"SUCCESS: Synced version to {pyproject_version} in {init_file}")
 
 
 @session(dependency_group="dev")
@@ -761,7 +761,7 @@ def bump_version(session: Session):
     with open("pyproject.toml", "w") as f:
         f.write(updated_content)
 
-    session.log(f"✅ Updated pyproject.toml to version {new_version}")
+    session.log(f"SUCCESS: Updated pyproject.toml to version {new_version}")
 
     # Sync to __init__.py
     version_sync(session)
@@ -789,20 +789,18 @@ def git_check(session: Session):
     current_branch = result.strip() if result else ""
 
     if current_branch not in ["main", "master"]:
-        session.log(
-            f"⚠️  Warning: Not on main/master branch (current: {current_branch})"
-        )
+        session.log(f"WARNING: Not on main/master branch (current: {current_branch})")
         response = input("Continue anyway? (y/N): ")
         if response.lower() != "y":
             session.error("Release cancelled")
 
-    session.log("✅ Git repository is clean and ready")
+    session.log("SUCCESS: Git repository is clean and ready")
 
 
 @session(dependency_group="dev")
 def release_check(session: Session):
     """Pre-release validation checklist."""
-    session.log("🔍 Running pre-release checks...")
+    session.log("[CHECK] Running pre-release checks...")
 
     # Git checks first
     git_check(session)
@@ -821,7 +819,7 @@ def release_check(session: Session):
 
     test_install(session)
 
-    session.log("✅ All pre-release checks passed!")
+    session.log("SUCCESS: All pre-release checks passed!")
 
 
 @session(dependency_group="dev")
@@ -832,7 +830,7 @@ def release(session: Session):
     if session.posargs:
         bump_type = session.posargs[0].lower()
 
-    session.log(f"🚀 Starting release process (bump: {bump_type})...")
+    session.log(f"[RELEASE] Starting release process (bump: {bump_type})...")
 
     # Pre-release checks
     release_check(session)
@@ -848,13 +846,13 @@ def release(session: Session):
     tag_name = f"v{new_version}"
     session.run("git", "tag", "-a", tag_name, "-m", f"Release {new_version}")
 
-    session.log(f"✅ Created git tag: {tag_name}")
+    session.log(f"SUCCESS: Created git tag: {tag_name}")
 
     # Clean build and rebuild
     clean(session)
     build(session)
 
-    session.log(f"🎉 Release {new_version} ready!")
+    session.log(f"SUCCESS: Release {new_version} ready!")
     session.log("Next steps:")
     session.log(f"  1. Push changes: git push origin main")
     session.log(f"  2. Push tag: git push origin {tag_name}")
@@ -865,7 +863,7 @@ def release(session: Session):
 @session(dependency_group="dev")
 def publish_test(session: Session):
     """Publish to TestPyPI using uv."""
-    session.log("📦 Publishing to TestPyPI...")
+    session.log("[PUBLISH] Publishing to TestPyPI...")
 
     # Ensure we have a clean build
     if not os.path.exists(DIST_DIR) or not os.listdir(DIST_DIR):
@@ -876,13 +874,13 @@ def publish_test(session: Session):
     session.run(
         "uv", "publish", "--publish-url", "https://test.pypi.org/legacy/", "dist/*"
     )
-    session.log("✅ Published to TestPyPI")
+    session.log("SUCCESS: Published to TestPyPI")
 
 
 @session(dependency_group="dev")
 def publish(session: Session):
     """Publish to PyPI using uv."""
-    session.log("📦 Publishing to PyPI...")
+    session.log("[PUBLISH] Publishing to PyPI...")
 
     # Ensure we have a clean build
     if not os.path.exists(DIST_DIR) or not os.listdir(DIST_DIR):
@@ -898,13 +896,13 @@ def publish(session: Session):
 
     # Publish using uv
     session.run("uv", "publish", "dist/*")
-    session.log("🎉 Published to PyPI!")
+    session.log("SUCCESS: Published to PyPI!")
 
 
 @session(dependency_group="dev")
 def hotfix(session: Session):
     """Create a hotfix release (patch version bump)."""
-    session.log("🔥 Creating hotfix release...")
+    session.log("[HOTFIX] Creating hotfix release...")
 
     # Force patch bump
     session.posargs = ["patch"]
@@ -949,7 +947,7 @@ def release_info(session: Session):
         last_tag = "none"
         commits_since_tag = "unknown"
 
-    session.log("📋 Release Information:")
+    session.log("[INFO] Release Information:")
     session.log(f"  Current version: {current_version}")
     session.log(f"  Current branch: {current_branch}")
     session.log(f"  Last tag: {last_tag}")
@@ -968,10 +966,10 @@ def release_info(session: Session):
 @session(dependency_group="dev", reuse_venv=True)
 def test_install(session: Session):
     """Test package installation in a completely fresh environment."""
-    session.log("🧪 Testing package installation in fresh environment...")
+    session.log("[TEST] Testing package installation in fresh environment...")
 
     # Clean up any existing installation first
-    session.log("🧹 Cleaning up any existing installations...")
+    session.log("[CLEAN] Cleaning up any existing installations...")
     session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
 
     # Ensure we have a built package
@@ -1001,7 +999,7 @@ def test_install(session: Session):
         test_files.append(("tarball", tarball_files[0]))
 
     for dist_type, dist_file in test_files:
-        session.log(f"📦 Testing {dist_type}: {Path(dist_file).name}")
+        session.log(f"[PACKAGE] Testing {dist_type}: {Path(dist_file).name}")
 
         # Clean up before each test
         session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
@@ -1017,31 +1015,31 @@ def test_install(session: Session):
             session.error(f"Package {PROJECT_NAME} was not installed correctly")
 
         # Test basic import
-        session.log("🔍 Testing basic import...")
+        session.log("[CHECK] Testing basic import...")
         session.run(
             "python",
             "-c",
-            f"import {PROJECT_NAME_NORMALIZED}; print(f'✅ Successfully imported {PROJECT_NAME_NORMALIZED}')",
+            f"import {PROJECT_NAME_NORMALIZED}; print('SUCCESS: Successfully imported {PROJECT_NAME_NORMALIZED}')",
         )
 
         # Test version access
-        session.log("🔍 Testing version access...")
+        session.log("[CHECK] Testing version access...")
         session.run(
             "python",
             "-c",
-            f"from {PROJECT_NAME_NORMALIZED} import __version__; print(f'📋 Version: {{__version__}}')",
+            f"from {PROJECT_NAME_NORMALIZED} import __version__; print(f'VERSION: {{__version__}}')",
         )
 
         # Test main components import
-        session.log("🔍 Testing main components...")
+        session.log("[CHECK] Testing main components...")
         session.run(
             "python",
             "-c",
-            f"from {PROJECT_NAME_NORMALIZED} import Shield, ShieldedDepends, shield; print('✅ All main components imported successfully')",
+            f"from {PROJECT_NAME_NORMALIZED} import Shield, ShieldedDepends, shield; print('SUCCESS: All main components imported successfully')",
         )
 
         # Test with FastAPI integration (basic)
-        session.log("🔍 Testing FastAPI integration...")
+        session.log("[CHECK] Testing FastAPI integration...")
         fastapi_test = f"""
 from fastapi import FastAPI
 from {PROJECT_NAME_NORMALIZED} import shield
@@ -1057,17 +1055,19 @@ def simple_shield():
 async def test_endpoint():
     return {{"message": "FastAPI integration works"}}
 
-print("✅ FastAPI integration test passed")
+print("SUCCESS: FastAPI integration test passed")
 """
         session.run("python", "-c", fastapi_test)
 
         # Clean up after test
         session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
         session.log(
-            f"✅ {dist_type.capitalize()} installation test completed successfully"
+            f"SUCCESS: {dist_type.capitalize()} installation test completed successfully"
         )
 
-    session.log("🎉 All installation tests passed! Package is ready for end users.")
+    session.log(
+        "SUCCESS: All installation tests passed! Package is ready for end users."
+    )
 
 
 @session(dependency_group="dev", reuse_venv=True)
@@ -1076,16 +1076,16 @@ def test_install_from_pypi(session: Session):
     import sys
 
     # Clean up any existing installation first
-    session.log("🧹 Cleaning up any existing installations...")
+    session.log("[CLEAN] Cleaning up any existing installations...")
     session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
 
     # Default to TestPyPI, but allow override
     pypi_url = "https://test.pypi.org/simple/"
     if session.posargs and session.posargs[0] == "pypi":
         pypi_url = None  # Use default PyPI
-        session.log("📦 Testing installation from PyPI...")
+        session.log("[PACKAGE] Testing installation from PyPI...")
     else:
-        session.log("📦 Testing installation from TestPyPI...")
+        session.log("[PACKAGE] Testing installation from TestPyPI...")
 
     # Install from PyPI using uv
     install_cmd = ["uv", "pip", "install"]
@@ -1097,7 +1097,7 @@ def test_install_from_pypi(session: Session):
 
     try:
         session.run(*install_cmd)
-        session.log("✅ Package installed successfully from PyPI")
+        session.log("SUCCESS: Package installed successfully from PyPI")
 
         # Verify installation
         result = session.run(
@@ -1109,24 +1109,24 @@ def test_install_from_pypi(session: Session):
             )
 
         # Run the same tests as test_install
-        session.log("🔍 Testing installed package...")
+        session.log("[CHECK] Testing installed package...")
         session.run(
             "python",
             "-c",
-            f"import {PROJECT_NAME_NORMALIZED}; print(f'✅ Successfully imported {PROJECT_NAME_NORMALIZED}')",
+            f"import {PROJECT_NAME_NORMALIZED}; print('SUCCESS: Successfully imported {PROJECT_NAME_NORMALIZED}')",
         )
         session.run(
             "python",
             "-c",
-            f"from {PROJECT_NAME_NORMALIZED} import __version__; print(f'📋 Version: {{__version__}}')",
+            f"from {PROJECT_NAME_NORMALIZED} import __version__; print(f'VERSION: {{__version__}}')",
         )
         session.run(
             "python",
             "-c",
-            f"from {PROJECT_NAME_NORMALIZED} import Shield, ShieldedDepends, shield; print('✅ All main components imported successfully')",
+            f"from {PROJECT_NAME_NORMALIZED} import Shield, ShieldedDepends, shield; print('SUCCESS: All main components imported successfully')",
         )
 
-        session.log("🎉 PyPI installation test passed!")
+        session.log("SUCCESS: PyPI installation test passed!")
 
     except Exception as e:
         session.error(f"PyPI installation test failed: {e}")
@@ -1138,10 +1138,10 @@ def test_install_from_pypi(session: Session):
 @session(dependency_group="dev", reuse_venv=True)
 def test_install_editable(session: Session):
     """Test editable installation for development."""
-    session.log("🔧 Testing editable installation...")
+    session.log("[TEST] Testing editable installation...")
 
     # Clean up any existing installation first
-    session.log("🧹 Cleaning up any existing installations...")
+    session.log("[CLEAN] Cleaning up any existing installations...")
     session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
 
     # Install in editable mode
@@ -1155,11 +1155,11 @@ def test_install_editable(session: Session):
         session.error(f"Editable package {PROJECT_NAME} was not installed correctly")
 
     # Test that changes are reflected
-    session.log("🔍 Testing editable installation...")
+    session.log("[CHECK] Testing editable installation...")
     session.run(
         "python",
         "-c",
-        f"import {PROJECT_NAME_NORMALIZED}; print(f'✅ Editable installation works')",
+        f"import {PROJECT_NAME_NORMALIZED}; print('SUCCESS: Editable installation works')",
     )
 
     # Test that we can import from the source directory
@@ -1171,7 +1171,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.getcwd(), 'src'))
 from {PROJECT_NAME_NORMALIZED} import Shield
-print('✅ Can import from source directory')
+print('SUCCESS: Can import from source directory')
 """,
     )
 
@@ -1185,19 +1185,19 @@ import os
 module_path = {PROJECT_NAME_NORMALIZED}.__file__
 project_src = os.path.join(os.getcwd(), 'src', '{PROJECT_NAME_NORMALIZED}')
 if project_src in module_path:
-    print('✅ Package is installed in editable mode')
+    print('SUCCESS: Package is installed in editable mode')
 else:
-    print(f'⚠️  Warning: Package may not be in editable mode. Module path: {{module_path}}')
+    print(f'WARNING: Package may not be in editable mode. Module path: {{module_path}}')
 """,
     )
 
-    session.log("✅ Editable installation test passed!")
+    session.log("SUCCESS: Editable installation test passed!")
 
 
 @session(dependency_group="dev")
 def test_install_all(session: Session):
     """Run all installation tests."""
-    session.log("🚀 Running comprehensive installation tests...")
+    session.log("[TEST] Running comprehensive installation tests...")
 
     # Build first
     build(session)
@@ -1208,4 +1208,4 @@ def test_install_all(session: Session):
     # Test editable installation
     test_install_editable(session)
 
-    session.log("🎉 All installation tests completed successfully!")
+    session.log("SUCCESS: All installation tests completed successfully!")
