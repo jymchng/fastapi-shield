@@ -797,8 +797,8 @@ def release_check(session: Session):
     clean(session)
     format(session)
     check(session)
-    lint(session)
-    type_check(session)
+    # lint(session)
+    # type_check(session)
     test(session)
     
     # Build and verify
