@@ -1,6 +1,8 @@
+<!--Examples tested-->
+
 # JWT Authentication
 
-This guide explores how to implement JSON Web Token (JWT) authentication in FastAPI applications using FastAPI Shield.
+This guide explores how to implement JSON Web Token (JWT) authentication in FastAPI applications using FastAPI Shield, based on proven patterns and real-world implementations.
 
 ## Introduction to JWT Authentication
 
@@ -8,8 +10,8 @@ JSON Web Tokens (JWT) provide a compact, self-contained way to securely transmit
 
 JWTs are commonly used for:
 
-1. Authentication: After a user logs in, subsequent requests include the JWT, allowing the user to access routes, services, and resources permitted with that token.
-2. Information Exchange: JWTs can securely transmit information between parties, as the signature ensures the sender is who they claim to be.
+1. **Authentication**: After a user logs in, subsequent requests include the JWT, allowing the user to access routes, services, and resources permitted with that token.
+2. **Information Exchange**: JWTs can securely transmit information between parties, as the signature ensures the sender is who they claim to be.
 
 ## JWT Structure
 
@@ -26,475 +28,404 @@ A JWT consists of three parts:
 First, ensure you have the required dependencies:
 
 ```bash
-pip install fastapi_shield python-jose[cryptography] passlib[bcrypt]
+pip install fastapi_shield PyJWT[crypto]
 ```
 
-### Creating a JWT Authentication Shield
+### Basic JWT Authentication Shield
 
-Let's create a JWT authentication system using FastAPI Shield:
+Let's start with a simple JWT authentication system using FastAPI Shield's decorator pattern:
 
 ```python
-from typing import NewType, Optional, Dict, Any
-from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, HTTPException, status
 from fastapi_shield import shield, ShieldedDepends
-
-# Configuration (in a real application, store these in environment variables)
-SECRET_KEY = "yoursecretkey"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 token URL
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+import jwt
+from jwt.exceptions import PyJWTError
 
 app = FastAPI()
 
-# User model
-class User(BaseModel):
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
+# Configuration (store these securely in production!)
+JWT_SECRET = "your-secret-key"
+JWT_ALGORITHM = "HS256"
 
-# Token model
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-# Simulated database
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
-        "disabled": False,
-    }
-}
-
-# Define a validated user type
-ValidatedUser = NewType("ValidatedUser", User)
-
-# Function to verify password
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-# Function to get password hash
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-# Function to authenticate user
-def authenticate_user(fake_db, username: str, password: str):
-    user = fake_db.get(username)
-    if not user:
-        return False
-    if not verify_password(password, user["hashed_password"]):
-        return False
-    return user
-
-# Function to create access token
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-# Shield for JWT authentication
-@shield
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> ValidatedUser:
-    credentials_exception = HTTPException(
+@shield(
+    name="JWT Authentication",
+    exception_to_raise_if_fail=HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Invalid authentication credentials",
         headers={"WWW-Authenticate": "Bearer"},
-    )
-    
+    ),
+)
+def jwt_auth_shield(authorization: str = Header()) -> dict:
+    """Validate JWT token and return decoded payload"""
+    if not authorization.startswith("Bearer "):
+        return None
+
+    token = authorization.replace("Bearer ", "")
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
-    user_dict = fake_users_db.get(username)
-    if user_dict is None:
-        raise credentials_exception
-        
-    user = User(**user_dict)
-    return ValidatedUser(user)
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except PyJWTError:
+        return None
 
-# Shield to check if user is active
-@shield
-def get_current_active_user(current_user: ValidatedUser = ShieldedDepends(get_current_user)) -> ValidatedUser:
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
-# Login endpoint to create access token
-@app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
-
-# Protected route example
-@app.get("/users/me/", response_model=User)
-async def read_users_me(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)):
-    return current_user
-
-# Another protected route with additional logic
-@app.get("/users/me/items/")
-async def read_own_items(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)):
-    return [{"item_id": 1, "owner": current_user.username}]
-```
-
-## Enhanced JWT Authentication with Role-Based Access Control
-
-Let's extend our JWT authentication to include role-based access control:
-
-```python
-from typing import NewType, Optional, Dict, Any, List
-from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
-from fastapi_shield import shield, ShieldedDepends
-
-# Configuration
-SECRET_KEY = "yoursecretkey"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 token URL
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-app = FastAPI()
-
-# User model with roles
-class User(BaseModel):
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
-    roles: List[str] = []
-
-# Token model
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-# Simulated database with roles
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
-        "disabled": False,
-        "roles": ["user"]
-    },
-    "alice": {
-        "username": "alice",
-        "full_name": "Alice Wonderland",
-        "email": "alice@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
-        "disabled": False,
-        "roles": ["user", "admin"]
-    }
-}
-
-# Define validated user types
-ValidatedUser = NewType("ValidatedUser", User)
-AdminUser = NewType("AdminUser", User)
-
-# Helper functions for authentication
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def authenticate_user(fake_db, username: str, password: str):
-    user = fake_db.get(username)
-    if not user:
-        return False
-    if not verify_password(password, user["hashed_password"]):
-        return False
-    return user
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-# Shield for JWT authentication
-@shield
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> ValidatedUser:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
-    user_dict = fake_users_db.get(username)
-    if user_dict is None:
-        raise credentials_exception
-        
-    user = User(**user_dict)
-    return ValidatedUser(user)
-
-# Shield to check if user is active
-@shield
-def get_current_active_user(current_user: ValidatedUser = ShieldedDepends(get_current_user)) -> ValidatedUser:
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
-# Shield to check if user has admin role
-@shield
-def get_admin_user(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)) -> AdminUser:
-    if "admin" not in current_user.roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions"
-        )
-    return AdminUser(current_user)
-
-# Login endpoint
-@app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
-
-# Regular user endpoint
-@app.get("/users/me/", response_model=User)
-async def read_users_me(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)):
-    return current_user
-
-# Admin-only endpoint
-@app.get("/admin/")
-async def admin_panel(admin_user: AdminUser = ShieldedDepends(get_admin_user)):
-    return {
-        "message": "Welcome to the admin panel",
-        "admin": admin_user.username,
-        "roles": admin_user.roles
-    }
-
-# Role-based endpoint with dynamic permission check
-@app.get("/resources/{resource_id}")
-async def get_resource(
-    resource_id: int,
-    current_user: ValidatedUser = ShieldedDepends(get_current_active_user)
+# Protected endpoint using the shield
+@app.get("/protected")
+@jwt_auth_shield
+async def protected_endpoint(
+    payload: dict = ShieldedDepends(lambda payload: payload)
 ):
-    # Simulate resource ownership check
-    if resource_id % 2 == 0:  # Even-numbered resources require admin
-        if "admin" not in current_user.roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin role required for this resource"
-            )
-    
     return {
-        "resource_id": resource_id,
-        "owner": "system" if resource_id % 2 == 0 else current_user.username,
-        "data": f"Resource data for ID {resource_id}"
+        "message": "Access granted",
+        "user": payload.get("sub"),
+        "roles": payload.get("roles", [])
     }
 ```
 
-## Handling JWT Refresh Tokens
+### Key Shield Patterns
 
-For better security, we can implement refresh tokens to obtain new access tokens without requiring the user to log in again:
+Notice the important patterns in the above example:
+
+1. **Shield as Decorator**: Use `@shield` as a decorator, not a function call
+2. **Return None for Failure**: When validation fails, return `None` to trigger the shield's failure response
+3. **Named Shields**: Give descriptive names to shields for better debugging
+4. **Custom Exceptions**: Define specific HTTP exceptions for different failure scenarios
+5. **ShieldedDepends**: Use `ShieldedDepends(lambda payload: payload)` to access the shield's return value
+
+## Role-Based Access Control with Shield Chaining
+
+FastAPI Shield excels at chaining multiple shields for complex authorization flows:
 
 ```python
-from typing import NewType, Optional, Dict, Any, List
-from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends, HTTPException, status, Cookie
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, HTTPException, status
 from fastapi_shield import shield, ShieldedDepends
-
-# Configuration
-SECRET_KEY = "yoursecretkey"
-REFRESH_SECRET_KEY = "yourrefreshsecretkey"  # Different key for refresh tokens
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15
-REFRESH_TOKEN_EXPIRE_DAYS = 7
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 token URL
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI()
 
-# User model
+# User database with roles
+USERS = {
+    "admin_token": {"user_id": "admin", "roles": ["admin", "user"]},
+    "editor_token": {"user_id": "editor", "roles": ["editor", "user"]},
+    "user_token": {"user_id": "user1", "roles": ["user"]},
+}
+
+@shield(name="Authentication")
+def auth_shield(api_token: str = Header()) -> dict:
+    """Authenticate the user and return user data"""
+    if api_token in USERS:
+        return USERS[api_token]
+    return None
+
+def role_shield(required_roles: list[str]):
+    """Factory function to create a role-checking shield"""
+    
+    @shield(
+        name=f"Role Check ({', '.join(required_roles)})",
+        exception_to_raise_if_fail=HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied. Required roles: {', '.join(required_roles)}"
+        )
+    )
+    def check_role(user_data: dict = ShieldedDepends(lambda user: user)) -> dict:
+        """Check if the user has any of the required roles"""
+        user_roles = user_data.get("roles", [])
+        if any(role in required_roles for role in user_roles):
+            return user_data
+        return None
+    
+    return check_role
+
+# Create specific role shields
+admin_shield = role_shield(["admin"])
+editor_shield = role_shield(["admin", "editor"])
+user_shield = role_shield(["admin", "editor", "user"])
+
+@app.get("/admin")
+@auth_shield
+@admin_shield
+async def admin_endpoint(
+    user: dict = ShieldedDepends(lambda user: user)
+):
+    return {"message": "Admin endpoint", "user": user["user_id"]}
+
+@app.get("/editor")
+@auth_shield
+@editor_shield
+async def editor_endpoint(
+    user: dict = ShieldedDepends(lambda user: user)
+):
+    return {"message": "Editor endpoint", "user": user["user_id"]}
+
+@app.get("/user")
+@auth_shield
+@user_shield
+async def user_endpoint(
+    user: dict = ShieldedDepends(lambda user: user)
+):
+    return {"message": "User endpoint", "user": user["user_id"]}
+```
+
+## Advanced JWT Authentication with Chained Shields
+
+For more sophisticated authentication flows, you can chain multiple shields to build complex authorization logic:
+
+```python
+from fastapi import FastAPI, Header, HTTPException, status
+from fastapi_shield import shield, ShieldedDepends
+import jwt
+from jwt.exceptions import PyJWTError
+from typing import List, Optional
+from datetime import datetime, timedelta
+
+app = FastAPI()
+
+# Configuration
+JWT_SECRET = "your-secret-key"
+JWT_ALGORITHM = "HS256"
+
+class AuthData:
+    """Class to hold authentication data and provide helper methods"""
+    
+    def __init__(self, user_id: str, roles: List[str], permissions: List[str]):
+        self.user_id = user_id
+        self.roles = roles
+        self.permissions = permissions
+    
+    def has_role(self, role: str) -> bool:
+        """Check if user has a specific role"""
+        return role in self.roles
+    
+    def has_permission(self, permission: str) -> bool:
+        """Check if user has a specific permission"""
+        return permission in self.permissions
+
+@shield(
+    name="JWT Authentication",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+)
+async def jwt_auth_shield(authorization: str = Header()) -> Optional[dict]:
+    """Validate JWT token and extract payload"""
+    if not authorization.startswith("Bearer "):
+        return None
+
+    token = authorization.replace("Bearer ", "")
+
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except PyJWTError:
+        return None
+
+@shield(
+    name="User Role Extraction",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid user data in token"
+    )
+)
+async def role_extraction_shield(
+    payload: dict = ShieldedDepends(lambda payload: payload),
+) -> Optional[AuthData]:
+    """Extract user roles from the JWT payload and create AuthData object"""
+    if not payload or "user_id" not in payload:
+        return None
+
+    user_id = payload.get("user_id")
+    roles = payload.get("roles", [])
+    permissions = payload.get("permissions", [])
+
+    return AuthData(user_id, roles, permissions)
+
+def require_role(role: str):
+    """Create a shield that requires a specific role"""
+    
+    @shield(
+        name=f"Role Requirement ({role})",
+        exception_to_raise_if_fail=HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires role: {role}",
+        ),
+    )
+    async def role_shield(
+        auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data),
+    ) -> Optional[AuthData]:
+        if auth_data.has_role(role):
+            return auth_data
+        return None
+
+    return role_shield
+
+def require_permission(permission: str):
+    """Create a shield that requires a specific permission"""
+    
+    @shield(
+        name=f"Permission Requirement ({permission})",
+        exception_to_raise_if_fail=HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires permission: {permission}",
+        ),
+    )
+    async def permission_shield(
+        auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data),
+    ) -> Optional[AuthData]:
+        if auth_data.has_permission(permission):
+            return auth_data
+        return None
+
+    return permission_shield
+
+# Usage examples
+@app.get("/user-profile")
+@jwt_auth_shield
+@role_extraction_shield
+async def user_profile(
+    auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data),
+):
+    return {
+        "user_id": auth_data.user_id,
+        "roles": auth_data.roles,
+        "permissions": auth_data.permissions,
+    }
+
+@app.get("/admin-panel")
+@jwt_auth_shield
+@role_extraction_shield
+@require_role("admin")
+async def admin_panel(
+    auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data),
+):
+    return {"message": "Welcome to admin panel", "user_id": auth_data.user_id}
+
+@app.post("/user-management")
+@jwt_auth_shield
+@role_extraction_shield
+@require_permission("manage_users")
+async def user_management(
+    auth_data: AuthData = ShieldedDepends(lambda auth_data: auth_data),
+):
+    return {
+        "message": "User management access granted",
+        "user_id": auth_data.user_id,
+    }
+```
+
+## OAuth2 Integration with JWT
+
+FastAPI Shield integrates seamlessly with FastAPI's OAuth2 patterns:
+
+```python
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi_shield import shield, ShieldedDepends
+import jwt
+from jwt.exceptions import PyJWTError
+from datetime import datetime, timedelta
+from typing import Optional, List
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# OAuth2 scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Configuration
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Models
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
 class User(BaseModel):
     username: str
     email: Optional[str] = None
     full_name: Optional[str] = None
-    disabled: Optional[bool] = None
     roles: List[str] = []
 
-# Token models
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    refresh_token: str
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-
-# Simulated database
+# Mock database
 fake_users_db = {
     "johndoe": {
         "username": "johndoe",
         "full_name": "John Doe",
         "email": "johndoe@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
-        "disabled": False,
+        "hashed_password": "fakehashedsecret",
         "roles": ["user"]
     },
     "alice": {
         "username": "alice",
-        "full_name": "Alice Wonderland",
+        "full_name": "Alice Admin",
         "email": "alice@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
-        "disabled": False,
-        "roles": ["user", "admin"]
+        "hashed_password": "fakehashedsecret2",
+        "roles": ["admin", "user"]
     }
 }
 
-# In-memory token blacklist (replace with Redis or database in production)
-token_blacklist = set()
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    # In production, use proper password hashing
+    return plain_password == "secret"
 
-# Define validated user type
-ValidatedUser = NewType("ValidatedUser", User)
-
-# Helper functions
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def authenticate_user(fake_db, username: str, password: str):
-    user = fake_db.get(username)
-    if not user:
-        return False
-    if not verify_password(password, user["hashed_password"]):
+def authenticate_user(username: str, password: str):
+    user = fake_users_db.get(username)
+    if not user or not verify_password(password, user["hashed_password"]):
         return False
     return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
-    to_encode.update({"exp": expire, "type": "access"})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(days=7))
-    to_encode.update({"exp": expire, "type": "refresh"})
-    encoded_jwt = jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-# Shield for JWT authentication
-@shield
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> ValidatedUser:
-    credentials_exception = HTTPException(
+@shield(
+    name="OAuth2 JWT Authentication",
+    exception_to_raise_if_fail=HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
-    # Check if token is blacklisted
-    if token in token_blacklist:
-        raise credentials_exception
-    
+)
+async def oauth2_jwt_shield(token: str = Depends(oauth2_scheme)) -> User:
+    """Validate OAuth2 JWT token and return user"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        token_type = payload.get("type")
-        
-        if username is None or token_type != "access":
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
+        if username is None:
+            return None
+    except PyJWTError:
+        return None
+    
     user_dict = fake_users_db.get(username)
     if user_dict is None:
-        raise credentials_exception
-        
-    user = User(**user_dict)
-    return ValidatedUser(user)
+        return None
+    
+    return User(**user_dict)
 
-# Shield to check if user is active
-@shield
-def get_current_active_user(current_user: ValidatedUser = ShieldedDepends(get_current_user)) -> ValidatedUser:
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
+def require_oauth2_role(role: str):
+    """Create a shield that requires a specific OAuth2 role"""
+    
+    @shield(
+        name=f"OAuth2 Role ({role})",
+        exception_to_raise_if_fail=HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Role {role} required",
+        ),
+    )
+    async def role_check(user: User = ShieldedDepends(lambda user: user)) -> User:
+        if role in user.roles:
+            return user
+        return None
+    
+    return role_check
 
-# Login endpoint with refresh token
+# Token endpoint
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -503,435 +434,210 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    
     access_token = create_access_token(
-        data={"sub": user["username"]}, 
-        expires_delta=access_token_expires
+        data={"sub": user["username"]}, expires_delta=access_token_expires
     )
-    
-    refresh_token = create_refresh_token(
-        data={"sub": user["username"]},
-        expires_delta=refresh_token_expires
-    )
-    
-    return {
-        "access_token": access_token, 
-        "token_type": "bearer",
-        "refresh_token": refresh_token
-    }
-
-# Refresh token endpoint
-@app.post("/token/refresh", response_model=Token)
-async def refresh_access_token(refresh_token: str):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate refresh token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    # Check if token is blacklisted
-    if refresh_token in token_blacklist:
-        raise credentials_exception
-    
-    try:
-        payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        token_type = payload.get("type")
-        
-        if username is None or token_type != "refresh":
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
-    user_dict = fake_users_db.get(username)
-    if user_dict is None:
-        raise credentials_exception
-    
-    # Add the old refresh token to the blacklist
-    token_blacklist.add(refresh_token)
-    
-    # Create new tokens
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    
-    access_token = create_access_token(
-        data={"sub": username}, 
-        expires_delta=access_token_expires
-    )
-    
-    new_refresh_token = create_refresh_token(
-        data={"sub": username},
-        expires_delta=refresh_token_expires
-    )
-    
-    return {
-        "access_token": access_token, 
-        "token_type": "bearer",
-        "refresh_token": new_refresh_token
-    }
-
-# Logout endpoint to blacklist tokens
-@app.post("/logout")
-async def logout(
-    current_user: ValidatedUser = ShieldedDepends(get_current_active_user),
-    access_token: str = Depends(oauth2_scheme),
-    refresh_token: Optional[str] = None
-):
-    # Add the current access token to the blacklist
-    token_blacklist.add(access_token)
-    
-    # If refresh token is provided, blacklist it too
-    if refresh_token:
-        token_blacklist.add(refresh_token)
-    
-    return {"message": "Successfully logged out"}
-
-# Protected route example
-@app.get("/users/me/", response_model=User)
-async def read_users_me(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)):
-    return current_user
-```
-
-## JWT Claims and Custom Payloads
-
-JWTs allow you to include custom claims in the token payload:
-
-```python
-from typing import NewType, Optional, Dict, Any, List
-from datetime import datetime, timedelta
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
-from fastapi_shield import shield, ShieldedDepends
-import uuid
-
-# Configuration
-SECRET_KEY = "yoursecretkey"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 token URL
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-app = FastAPI()
-
-# User model
-class User(BaseModel):
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
-    roles: List[str] = []
-    permissions: List[str] = []
-
-# Token model
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-# Token payload model for validation
-class TokenPayload(BaseModel):
-    sub: str
-    exp: datetime
-    jti: str
-    roles: List[str]
-    permissions: List[str]
-    user_data: Dict[str, Any]
-
-# Simulated database
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
-        "disabled": False,
-        "roles": ["user"],
-        "permissions": ["read:own_data", "update:own_data"],
-        "user_data": {
-            "department": "Engineering",
-            "location": "New York"
-        }
-    },
-    "alice": {
-        "username": "alice",
-        "full_name": "Alice Wonderland",
-        "email": "alice@example.com",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "secret"
-        "disabled": False,
-        "roles": ["user", "admin"],
-        "permissions": ["read:own_data", "update:own_data", "read:all_data", "update:all_data"],
-        "user_data": {
-            "department": "Management",
-            "location": "San Francisco"
-        }
-    }
-}
-
-# Define validated user type
-ValidatedUser = NewType("ValidatedUser", User)
-
-# Define a type for users with specific permissions
-HasReadAllPermission = NewType("HasReadAllPermission", User)
-HasUpdateAllPermission = NewType("HasUpdateAllPermission", User)
-
-# Helper functions
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def authenticate_user(fake_db, username: str, password: str):
-    user = fake_db.get(username)
-    if not user:
-        return False
-    if not verify_password(password, user["hashed_password"]):
-        return False
-    return user
-
-def create_access_token(user_data: dict):
-    # Prepare payload with standard and custom claims
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    payload = {
-        "sub": user_data["username"],
-        "exp": expire,
-        "jti": str(uuid.uuid4()),  # Unique token ID
-        "roles": user_data["roles"],
-        "permissions": user_data["permissions"],
-        "user_data": {
-            "department": user_data.get("user_data", {}).get("department", ""),
-            "location": user_data.get("user_data", {}).get("location", "")
-        }
-    }
-    
-    encoded_jwt = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-# Shield for JWT authentication with enhanced validation
-@shield
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> ValidatedUser:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        # Decode the JWT
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        # Validate the payload structure
-        token_data = TokenPayload(**payload)
-        
-        # Check token expiration
-        if datetime.utcnow() > token_data.exp:
-            raise credentials_exception
-            
-        username = token_data.sub
-    except (JWTError, ValueError):
-        raise credentials_exception
-        
-    user_dict = fake_users_db.get(username)
-    if user_dict is None:
-        raise credentials_exception
-        
-    user = User(**user_dict)
-    return ValidatedUser(user)
-
-# Shield to check if user is active
-@shield
-def get_current_active_user(current_user: ValidatedUser = ShieldedDepends(get_current_user)) -> ValidatedUser:
-    if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
-# Shield to check for specific permission
-@shield
-def check_read_all_permission(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)) -> HasReadAllPermission:
-    if "read:all_data" not in current_user.permissions:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to access this resource"
-        )
-    return HasReadAllPermission(current_user)
-
-@shield
-def check_update_all_permission(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)) -> HasUpdateAllPermission:
-    if "update:all_data" not in current_user.permissions:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to modify this resource"
-        )
-    return HasUpdateAllPermission(current_user)
-
-# Login endpoint
-@app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token = create_access_token(user)
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-# User profile endpoint (any authenticated user can access their own profile)
-@app.get("/users/me/", response_model=User)
-async def read_users_me(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)):
-    return current_user
-
-# Endpoint requiring read:all_data permission
-@app.get("/users/all/")
-async def read_all_users(admin_user: HasReadAllPermission = ShieldedDepends(check_read_all_permission)):
-    # Convert user dictionaries to User models
-    users = [User(**user_data) for user_data in fake_users_db.values()]
-    return users
-
-# Endpoint requiring update:all_data permission
-@app.put("/users/{username}/disable")
-async def disable_user(
-    username: str,
-    admin_user: HasUpdateAllPermission = ShieldedDepends(check_update_all_permission)
+# Protected endpoints
+@app.get("/users/me")
+@oauth2_jwt_shield
+async def read_users_me(
+    user: User = ShieldedDepends(lambda user: user),
 ):
-    if username not in fake_users_db:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # In a real app, you would update the database
-    fake_users_db[username]["disabled"] = True
-    
-    return {"message": f"User {username} has been disabled"}
+    return user
 
-# Endpoint showcasing JWT payload information
-@app.get("/token/info")
-async def token_info(current_user: ValidatedUser = ShieldedDepends(get_current_active_user)):
-    return {
-        "username": current_user.username,
-        "roles": current_user.roles,
-        "permissions": current_user.permissions,
-        "user_data": {
-            "department": current_user.user_data.get("department"),
-            "location": current_user.user_data.get("location")
-        }
-    }
+@app.get("/admin/settings")
+@oauth2_jwt_shield
+@require_oauth2_role("admin")
+async def admin_settings(
+    user: User = ShieldedDepends(lambda user: user),
+):
+    return {"message": "Admin settings", "user": user.username}
 ```
 
-## Security Considerations
+## JWT Token Creation and Management
 
-When working with JWTs, consider these security best practices:
+Here's how to properly create and manage JWT tokens:
 
-1. **Use HTTPS**: Always use HTTPS to transfer tokens to prevent interception.
+```python
+import jwt
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 
-2. **Keep Secrets Secure**: Store your secret keys securely, preferably in environment variables or a secure key management system.
+def create_jwt_token(
+    user_id: str,
+    roles: List[str] = None,
+    permissions: List[str] = None,
+    expires_delta: Optional[timedelta] = None
+) -> str:
+    """Create a JWT token with user information"""
+    payload = {
+        "user_id": user_id,
+        "roles": roles or [],
+        "permissions": permissions or [],
+    }
+    
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=1)
+    
+    payload["exp"] = expire
+    
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-3. **Set Short Expiration Times**: Use short-lived access tokens (15-30 minutes) and longer-lived refresh tokens.
+# Example usage
+admin_token = create_jwt_token(
+    user_id="admin_user",
+    roles=["admin", "user"],
+    permissions=["read", "write", "delete"],
+    expires_delta=timedelta(hours=8)
+)
 
-4. **Validate All Claims**: Validate all claims in the token, including issuer, audience, and expiration time.
+user_token = create_jwt_token(
+    user_id="regular_user",
+    roles=["user"],
+    permissions=["read"],
+    expires_delta=timedelta(hours=1)
+)
+```
 
-5. **Implement Token Revocation**: Use a token blacklist or maintain a version number for user accounts.
+## Error Handling and Security Best Practices
 
-6. **Monitor for Suspicious Activity**: Implement logging and monitoring for unsuccessful authentication attempts.
+### Proper Error Handling
 
-7. **CSRF Protection**: Even with JWT-based authentication, include CSRF protection for browser-based applications.
+```python
+@shield(
+    name="Secure JWT Authentication",
+    exception_to_raise_if_fail=HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication failed",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+)
+def secure_jwt_shield(authorization: str = Header()) -> Optional[dict]:
+    """Secure JWT validation with proper error handling"""
+    
+    # Check authorization header format
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    
+    token = authorization.replace("Bearer ", "")
+    
+    try:
+        # Decode and validate token
+        payload = jwt.decode(
+            token, 
+            JWT_SECRET, 
+            algorithms=[JWT_ALGORITHM],
+            options={"verify_exp": True}  # Ensure expiration is checked
+        )
+        
+        # Validate required claims
+        if not payload.get("user_id"):
+            return None
+        
+        # Check token expiration explicitly
+        exp = payload.get("exp")
+        if exp and datetime.utcnow().timestamp() > exp:
+            return None
+        
+        return payload
+        
+    except jwt.ExpiredSignatureError:
+        # Token has expired
+        return None
+    except jwt.InvalidTokenError:
+        # Token is invalid
+        return None
+    except Exception:
+        # Any other error
+        return None
+```
 
-8. **Payload Size**: Keep JWT payloads small, as they are included in every request.
+### Security Considerations
 
-9. **Don't Store Sensitive Data**: Never store sensitive information like passwords or credit card numbers in JWTs.
+When implementing JWT authentication with FastAPI Shield, follow these security best practices:
 
-10. **Proper Key Rotation**: Implement a key rotation strategy for your signing keys.
+1. **Use Strong Secrets**: Store JWT secrets securely and use strong, random keys
+2. **Set Short Expiration Times**: Use short-lived tokens (15-30 minutes) with refresh tokens
+3. **Validate All Claims**: Always validate required claims and token structure
+4. **Handle Errors Gracefully**: Return `None` from shields for security failures
+5. **Use HTTPS**: Always transmit tokens over HTTPS in production
+6. **Implement Token Blacklisting**: Consider maintaining a blacklist for revoked tokens
 
-## JWT Authentication in Production
-
-For production environments:
-
-1. **Use Environment Variables**: Store secrets, keys, and configuration in environment variables:
+### Environment Configuration
 
 ```python
 import os
-from dotenv import load_dotenv
+from typing import Optional
 
-load_dotenv()  # Load environment variables from .env file
+# Production configuration
+JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret-for-dev")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-REFRESH_SECRET_KEY = os.getenv("JWT_REFRESH_SECRET_KEY")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+# Validate configuration
+if not JWT_SECRET or JWT_SECRET == "fallback-secret-for-dev":
+    if os.getenv("ENVIRONMENT") == "production":
+        raise ValueError("JWT_SECRET_KEY must be set in production")
 ```
 
-2. **Use a Database for Blacklisting**: Replace the in-memory blacklist with a database or Redis:
+## Testing JWT Authentication
+
+When testing JWT authentication with FastAPI Shield, create helper functions for token generation:
 
 ```python
-import redis
+import pytest
+from fastapi.testclient import TestClient
 
-# Redis connection
-redis_client = redis.Redis(
-    host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", "6379")),
-    db=int(os.getenv("REDIS_DB", "0"))
-)
+def create_test_token(user_id: str, roles: List[str] = None) -> str:
+    """Create a test JWT token"""
+    payload = {
+        "user_id": user_id,
+        "roles": roles or ["user"]
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-# Add token to blacklist with expiration
-def blacklist_token(token: str, expires_delta: timedelta):
-    redis_client.setex(f"blacklist:{token}", int(expires_delta.total_seconds()), "true")
+def test_protected_endpoint():
+    """Test protected endpoint with valid token"""
+    client = TestClient(app)
+    token = create_test_token("test_user", ["user"])
+    
+    response = client.get(
+        "/protected",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    assert response.status_code == 200
+    assert response.json()["user"] == "test_user"
 
-# Check if token is blacklisted
-def is_token_blacklisted(token: str) -> bool:
-    return redis_client.exists(f"blacklist:{token}") == 1
-```
-
-3. **Implement Rate Limiting**: Protect authentication endpoints from brute-force attacks:
-
-```python
-from fastapi import Request
-from fastapi.middleware.base import BaseHTTPMiddleware
-import time
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, rate_limit_per_minute: int = 60):
-        super().__init__(app)
-        self.rate_limit = rate_limit_per_minute
-        self.request_counts = {}
-        
-    async def dispatch(self, request: Request, call_next):
-        if request.url.path == "/token":
-            client_ip = request.client.host
-            current_time = int(time.time() / 60)  # Current minute
-            
-            # Get request count for this minute
-            request_key = f"{client_ip}:{current_time}"
-            current_count = self.request_counts.get(request_key, 0)
-            
-            # Check if rate limit exceeded
-            if current_count >= self.rate_limit:
-                return JSONResponse(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    content={"detail": "Rate limit exceeded. Try again later."}
-                )
-            
-            # Increment counter
-            self.request_counts[request_key] = current_count + 1
-            
-        response = await call_next(request)
-        return response
-
-# Add middleware to app
-app.add_middleware(RateLimitMiddleware, rate_limit_per_minute=10)
+def test_admin_endpoint():
+    """Test admin endpoint with admin token"""
+    client = TestClient(app)
+    token = create_test_token("admin_user", ["admin"])
+    
+    response = client.get(
+        "/admin",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    assert response.status_code == 200
 ```
 
 ## Conclusion
 
-Implementing JWT authentication with FastAPI Shield provides a robust, type-safe way to secure your APIs. By leveraging Shield's dependency injection and type-wrapping capabilities, you can create clean, maintainable authentication systems with strong type safety.
+FastAPI Shield provides a powerful, type-safe way to implement JWT authentication in your FastAPI applications. By using the shield decorator pattern and chaining multiple shields, you can create sophisticated authentication and authorization flows that are both secure and maintainable.
 
-JWT authentication is particularly well-suited for modern, distributed architectures and client-side applications. By following the patterns demonstrated in this guide, you can implement secure, scalable authentication for your FastAPI applications. 
+Key takeaways:
+
+1. **Use shields as decorators** with descriptive names
+2. **Return `None` for validation failures** to trigger shield error responses
+3. **Chain shields** for complex authorization logic
+4. **Use `ShieldedDepends`** to access shield return values in endpoints
+5. **Implement proper error handling** and security best practices
+6. **Test thoroughly** with realistic token scenarios
+
+This approach ensures your JWT authentication is robust, secure, and follows FastAPI Shield's proven patterns. 

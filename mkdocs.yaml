@@ -58,6 +58,7 @@ nav:
       - Using with Pydantic: examples/using_with_pydantic.md
   - Advanced Topics:
       - Type Inheritance: advanced-topics/type-inheritance.md
+      # JWT Authentication Done
       - JWT Authentication: advanced-topics/jwt-authentication.md
       # Dependency Injection Done
       - Dependency Injection: advanced-topics/dependency-injection.md
