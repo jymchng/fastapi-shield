@@ -20,8 +20,17 @@ except ImportError:
 TYPE_CHECKING = False
 TYPE_EXTENSIONS_IMPORTED = False
 if TYPE_CHECKING:
-    from typing import (Any, Callable, Dict, Literal, Optional, Sequence,
-                        TypedDict, Union, overload)
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Literal,
+        Optional,
+        Sequence,
+        TypedDict,
+        Union,
+        overload,
+    )
 
     try:
         from typing_extensions import NotRequired
@@ -219,7 +228,10 @@ def session(
 
 # dependency_group is used to install the dependencies for the test session
 # default_posargs is used to pass additional arguments to the test session
-@session(dependency_group="dev", default_posargs=[TEST_DIR, "-s", "-vv", "-n", "auto", "--dist", "worksteal"])
+@session(
+    dependency_group="dev",
+    default_posargs=[TEST_DIR, "-s", "-vv", "-n", "auto", "--dist", "worksteal"],
+)
 def test(session: AlteredSession):
     command = [
         shutil.which("uv"),
@@ -456,7 +468,7 @@ def format(session: Session):
 @session(dependency_group="dev", default_posargs=["check", ".", "--fix"])
 def check(session: Session):
     session.run("uv", "tool", "run", "ruff")
-    
+
 
 @session(dependency_group="dev", default_posargs=["src", "--rcfile", MANIFEST_FILENAME])
 def lint(session: Session):
@@ -666,32 +678,30 @@ def test_all_vers(session: Session):
 def version_sync(session: Session):
     """Sync version between pyproject.toml and __init__.py."""
     import re
-    
+
     # Read version from pyproject.toml
     with open("pyproject.toml", "r") as f:
         pyproject_content = f.read()
-    
+
     version_match = re.search(r'version = "([^"]+)"', pyproject_content)
     if not version_match:
         session.error("Could not find version in pyproject.toml")
-    
+
     pyproject_version = version_match.group(1)
     session.log(f"Found version in pyproject.toml: {pyproject_version}")
-    
+
     # Update __init__.py
     init_file = f"{PROJECT_CODES_DIR}/__init__.py"
     with open(init_file, "r") as f:
         init_content = f.read()
-    
+
     updated_content = re.sub(
-        r'__version__ = "[^"]+"',
-        f'__version__ = "{pyproject_version}"',
-        init_content
+        r'__version__ = "[^"]+"', f'__version__ = "{pyproject_version}"', init_content
     )
-    
+
     with open(init_file, "w") as f:
         f.write(updated_content)
-    
+
     session.log(f"✅ Synced version to {pyproject_version} in {init_file}")
 
 
@@ -699,34 +709,36 @@ def version_sync(session: Session):
 def bump_version(session: Session):
     """Bump version (minor by default, or specify: patch, minor, major)."""
     import re
-    
+
     # Get bump type from posargs, default to minor
     bump_type = "minor"
     if session.posargs:
         bump_type = session.posargs[0].lower()
         if bump_type not in ["patch", "minor", "major"]:
-            session.error(f"Invalid bump type: {bump_type}. Use: patch, minor, or major")
-    
+            session.error(
+                f"Invalid bump type: {bump_type}. Use: patch, minor, or major"
+            )
+
     session.log(f"Bumping {bump_type} version...")
-    
+
     # Read current version from pyproject.toml
     with open("pyproject.toml", "r") as f:
         content = f.read()
-    
+
     version_match = re.search(r'version = "([^"]+)"', content)
     if not version_match:
         session.error("Could not find version in pyproject.toml")
-    
+
     current_version = version_match.group(1)
     session.log(f"Current version: {current_version}")
-    
+
     # Parse version
     version_parts = current_version.split(".")
     if len(version_parts) != 3:
         session.error(f"Invalid version format: {current_version}. Expected: X.Y.Z")
-    
+
     major, minor, patch = map(int, version_parts)
-    
+
     # Bump version
     if bump_type == "major":
         major += 1
@@ -737,25 +749,23 @@ def bump_version(session: Session):
         patch = 0
     elif bump_type == "patch":
         patch += 1
-    
+
     new_version = f"{major}.{minor}.{patch}"
     session.log(f"New version: {new_version}")
-    
+
     # Update pyproject.toml
     updated_content = re.sub(
-        r'version = "[^"]+"',
-        f'version = "{new_version}"',
-        content
+        r'version = "[^"]+"', f'version = "{new_version}"', content
     )
-    
+
     with open("pyproject.toml", "w") as f:
         f.write(updated_content)
-    
+
     session.log(f"✅ Updated pyproject.toml to version {new_version}")
-    
+
     # Sync to __init__.py
     version_sync(session)
-    
+
     return new_version
 
 
@@ -763,25 +773,29 @@ def bump_version(session: Session):
 def git_check(session: Session):
     """Check git status and ensure clean working directory."""
     # Check if git repo
-    result = session.run("git", "status", "--porcelain", silent=True, success_codes=[0, 128])
+    result = session.run(
+        "git", "status", "--porcelain", silent=True, success_codes=[0, 128]
+    )
     if result is False:
         session.error("Not a git repository")
-    
+
     # Check for uncommitted changes
     result = session.run("git", "status", "--porcelain", silent=True)
     if result and result.strip():
         session.error("Working directory is not clean. Commit or stash changes first.")
-    
+
     # Check if on main/master branch
     result = session.run("git", "branch", "--show-current", silent=True)
     current_branch = result.strip() if result else ""
-    
+
     if current_branch not in ["main", "master"]:
-        session.log(f"⚠️  Warning: Not on main/master branch (current: {current_branch})")
+        session.log(
+            f"⚠️  Warning: Not on main/master branch (current: {current_branch})"
+        )
         response = input("Continue anyway? (y/N): ")
         if response.lower() != "y":
             session.error("Release cancelled")
-    
+
     session.log("✅ Git repository is clean and ready")
 
 
@@ -789,10 +803,10 @@ def git_check(session: Session):
 def release_check(session: Session):
     """Pre-release validation checklist."""
     session.log("🔍 Running pre-release checks...")
-    
+
     # Git checks first
     git_check(session)
-    
+
     # Run all quality checks
     clean(session)
     format(session)
@@ -800,11 +814,13 @@ def release_check(session: Session):
     # lint(session)
     # type_check(session)
     test(session)
-    
+
     # Build and verify
     build(session)
     list_dist_files(session)
-    
+
+    test_install(session)
+
     session.log("✅ All pre-release checks passed!")
 
 
@@ -815,29 +831,29 @@ def release(session: Session):
     bump_type = "minor"
     if session.posargs:
         bump_type = session.posargs[0].lower()
-    
+
     session.log(f"🚀 Starting release process (bump: {bump_type})...")
-    
+
     # Pre-release checks
     release_check(session)
-    
+
     # Bump version
     new_version = bump_version(session)
-    
+
     # Commit version changes
     session.run("git", "add", "pyproject.toml", f"{PROJECT_CODES_DIR}/__init__.py")
     session.run("git", "commit", "-m", f"chore: bump version to {new_version}")
-    
+
     # Create git tag
     tag_name = f"v{new_version}"
     session.run("git", "tag", "-a", tag_name, "-m", f"Release {new_version}")
-    
+
     session.log(f"✅ Created git tag: {tag_name}")
-    
+
     # Clean build and rebuild
     clean(session)
     build(session)
-    
+
     session.log(f"🎉 Release {new_version} ready!")
     session.log("Next steps:")
     session.log(f"  1. Push changes: git push origin main")
@@ -850,32 +866,36 @@ def release(session: Session):
 def publish_test(session: Session):
     """Publish to TestPyPI using uv."""
     session.log("📦 Publishing to TestPyPI...")
-    
+
     # Ensure we have a clean build
     if not os.path.exists(DIST_DIR) or not os.listdir(DIST_DIR):
         session.log("No distribution files found, building...")
         build(session)
-    
+
     # Publish using uv
-    session.run("uv", "publish", "--publish-url", "https://test.pypi.org/legacy/", "dist/*")
+    session.run(
+        "uv", "publish", "--publish-url", "https://test.pypi.org/legacy/", "dist/*"
+    )
     session.log("✅ Published to TestPyPI")
 
 
-@session(dependency_group="dev") 
+@session(dependency_group="dev")
 def publish(session: Session):
     """Publish to PyPI using uv."""
     session.log("📦 Publishing to PyPI...")
-    
+
     # Ensure we have a clean build
     if not os.path.exists(DIST_DIR) or not os.listdir(DIST_DIR):
         session.log("No distribution files found, building...")
         build(session)
-    
+
     # Confirm publication
-    response = input("Are you sure you want to publish to PyPI? This cannot be undone. (y/N): ")
+    response = input(
+        "Are you sure you want to publish to PyPI? This cannot be undone. (y/N): "
+    )
     if response.lower() != "y":
         session.error("Publication cancelled")
-    
+
     # Publish using uv
     session.run("uv", "publish", "dist/*")
     session.log("🎉 Published to PyPI!")
@@ -885,7 +905,7 @@ def publish(session: Session):
 def hotfix(session: Session):
     """Create a hotfix release (patch version bump)."""
     session.log("🔥 Creating hotfix release...")
-    
+
     # Force patch bump
     session.posargs = ["patch"]
     release(session)
@@ -895,30 +915,46 @@ def hotfix(session: Session):
 def release_info(session: Session):
     """Show current release information."""
     import re
-    
+
     # Get current version
     with open("pyproject.toml", "r") as f:
         content = f.read()
-    
+
     version_match = re.search(r'version = "([^"]+)"', content)
     current_version = version_match.group(1) if version_match else "unknown"
-    
+
     # Get git info
     try:
-        current_branch = session.run("git", "branch", "--show-current", silent=True).strip()
-        last_tag = session.run("git", "describe", "--tags", "--abbrev=0", silent=True, success_codes=[0, 128]).strip()
-        commits_since_tag = session.run("git", "rev-list", f"{last_tag}..HEAD", "--count", silent=True, success_codes=[0, 128]).strip()
+        current_branch = session.run(
+            "git", "branch", "--show-current", silent=True
+        ).strip()
+        last_tag = session.run(
+            "git",
+            "describe",
+            "--tags",
+            "--abbrev=0",
+            silent=True,
+            success_codes=[0, 128],
+        ).strip()
+        commits_since_tag = session.run(
+            "git",
+            "rev-list",
+            f"{last_tag}..HEAD",
+            "--count",
+            silent=True,
+            success_codes=[0, 128],
+        ).strip()
     except:
         current_branch = "unknown"
         last_tag = "none"
         commits_since_tag = "unknown"
-    
+
     session.log("📋 Release Information:")
     session.log(f"  Current version: {current_version}")
     session.log(f"  Current branch: {current_branch}")
     session.log(f"  Last tag: {last_tag}")
     session.log(f"  Commits since tag: {commits_since_tag}")
-    
+
     # Show what next version would be
     version_parts = current_version.split(".")
     if len(version_parts) == 3:
@@ -927,3 +963,249 @@ def release_info(session: Session):
         session.log(f"    Patch: {major}.{minor}.{patch + 1}")
         session.log(f"    Minor: {major}.{minor + 1}.0")
         session.log(f"    Major: {major + 1}.0.0")
+
+
+@session(dependency_group="dev", reuse_venv=True)
+def test_install(session: Session):
+    """Test package installation in a completely fresh environment."""
+    session.log("🧪 Testing package installation in fresh environment...")
+
+    # Clean up any existing installation first
+    session.log("🧹 Cleaning up any existing installations...")
+    session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
+
+    # Ensure we have a built package
+    if not os.path.exists(DIST_DIR) or not os.listdir(DIST_DIR):
+        session.log("No distribution files found, building first...")
+        build(session)
+
+    # Find the latest wheel and tarball
+    import glob
+    from pathlib import Path
+
+    wheel_files = sorted(
+        glob.glob(f"{DIST_DIR}/*.whl"), key=os.path.getmtime, reverse=True
+    )
+    tarball_files = sorted(
+        glob.glob(f"{DIST_DIR}/*.tar.gz"), key=os.path.getmtime, reverse=True
+    )
+
+    if not wheel_files and not tarball_files:
+        session.error("No distribution files found to test")
+
+    # Test both wheel and tarball if available
+    test_files = []
+    if wheel_files:
+        test_files.append(("wheel", wheel_files[0]))
+    if tarball_files:
+        test_files.append(("tarball", tarball_files[0]))
+
+    for dist_type, dist_file in test_files:
+        session.log(f"📦 Testing {dist_type}: {Path(dist_file).name}")
+
+        # Clean up before each test
+        session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
+
+        # Install the package
+        session.install(dist_file)
+
+        # Verify installation
+        result = session.run(
+            "uv", "pip", "show", PROJECT_NAME, silent=True, success_codes=[0, 1]
+        )
+        if not result:
+            session.error(f"Package {PROJECT_NAME} was not installed correctly")
+
+        # Test basic import
+        session.log("🔍 Testing basic import...")
+        session.run(
+            "python",
+            "-c",
+            f"import {PROJECT_NAME_NORMALIZED}; print(f'✅ Successfully imported {PROJECT_NAME_NORMALIZED}')",
+        )
+
+        # Test version access
+        session.log("🔍 Testing version access...")
+        session.run(
+            "python",
+            "-c",
+            f"from {PROJECT_NAME_NORMALIZED} import __version__; print(f'📋 Version: {{__version__}}')",
+        )
+
+        # Test main components import
+        session.log("🔍 Testing main components...")
+        session.run(
+            "python",
+            "-c",
+            f"from {PROJECT_NAME_NORMALIZED} import Shield, ShieldedDepends, shield; print('✅ All main components imported successfully')",
+        )
+
+        # Test with FastAPI integration (basic)
+        session.log("🔍 Testing FastAPI integration...")
+        fastapi_test = f"""
+from fastapi import FastAPI
+from {PROJECT_NAME_NORMALIZED} import shield
+
+app = FastAPI()
+
+@shield
+def simple_shield():
+    return {{"status": "ok"}}
+
+@app.get("/test")
+@simple_shield
+async def test_endpoint():
+    return {{"message": "FastAPI integration works"}}
+
+print("✅ FastAPI integration test passed")
+"""
+        session.run("python", "-c", fastapi_test)
+
+        # Clean up after test
+        session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
+        session.log(
+            f"✅ {dist_type.capitalize()} installation test completed successfully"
+        )
+
+    session.log("🎉 All installation tests passed! Package is ready for end users.")
+
+
+@session(dependency_group="dev", reuse_venv=True)
+def test_install_from_pypi(session: Session):
+    """Test installation from PyPI (or TestPyPI)."""
+    import sys
+
+    # Clean up any existing installation first
+    session.log("🧹 Cleaning up any existing installations...")
+    session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
+
+    # Default to TestPyPI, but allow override
+    pypi_url = "https://test.pypi.org/simple/"
+    if session.posargs and session.posargs[0] == "pypi":
+        pypi_url = None  # Use default PyPI
+        session.log("📦 Testing installation from PyPI...")
+    else:
+        session.log("📦 Testing installation from TestPyPI...")
+
+    # Install from PyPI using uv
+    install_cmd = ["uv", "pip", "install"]
+    if pypi_url:
+        install_cmd.extend(
+            ["-i", pypi_url, "--extra-index-url", "https://pypi.org/simple/"]
+        )
+    install_cmd.append(PROJECT_NAME)
+
+    try:
+        session.run(*install_cmd)
+        session.log("✅ Package installed successfully from PyPI")
+
+        # Verify installation
+        result = session.run(
+            "uv", "pip", "show", PROJECT_NAME, silent=True, success_codes=[0, 1]
+        )
+        if not result:
+            session.error(
+                f"Package {PROJECT_NAME} was not installed correctly from PyPI"
+            )
+
+        # Run the same tests as test_install
+        session.log("🔍 Testing installed package...")
+        session.run(
+            "python",
+            "-c",
+            f"import {PROJECT_NAME_NORMALIZED}; print(f'✅ Successfully imported {PROJECT_NAME_NORMALIZED}')",
+        )
+        session.run(
+            "python",
+            "-c",
+            f"from {PROJECT_NAME_NORMALIZED} import __version__; print(f'📋 Version: {{__version__}}')",
+        )
+        session.run(
+            "python",
+            "-c",
+            f"from {PROJECT_NAME_NORMALIZED} import Shield, ShieldedDepends, shield; print('✅ All main components imported successfully')",
+        )
+
+        session.log("🎉 PyPI installation test passed!")
+
+    except Exception as e:
+        session.error(f"PyPI installation test failed: {e}")
+    finally:
+        # Clean up
+        session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
+
+
+@session(dependency_group="dev", reuse_venv=True)
+def test_install_editable(session: Session):
+    """Test editable installation for development."""
+    session.log("🔧 Testing editable installation...")
+
+    # Clean up any existing installation first
+    session.log("🧹 Cleaning up any existing installations...")
+    session.run("uv", "pip", "uninstall", PROJECT_NAME, success_codes=[0, 1])
+
+    # Install in editable mode
+    session.run("uv", "pip", "install", "-e", ".")
+
+    # Verify editable installation
+    result = session.run(
+        "uv", "pip", "show", PROJECT_NAME, silent=True, success_codes=[0, 1]
+    )
+    if not result:
+        session.error(f"Editable package {PROJECT_NAME} was not installed correctly")
+
+    # Test that changes are reflected
+    session.log("🔍 Testing editable installation...")
+    session.run(
+        "python",
+        "-c",
+        f"import {PROJECT_NAME_NORMALIZED}; print(f'✅ Editable installation works')",
+    )
+
+    # Test that we can import from the source directory
+    session.run(
+        "python",
+        "-c",
+        f"""
+import sys
+import os
+sys.path.insert(0, os.path.join(os.getcwd(), 'src'))
+from {PROJECT_NAME_NORMALIZED} import Shield
+print('✅ Can import from source directory')
+""",
+    )
+
+    # Verify it's actually editable (check if installed in development mode)
+    session.run(
+        "python",
+        "-c",
+        f"""
+import {PROJECT_NAME_NORMALIZED}
+import os
+module_path = {PROJECT_NAME_NORMALIZED}.__file__
+project_src = os.path.join(os.getcwd(), 'src', '{PROJECT_NAME_NORMALIZED}')
+if project_src in module_path:
+    print('✅ Package is installed in editable mode')
+else:
+    print(f'⚠️  Warning: Package may not be in editable mode. Module path: {{module_path}}')
+""",
+    )
+
+    session.log("✅ Editable installation test passed!")
+
+
+@session(dependency_group="dev")
+def test_install_all(session: Session):
+    """Run all installation tests."""
+    session.log("🚀 Running comprehensive installation tests...")
+
+    # Build first
+    build(session)
+
+    # Test local installation
+    test_install(session)
+
+    # Test editable installation
+    test_install_editable(session)
+
+    session.log("🎉 All installation tests completed successfully!")
