@@ -120,7 +120,7 @@ jobs:
           else
             source test-env/bin/activate
           fi
-          uv pip install pytest pandas
+          uv sync --no-install-project
           uv pip install dist/*.whl
 
       - name: Run tests
