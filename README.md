@@ -5,16 +5,37 @@
 # FastAPI Shield
 
 ## Documentation
-<a href="https://fastapi-shield.readthedocs.io">
+<a href="https://py-nt.asyncmove.com">
   <img src="https://img.shields.io/badge/docs-passing-brightgreen.svg" width="100" alt="docs passing">
 </a>
 
-## Compatibility and Version
+### Compatibility and Version
 <img src="https://img.shields.io/badge/%3E=python-3.9-blue.svg" alt="Python compat">
 <a href="https://pypi.python.org/pypi/fastapi-shield"><img src="https://img.shields.io/pypi/v/fastapi-shield.svg" alt="PyPi"></a>
 
+### CI/CD
+<a href="https://codecov.io/github/jymchng/fastapi-shield?branch=main"><img src="https://codecov.io/github/jymchng/fastapi-shield/coverage.svg?branch=main" alt="Coverage"></a>
+
 ### License and Issues
-<a href="https://github.com/jimchng/fastapi-shield/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jimchng/fastapi-shield" alt="License"></a>
+<a href="https://github.com/jymchng/fastapi-shield/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jymchng/fastapi-shield" alt="License"></a>
+<a href="https://github.com/jymchng/fastapi-shield/issues"><img src="https://img.shields.io/github/issues/jymchng/fastapi-shield" alt="Issues"></a>
+<a href="https://github.com/jymchng/fastapi-shield/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/jymchng/fastapi-shield" alt="Closed Issues"></a>
+<a href="https://github.com/jymchng/fastapi-shield/issues?q=is%3Aissue+is%3Aopen"><img src="https://img.shields.io/github/issues/jymchng/fastapi-shield" alt="Open Issues"></a>
+
+### Development and Quality
+<a href="https://github.com/jymchng/fastapi-shield/network/members"><img src="https://img.shields.io/github/forks/jymchng/fastapi-shield" alt="Forks"></a>
+<a href="https://github.com/jymchng/fastapi-shield/stargazers"><img src="https://img.shields.io/github/stars/jymchng/fastapi-shield" alt="Stars"></a>
+<a href="https://pypi.python.org/pypi/fastapi-shield"><img src="https://img.shields.io/pypi/dm/fastapi-shield" alt="Downloads"></a>
+<a href="https://github.com/jymchng/fastapi-shield/graphs/contributors"><img src="https://img.shields.io/github/contributors/jymchng/fastapi-shield" alt="Contributors"></a>
+<a href="https://github.com/jymchng/fastapi-shield/commits/main"><img src="https://img.shields.io/github/commit-activity/m/jymchng/fastapi-shield" alt="Commits"></a>
+<a href="https://github.com/jymchng/fastapi-shield/commits/main"><img src="https://img.shields.io/github/last-commit/jymchng/fastapi-shield" alt="Last Commit"></a>
+<a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/languages/code-size/jymchng/fastapi-shield" alt="Code Size"></a>
+<a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/repo-size/jymchng/fastapi-shield" alt="Repo Size"></a>
+<a href="https://github.com/jymchng/fastapi-shield/watchers"><img src="https://img.shields.io/github/watchers/jymchng/fastapi-shield" alt="Watchers"></a>
+<a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/commit-activity/y/jymchng/fastapi-shield" alt="Activity"></a>
+<a href="https://github.com/jymchng/fastapi-shield/pulls"><img src="https://img.shields.io/github/issues-pr/jymchng/fastapi-shield" alt="PRs"></a>
+<a href="https://github.com/jymchng/fastapi-shield/pulls?q=is%3Apr+is%3Aclosed"><img src="https://img.shields.io/github/issues-pr-closed/jymchng/fastapi-shield" alt="Merged PRs"></a>
+<a href="https://github.com/jymchng/fastapi-shield/pulls?q=is%3Apr+is%3Aopen"><img src="https://img.shields.io/github/issues-pr/open/jymchng/fastapi-shield" alt="Open PRs"></a>
 
 </div>
 

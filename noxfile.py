@@ -710,8 +710,8 @@ def bump_version(session: Session):
     """Bump version (minor by default, or specify: patch, minor, major)."""
     import re
 
-    # Get bump type from posargs, default to minor
-    bump_type = "minor"
+    # Get bump type from posargs, default to patch
+    bump_type = "patch"
     if session.posargs:
         bump_type = session.posargs[0].lower()
         if bump_type not in ["patch", "minor", "major"]:
