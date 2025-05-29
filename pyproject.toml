@@ -1,6 +1,6 @@
 [project]
 name = "fastapi-shield"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shield is a FastAPI decorator that provides a simple shield for your API Endpoints to shield off unwanted requests."
 readme = "README.md"
 requires-python = ">=3.9"
