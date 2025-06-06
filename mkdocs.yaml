@@ -65,6 +65,18 @@ nav:
       - Method Interception: advanced-topics/method-interception.md
       # Security Best Practices Done
       - Security Best Practices: advanced-topics/security-best-practices.md
+  - API Reference:
+      - Overview: api/index.md
+      - Core Components:
+        - Shield: api/shield.md
+        - ShieldDepends: api/shield-depends.md
+        - shield (factory): api/shield-factory.md
+        - ShieldedDepends (factory): api/shielded-depends-factory.md
+      - Utilities:
+        - Utils: api/utils.md
+        - OpenAPI Integration: api/openapi.md
+        - Type Definitions: api/typing.md
+        - Constants: api/constants.md
   - Development:
       - Overview: development/index.md
       - Contributing: development/contributing.md
