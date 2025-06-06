@@ -1,3 +1,14 @@
+"""OpenAPI schema generation utilities for FastAPI Shield.
+
+This module provides functions to integrate FastAPI Shield with OpenAPI schema
+generation, ensuring that shielded endpoints are properly documented in the
+generated API documentation while maintaining the shield functionality.
+
+The main challenge is that shields modify endpoint signatures, so special handling
+is required to generate accurate OpenAPI schemas that reflect the original
+endpoint parameters rather than the wrapped shield parameters.
+"""
+
 from contextlib import contextmanager
 from functools import wraps
 from inspect import Signature, signature
@@ -19,6 +30,38 @@ from fastapi_shield.utils import (
 
 @contextmanager
 def switch_routes(app: FastAPI):
+    """Context manager that temporarily switches shielded routes to their original signatures.
+
+    This context manager temporarily modifies all shielded routes in a FastAPI app
+    to use their original endpoint signatures instead of the shield-wrapped versions.
+    This is necessary for accurate OpenAPI schema generation, as shields modify
+    endpoint signatures in ways that shouldn't be reflected in the API documentation.
+
+    The context manager:
+    1. Identifies all shielded routes in the app
+    2. Creates mock endpoints with the original, unwrapped signatures
+    3. Temporarily replaces the shielded endpoints with the mock versions
+    4. Yields the modified routes for schema generation
+    5. Restores the original shielded endpoints when done
+
+    Args:
+        app: The FastAPI application instance to modify.
+
+    Yields:
+        list: The app's routes with temporarily switched endpoint signatures.
+
+    Examples:
+        >>> app = FastAPI()
+        >>> # ... add shielded routes ...
+        >>> with switch_routes(app) as routes:
+        ...     # Generate OpenAPI schema using original signatures
+        ...     schema = get_openapi(routes=routes, title="My API", version="1.0.0")
+
+    Note:
+        This function safely handles the temporary modification and guarantees
+        that the original shielded endpoints are restored even if an exception
+        occurs during schema generation.
+    """
     shielded_endpoints = {}
     shielded_dependants = {}
     shielded_body_fields = {}
@@ -88,6 +131,34 @@ def switch_routes(app: FastAPI):
 
 
 def patch_get_openapi(app: FastAPI):
+    """Create a patched OpenAPI schema generator for FastAPI Shield compatibility.
+
+    Returns a function that generates OpenAPI schemas while properly handling
+    shielded endpoints. The patched function ensures that the generated schema
+    reflects the original endpoint signatures rather than the shield-wrapped
+    versions, providing accurate API documentation.
+
+    The function caches the generated schema to avoid repeated computation,
+    as schema generation can be expensive for large applications.
+
+    Args:
+        app: The FastAPI application instance to create a schema generator for.
+
+    Returns:
+        Callable: A function that generates the OpenAPI schema for the app.
+                 The function signature matches fastapi.openapi.utils.get_openapi.
+
+    Examples:
+        >>> app = FastAPI()
+        >>> # ... add shielded endpoints ...
+        >>> patched_openapi = patch_get_openapi(app)
+        >>> schema = patched_openapi()
+        >>> print(schema["paths"])  # Shows original endpoint signatures
+
+    Note:
+        The returned function automatically handles the temporary route switching
+        needed for accurate schema generation and caches the result for performance.
+    """
     original_schema = app.openapi()
 
     final_schema = None
@@ -123,6 +194,40 @@ def patch_get_openapi(app: FastAPI):
 
 
 def gather_signature_params_across_wrapped_endpoints(maybe_wrapped_fn: EndPointFunc):
+    """Recursively gather signature parameters from wrapped endpoint functions.
+
+    Traverses the chain of wrapped functions (created by decorators like shields)
+    to collect all unique parameters from each function in the chain. This is
+    necessary because shields and other decorators can modify function signatures,
+    and we need to reconstruct the complete parameter list for OpenAPI schema
+    generation.
+
+    The function follows the __wrapped__ attribute chain, which is automatically
+    set by `functools.wraps()` and similar decorators.
+
+    Args:
+        maybe_wrapped_fn: An endpoint function that may have been wrapped by
+                         decorators (shields, dependency injectors, etc.).
+
+    Yields:
+        Parameter: inspect.Parameter objects from the function and all its
+                  wrapped ancestors, in the order they're encountered.
+
+    Examples:
+        >>> @shield
+        ... def auth_shield(request): pass
+        ...
+        >>> @auth_shield
+        ... def endpoint(user_id: int, name: str): pass
+        ...
+        >>> params = list(gather_signature_params_across_wrapped_endpoints(endpoint))
+        >>> [p.name for p in params]  # ['request', 'user_id', 'name', ...]
+
+    Note:
+        This function is recursive and will traverse the entire decorator chain.
+        Duplicate parameters (same name) should be handled by the caller using
+        functions like merge_dedup_seq_params().
+    """
     yield from signature(maybe_wrapped_fn).parameters.values()
     if hasattr(maybe_wrapped_fn, "__wrapped__"):
         yield from gather_signature_params_across_wrapped_endpoints(
@@ -135,6 +240,53 @@ def patch_shields_for_openapi(
     /,
     activated_when: Union[Callable[[], bool], bool] = lambda: True,
 ):
+    """Decorator to patch shielded endpoints for proper OpenAPI schema generation.
+
+    This decorator can be applied to shielded endpoints to ensure they generate
+    correct OpenAPI schemas. It reconstructs the endpoint's signature by gathering
+    parameters from the entire decorator chain and properly arranging them according
+    to Python's parameter ordering rules.
+
+    The decorator can be conditionally activated, allowing you to enable/disable
+    the patching based on runtime conditions (e.g., only in development mode).
+
+    Args:
+        endpoint: The endpoint function to patch. If None, returns a decorator
+                 function that can be applied to an endpoint.
+        activated_when: Condition for activating the patch. Can be:
+                       - A boolean value (True/False)
+                       - A callable that returns a boolean
+                       Defaults to always True (always activated).
+
+    Returns:
+        EndPointFunc: The patched endpoint with corrected signature for OpenAPI,
+                     or the original endpoint if not shielded or not activated.
+
+    Examples:
+        >>> # Basic usage
+        >>> @patch_shields_for_openapi
+        ... @shield
+        ... def auth_shield(request): pass
+        ...
+        >>> @auth_shield
+        ... def endpoint(user_id: int): pass
+
+        >>> # Conditional activation
+        >>> @patch_shields_for_openapi(activated_when=lambda: settings.DEBUG)
+        ... @shield
+        ... def debug_shield(request): pass
+
+        >>> # As a decorator factory
+        >>> patch_for_dev = patch_shields_for_openapi(activated_when=settings.DEBUG)
+        >>> @patch_for_dev
+        ... @shield
+        ... def my_shield(request): pass
+
+    Note:
+        This decorator only affects endpoints that have been marked as shielded
+        (have the `IS_SHIELDED_ENDPOINT_KEY` attribute). Non-shielded endpoints
+        are returned unchanged.
+    """
     if endpoint is None:
         return lambda endpoint: patch_shields_for_openapi(
             endpoint, activated_when=activated_when
