@@ -6,6 +6,7 @@ repo_name: jymchng/fastapi-shield
 
 theme:
   name: material
+  logo: logo-shield-only.png
   features:
     - navigation.tabs
     - navigation.sections
