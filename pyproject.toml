@@ -109,9 +109,6 @@ dev = [
     "fastapi[standard]>=0.100.1",
     "httpx>=0.24.0",
     "isort>=6.0.1",
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.6.12",
-    "mkdocstrings[python]>=0.23.0",
     "nox>=2023.0.0",
     "passlib>=1.7.0",
     "pre-commit>=4.2.0",
@@ -126,4 +123,10 @@ dev = [
     "slowapi>=0.1.9",
     "unicorn>=2.0.0",
     "uvicorn>=0.20.0",
+]
+
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.12",
+    "mkdocstrings[python]>=0.23.0",
 ]

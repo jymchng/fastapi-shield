@@ -1209,3 +1209,24 @@ def test_install_all(session: Session):
     test_install_editable(session)
 
     session.log("SUCCESS: All installation tests completed successfully!")
+
+
+@session(dependency_group="docs")
+def export_docs_reqs(session: Session):
+    session.run("uv", "export", "-o", "requirements-docs.txt")
+    
+    
+@session(dependency_group="docs")
+def build_docs(session: Session):
+    session.chdir(ROOT_DIR)
+    # Install the package in editable mode so mkdocstrings can import it
+    session.run("uv", "pip", "install", "-e", ".")
+    session.run("mkdocs", "build")
+    
+    
+@session(dependency_group="docs")
+def serve_docs(session: Session):
+    session.chdir(ROOT_DIR)
+    # Install the package in editable mode so mkdocstrings can import it
+    session.run("uv", "pip", "install", "-e", ".")
+    session.run("mkdocs", "serve", "-a", "localhost:8001")
