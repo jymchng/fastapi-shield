@@ -105,6 +105,7 @@ jobs:
         #----------------------------------------------
       - name: Build HTML docs
         run: |
+          uv sync --group docs
           uv run mkdocs build
 
       # - name: Upload coverage to Codecov
