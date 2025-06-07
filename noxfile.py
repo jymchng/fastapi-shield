@@ -1213,7 +1213,7 @@ def test_install_all(session: Session):
 
 @session(dependency_group="docs")
 def export_docs_reqs(session: Session):
-    session.run("uv", "export", "-o", "requirements-docs.txt")
+    session.run(*("uv export --group docs -o requirements-docs.txt".split(" ")))
     
     
 @session(dependency_group="docs")
