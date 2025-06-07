@@ -1,0 +1,6 @@
+[build]
+command = """
+python -m pip install -r requirements-dev.txt
+mkdocs build
+"""
+publish = "site"
