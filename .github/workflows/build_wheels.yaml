@@ -132,7 +132,7 @@ jobs:
             source test-env/bin/activate
           fi
           uv sync --group dev
-          python -m pytest tests/
+          uv run python -m pytest tests/ -vv -s
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
