@@ -57,7 +57,6 @@ Repository = "https://github.com/jimchng/fastapi-shield.git"
 Documentation = "https://fastapi-shield.asyncmove.com/"
 "Bug Tracker" = "https://github.com/jimchng/fastapi-shield/issues"
 "Feature Requests" = "https://github.com/jimchng/fastapi-shield/discussions"
-Funding = "https://github.com/sponsors/jimchng"
 
 
 [tool.hatch.build.targets.wheel]
