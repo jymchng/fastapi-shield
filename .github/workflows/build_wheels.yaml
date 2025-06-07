@@ -131,6 +131,7 @@ jobs:
           else
             source test-env/bin/activate
           fi
+          uv sync --group dev
           python -m pytest tests/
 
       - name: Upload wheel
