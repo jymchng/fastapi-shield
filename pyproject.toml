@@ -20,7 +20,6 @@ keywords = [
     "python3",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
     "Framework :: FastAPI",
     "Framework :: AsyncIO",
