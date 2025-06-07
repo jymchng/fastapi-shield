@@ -1,6 +1,6 @@
 [build]
 command = """
-python -m pip install -r requirements-dev.txt
+python -m pip install mkdocs && python -m pip install -r requirements-dev.txt
 mkdocs build
 """
 publish = "site"
