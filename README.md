@@ -5,7 +5,7 @@
 # FastAPI Shield
 
 ## Documentation
-<a href="https://py-nt.asyncmove.com">
+<a href="https://docs.fastapi-shield.asyncmove.com">
   <img src="https://img.shields.io/badge/docs-passing-brightgreen.svg" width="100" alt="docs passing">
 </a>
 
