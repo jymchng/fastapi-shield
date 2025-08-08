@@ -18,7 +18,13 @@ Key Classes:
 
 from contextlib import asynccontextmanager
 from functools import cached_property, wraps
-from inspect import Parameter, Signature, signature
+from inspect import (
+    Parameter,
+    Signature,
+    isasyncgenfunction,
+    isgeneratorfunction,
+    signature,
+)
 from typing import Annotated, Any, Callable, Generic, Optional, Sequence
 
 from fastapi import HTTPException, Request, Response, status
@@ -401,6 +407,8 @@ class Shield(Generic[U]):
         "name",
         "_guard_func",
         "_guard_func_is_async",
+        "_guard_func_is_async_gen",
+        "_guard_func_is_sync_gen",
         "_guard_func_params",
         "_exception_to_raise_if_fail",
         "_default_response_to_return_if_fail",
@@ -465,6 +473,8 @@ class Shield(Generic[U]):
         assert callable(shield_func), "`shield_func` must be callable"
         self._guard_func = shield_func
         self._guard_func_is_async = is_coroutine_callable(shield_func)
+        self._guard_func_is_async_gen = isasyncgenfunction(shield_func)
+        self._guard_func_is_sync_gen = isgeneratorfunction(shield_func)
         self._guard_func_params = signature(shield_func).parameters
         self.name = name or "unknown"
         self.auto_error = auto_error
@@ -567,19 +577,8 @@ class Shield(Generic[U]):
             guard_func_args = {
                 k: v for k, v in kwargs.items() if k in self._guard_func_params
             }
-            try:
-                if self._guard_func_is_async:
-                    obj = await self._guard_func(**guard_func_args)
-                else:
-                    obj = self._guard_func(**guard_func_args)
-            except Exception as e:
-                if not isinstance(e, HTTPException):
-                    raise HTTPException(
-                        status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=f"Shield with name `{self.name}` failed: {e}",
-                    )
-                raise e
-            if obj:
+            # Helper to execute the protected endpoint after shield passes
+            async def _execute_endpoint_with_injection(obj_value):
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong
                 request: Request = kwargs.get("request")
@@ -599,8 +598,6 @@ class Shield(Generic[U]):
                         status.HTTP_400_BAD_REQUEST,
                         detail="Request is required",
                     )
-                # because `solve_dependencies` is async, we need to await it
-                # hence no point to split returning `wrapper` into two functions, one sync and one async
                 endpoint_solved_dependencies, body = await get_solved_dependencies(
                     request, path_format, endpoint, dependency_cache
                 )
@@ -613,7 +610,7 @@ class Shield(Generic[U]):
                 kwargs.update(endpoint_solved_dependencies.values)
                 resolved_shielded_depends = (
                     await inject_authenticated_entities_into_args_kwargs(
-                        obj, request, path_format, **shielded_depends_in_endpoint
+                        obj_value, request, path_format, **shielded_depends_in_endpoint
                     )
                 )
                 endpoint_kwargs = {
@@ -623,6 +620,127 @@ class Shield(Generic[U]):
                 if endpoint_is_async:
                     return await endpoint(*args, **endpoint_kwargs)
                 return endpoint(*args, **endpoint_kwargs)
+
+            # Path 1: async generator shield
+            if self._guard_func_is_async_gen:
+                try:
+                    gen = self._guard_func(**guard_func_args)
+                    try:
+                        enter_value = await anext(gen)
+                    except StopAsyncIteration:
+                        enter_value = None
+                except Exception as e:  # generator creation/enter failure
+                    if not isinstance(e, HTTPException):
+                        raise HTTPException(
+                            status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Shield with name `{self.name}` failed: {e}",
+                        )
+                    raise e
+
+                if not enter_value:
+                    try:
+                        await gen.aclose()
+                    except Exception as e:
+                        if not isinstance(e, HTTPException):
+                            raise HTTPException(
+                                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"Shield with name `{self.name}` failed: {e}",
+                            )
+                        raise e
+                    return self._raise_or_return_default_response()
+
+                endpoint_exception = None
+                try:
+                    result = await _execute_endpoint_with_injection(enter_value)
+                except Exception as e:
+                    endpoint_exception = e
+                # Teardown must run regardless of endpoint result
+                teardown_exception = None
+                try:
+                    await gen.aclose()
+                except Exception as e:
+                    teardown_exception = e
+
+                if endpoint_exception is not None:
+                    raise endpoint_exception
+                if teardown_exception is not None:
+                    if not isinstance(teardown_exception, HTTPException):
+                        raise HTTPException(
+                            status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=(
+                                f"Shield with name `{self.name}` failed: {teardown_exception}"
+                            ),
+                        )
+                    raise teardown_exception
+                return result
+
+            # Path 2: sync generator shield
+            if self._guard_func_is_sync_gen:
+                try:
+                    gen = self._guard_func(**guard_func_args)
+                    try:
+                        enter_value = next(gen)
+                    except StopIteration:
+                        enter_value = None
+                except Exception as e:  # generator creation/enter failure
+                    if not isinstance(e, HTTPException):
+                        raise HTTPException(
+                            status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Shield with name `{self.name}` failed: {e}",
+                        )
+                    raise e
+
+                if not enter_value:
+                    try:
+                        gen.close()
+                    except Exception as e:
+                        if not isinstance(e, HTTPException):
+                            raise HTTPException(
+                                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"Shield with name `{self.name}` failed: {e}",
+                            )
+                        raise e
+                    return self._raise_or_return_default_response()
+
+                endpoint_exception = None
+                try:
+                    result = await _execute_endpoint_with_injection(enter_value)
+                except Exception as e:
+                    endpoint_exception = e
+                teardown_exception = None
+                try:
+                    gen.close()
+                except Exception as e:
+                    teardown_exception = e
+
+                if endpoint_exception is not None:
+                    raise endpoint_exception
+                if teardown_exception is not None:
+                    if not isinstance(teardown_exception, HTTPException):
+                        raise HTTPException(
+                            status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=(
+                                f"Shield with name `{self.name}` failed: {teardown_exception}"
+                            ),
+                        )
+                    raise teardown_exception
+                return result
+
+            # Path 3: regular (non-generator) shield (sync or async)
+            try:
+                if self._guard_func_is_async:
+                    obj = await self._guard_func(**guard_func_args)
+                else:
+                    obj = self._guard_func(**guard_func_args)
+            except Exception as e:
+                if not isinstance(e, HTTPException):
+                    raise HTTPException(
+                        status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Shield with name `{self.name}` failed: {e}",
+                    )
+                raise e
+            if obj:
+                return await _execute_endpoint_with_injection(obj)
 
             return self._raise_or_return_default_response()
 
