@@ -614,7 +614,11 @@ class Shield(Generic[U]):
                     )
                 )
                 endpoint_kwargs = {
-                    k: resolved_shielded_depends.get(k) or kwargs.get(k)
+                    k: (
+                        resolved_shielded_depends[k]
+                        if k in resolved_shielded_depends
+                        else kwargs.get(k)
+                    )
                     for k in endpoint_params
                 }
                 if endpoint_is_async:
@@ -831,6 +835,7 @@ async def inject_authenticated_entities_into_args_kwargs(
                 )
             if (
                 new_arg_kwargs is None
+                and arg_kwargs.first_param is not None
                 and arg_kwargs.first_param.annotation is not Optional
             ):
                 return kwargs
