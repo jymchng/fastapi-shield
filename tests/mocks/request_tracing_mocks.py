@@ -9,7 +9,74 @@ from fastapi_shield.request_tracing import (
     TracerProvider, SpanKind, SpanEvent
 )
 
-
+class MockTracerProvider(TracerProvider):
+    """Mock tracing provider for testing and when tracing is disabled."""
+    
+    def __init__(self, service_name: str = "fastapi-shield"):
+        self.service_name = service_name
+        self.spans: List[Dict[str, Any]] = []
+        self.current_span_id = 0
+    
+    def create_span(self, name: str, kind: SpanKind = SpanKind.INTERNAL, 
+                   parent_context: Optional[Any] = None) -> Dict[str, Any]:
+        """Create a mock span."""
+        self.current_span_id += 1
+        span = {
+            "span_id": str(self.current_span_id),
+            "name": name,
+            "kind": kind,
+            "start_time": time.time(),
+            "attributes": {},
+            "events": [],
+            "status": "OK",
+            "finished": False
+        }
+        self.spans.append(span)
+        return span
+    
+    def set_span_attributes(self, span: Dict[str, Any], attributes: Dict[str, Any]):
+        """Set attributes on a mock span."""
+        span["attributes"].update(attributes)
+    
+    def add_span_event(self, span: Dict[str, Any], event: SpanEvent):
+        """Add an event to a mock span."""
+        span["events"].append({
+            "name": event.name,
+            "timestamp": event.timestamp or datetime.now(timezone.utc),
+            "attributes": event.attributes
+        })
+    
+    def set_span_status(self, span: Dict[str, Any], status_code: str, description: Optional[str] = None):
+        """Set mock span status."""
+        span["status"] = status_code
+        if description:
+            span["status_description"] = description
+    
+    def finish_span(self, span: Dict[str, Any]):
+        """Finish a mock span."""
+        span["end_time"] = time.time()
+        span["duration_ms"] = (span["end_time"] - span["start_time"]) * 1000
+        span["finished"] = True
+    
+    def extract_context(self, headers: Dict[str, str]) -> Optional[Any]:
+        """Mock extract trace context."""
+        return headers.get("traceparent")
+    
+    def inject_context(self, context: Any, headers: Dict[str, str]):
+        """Mock inject trace context."""
+        if context:
+            headers["traceparent"] = str(context)
+    
+    def get_spans(self) -> List[Dict[str, Any]]:
+        """Get all recorded spans."""
+        return self.spans
+    
+    def clear_spans(self):
+        """Clear recorded spans."""
+        self.spans.clear()
+        self.current_span_id = 0
+        
+        
 class MockSpan:
     """Mock span object for testing."""
     

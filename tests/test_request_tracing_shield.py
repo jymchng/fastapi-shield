@@ -19,7 +19,6 @@ from fastapi_shield.request_tracing import (
     SpanEvent,
     TraceContext,
     TracingMetrics,
-    MockTracerProvider,
     OpenTelemetryProvider,
     RequestTracer,
     request_tracing_shield,
@@ -31,6 +30,7 @@ from fastapi_shield.request_tracing import (
 from tests.mocks.request_tracing_mocks import (
     MockSpan,
     MockTracer,
+    MockTracerProvider,
     MockTracerProviderForTesting,
     create_mock_request_with_tracing,
     create_mock_response_with_tracing,
