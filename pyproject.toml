@@ -46,9 +46,13 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "fastapi>=0.100.1",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.20",
     "pyyaml>=6.0.2",
     "toml>=0.10.2",
     "typing-extensions>=4.0.0; python_version<'3.10'",
+    "uvicorn>=0.34.2",
+    "websockets>=15.0.1",
 ]
 dynamic = []
 
