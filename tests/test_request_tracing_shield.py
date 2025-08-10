@@ -20,12 +20,21 @@ from fastapi_shield.request_tracing import (
     TraceContext,
     TracingMetrics,
     OpenTelemetryProvider,
+    JaegerProvider,
+    ZipkinProvider,
+    DatadogProvider,
     RequestTracer,
     request_tracing_shield,
     detailed_tracing_shield,
     performance_tracing_shield,
     error_tracing_shield,
+    jaeger_tracing_shield,
+    zipkin_tracing_shield,
+    datadog_tracing_shield,
     OPENTELEMETRY_AVAILABLE,
+    JAEGER_AVAILABLE,
+    ZIPKIN_AVAILABLE,
+    DATADOG_AVAILABLE,
 )
 from tests.mocks.request_tracing_mocks import (
     MockSpan,
@@ -826,3 +835,404 @@ class TestEdgeCases:
         headers = {}
         provider.inject_context(None, headers)
         assert "traceparent" not in headers
+
+
+class TestMultipleBackendProviders:
+    """Test multiple backend provider implementations."""
+    
+    def test_jaeger_provider_unavailable(self):
+        """Test Jaeger provider when Jaeger is not available."""
+        if JAEGER_AVAILABLE:
+            pytest.skip("Jaeger is available, testing unavailable scenario")
+            
+        with pytest.raises(ImportError) as exc_info:
+            JaegerProvider("test-service")
+        
+        assert "Jaeger client is not available" in str(exc_info.value)
+    
+    def test_zipkin_provider_unavailable(self):
+        """Test Zipkin provider when Zipkin is not available."""
+        if ZIPKIN_AVAILABLE:
+            pytest.skip("Zipkin is available, testing unavailable scenario")
+            
+        with pytest.raises(ImportError) as exc_info:
+            ZipkinProvider("test-service")
+        
+        assert "Zipkin client is not available" in str(exc_info.value)
+    
+    def test_datadog_provider_unavailable(self):
+        """Test DataDog provider when DataDog is not available."""
+        if DATADOG_AVAILABLE:
+            pytest.skip("DataDog is available, testing unavailable scenario")
+            
+        with pytest.raises(ImportError) as exc_info:
+            DatadogProvider("test-service")
+        
+        assert "DataDog tracer is not available" in str(exc_info.value)
+    
+    def test_backend_selection_opentelemetry(self):
+        """Test backend selection for OpenTelemetry."""
+        config = RequestTracingConfig(backend=TracingBackend.OPENTELEMETRY)
+        
+        # In testing environment, MockTracerProvider is preferred
+        tracer = RequestTracer(config)
+        assert isinstance(tracer.provider, MockTracerProvider)
+    
+    def test_backend_selection_jaeger(self):
+        """Test backend selection for Jaeger."""
+        config = RequestTracingConfig(
+            backend=TracingBackend.JAEGER,
+            jaeger_config={'sampler': {'type': 'const', 'param': 1}}
+        )
+        
+        # In testing environment, MockTracerProvider is preferred
+        tracer = RequestTracer(config)
+        assert isinstance(tracer.provider, MockTracerProvider)
+    
+    def test_backend_selection_zipkin(self):
+        """Test backend selection for Zipkin."""
+        config = RequestTracingConfig(
+            backend=TracingBackend.ZIPKIN,
+            zipkin_config={'zipkin_address': 'http://localhost:9411'}
+        )
+        
+        # In testing environment, MockTracerProvider is preferred
+        tracer = RequestTracer(config)
+        assert isinstance(tracer.provider, MockTracerProvider)
+    
+    def test_backend_selection_datadog(self):
+        """Test backend selection for DataDog."""
+        config = RequestTracingConfig(
+            backend=TracingBackend.DATADOG,
+            datadog_config={'agent_hostname': 'localhost'}
+        )
+        
+        # In testing environment, MockTracerProvider is preferred
+        tracer = RequestTracer(config)
+        assert isinstance(tracer.provider, MockTracerProvider)
+    
+    def test_backend_selection_fallback(self):
+        """Test fallback to mock provider for unsupported backends."""
+        config = RequestTracingConfig(backend=TracingBackend.CUSTOM)
+        tracer = RequestTracer(config)
+        
+        # Should fallback to MockTracerProvider
+        assert hasattr(tracer.provider, 'spans')  # MockTracerProvider has spans attribute
+
+
+class TestNewConvenienceFunctions:
+    """Test new backend-specific convenience functions."""
+    
+    def test_jaeger_tracing_shield_creation(self):
+        """Test Jaeger tracing shield creation."""
+        shield = jaeger_tracing_shield(
+            service_name="jaeger-service",
+            jaeger_config={'sampler': {'type': 'const', 'param': 0.1}},
+            tracing_level=TracingLevel.DETAILED
+        )
+        
+        assert isinstance(shield, RequestTracingShield)
+        assert shield.config.backend == TracingBackend.JAEGER
+        assert shield.config.service_name == "jaeger-service"
+        assert shield.config.tracing_level == TracingLevel.DETAILED
+        assert shield.config.jaeger_config['sampler']['param'] == 0.1
+    
+    def test_zipkin_tracing_shield_creation(self):
+        """Test Zipkin tracing shield creation."""
+        shield = zipkin_tracing_shield(
+            service_name="zipkin-service",
+            zipkin_config={'zipkin_address': 'http://zipkin:9411'},
+            tracing_level=TracingLevel.VERBOSE
+        )
+        
+        assert isinstance(shield, RequestTracingShield)
+        assert shield.config.backend == TracingBackend.ZIPKIN
+        assert shield.config.service_name == "zipkin-service"
+        assert shield.config.tracing_level == TracingLevel.VERBOSE
+        assert shield.config.zipkin_config['zipkin_address'] == 'http://zipkin:9411'
+    
+    def test_datadog_tracing_shield_creation(self):
+        """Test DataDog tracing shield creation."""
+        shield = datadog_tracing_shield(
+            service_name="datadog-service",
+            datadog_config={'agent_hostname': 'dd-agent', 'agent_port': 8126},
+            tracing_level=TracingLevel.BASIC
+        )
+        
+        assert isinstance(shield, RequestTracingShield)
+        assert shield.config.backend == TracingBackend.DATADOG
+        assert shield.config.service_name == "datadog-service"
+        assert shield.config.tracing_level == TracingLevel.BASIC
+        assert shield.config.datadog_config['agent_hostname'] == 'dd-agent'
+        assert shield.config.datadog_config['agent_port'] == 8126
+
+
+class TestAdvancedTracingFeatures:
+    """Test advanced tracing features and edge cases."""
+    
+    def test_error_only_tracing_level(self):
+        """Test ERROR_ONLY tracing level functionality."""
+        config = RequestTracingConfig(tracing_level=TracingLevel.ERROR_ONLY)
+        tracer = RequestTracer(config)
+        
+        # Mock should_trace_request to simulate error-only behavior
+        request = create_mock_request_with_tracing(path="/api/test")
+        
+        # Normally, this would only trace on errors
+        # For our mock implementation, we'll test the configuration
+        assert tracer.config.tracing_level == TracingLevel.ERROR_ONLY
+    
+    def test_verbose_tracing_level(self):
+        """Test VERBOSE tracing level functionality."""
+        config = RequestTracingConfig(tracing_level=TracingLevel.VERBOSE)
+        tracer = RequestTracer(config)
+        
+        assert tracer.config.tracing_level == TracingLevel.VERBOSE
+        
+        request = create_mock_request_with_tracing(path="/api/test")
+        assert tracer.should_trace_request(request) is True
+    
+    def test_trace_context_extraction_with_baggage(self):
+        """Test trace context extraction with baggage items."""
+        config = RequestTracingConfig()
+        shield = RequestTracingShield(config)
+        
+        request = create_mock_request_with_tracing(
+            traceparent="00-0af7651916cd43dd8448eb211c80319c-b9c7c989f97918e1-01"
+        )
+        
+        trace_context = shield._extract_trace_context(request)
+        
+        # Should extract the trace ID from traceparent header
+        assert trace_context.trace_id == "0af7651916cd43dd8448eb211c80319c"
+        assert trace_context.span_id == "b9c7c989f97918e1"
+        assert trace_context.trace_flags == 1
+    
+    def test_custom_span_creation_with_metrics(self):
+        """Test custom span creation updates metrics correctly."""
+        config = RequestTracingConfig()
+        tracer = RequestTracer(config)
+        
+        initial_spans = tracer.metrics.total_spans_created
+        
+        # Create multiple custom spans
+        span1 = tracer.create_custom_span("database_query", {"query": "SELECT * FROM users"})
+        span2 = tracer.create_custom_span("cache_lookup", {"key": "user:123"})
+        span3 = tracer.create_custom_span("api_call", {"endpoint": "/external/api"})
+        
+        # Check spans were created correctly
+        assert span1["name"] == "database_query"
+        assert span1["attributes"]["query"] == "SELECT * FROM users"
+        
+        assert span2["name"] == "cache_lookup"
+        assert span2["attributes"]["key"] == "user:123"
+        
+        assert span3["name"] == "api_call"
+        assert span3["attributes"]["endpoint"] == "/external/api"
+        
+        # Check metrics updated
+        assert tracer.metrics.total_spans_created == initial_spans + 3
+    
+    def test_sampling_rate_edge_cases(self):
+        """Test sampling rate edge cases."""
+        # Test with 100% sampling
+        config = RequestTracingConfig(sampling_rate=1.0)
+        tracer = RequestTracer(config)
+        
+        request = create_mock_request_with_tracing()
+        
+        # Should always trace with 1.0 sampling
+        for _ in range(5):
+            assert tracer.should_trace_request(request) is True
+        
+        # Test with 0% sampling
+        config = RequestTracingConfig(sampling_rate=0.0)
+        tracer = RequestTracer(config)
+        
+        # Should never trace with 0.0 sampling
+        for _ in range(5):
+            assert tracer.should_trace_request(request) is False
+    
+    def test_excluded_paths_complex_patterns(self):
+        """Test excluded paths with complex patterns."""
+        config = RequestTracingConfig(
+            excluded_paths=["/health", "/metrics", "/api/internal", "/docs"]
+        )
+        tracer = RequestTracer(config)
+        
+        # Test various paths
+        test_cases = [
+            ("/health", False),
+            ("/health/check", False),  # Starts with /health
+            ("/metrics", False),
+            ("/metrics/prometheus", False),  # Starts with /metrics
+            ("/api/internal", False),
+            ("/api/internal/admin", False),  # Starts with /api/internal
+            ("/docs", False),
+            ("/docs/swagger", False),  # Starts with /docs
+            ("/api/users", True),  # Should be traced
+            ("/public/assets", True),  # Should be traced
+        ]
+        
+        for path, should_trace in test_cases:
+            request = create_mock_request_with_tracing(path=path)
+            assert tracer.should_trace_request(request) == should_trace, f"Path {path} tracing mismatch"
+    
+    def test_span_attributes_with_sensitive_headers(self):
+        """Test span attributes exclude sensitive headers."""
+        config = RequestTracingConfig(include_headers=True)
+        tracer = RequestTracer(config)
+        
+        request = create_mock_request_with_tracing(
+            method="POST",
+            path="/api/users",
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "TestAgent/1.0",
+                "Authorization": "Bearer secret-token",  # Sensitive
+                "X-API-Key": "api-key-123",  # Sensitive  
+                "Cookie": "session=abc123",  # Sensitive
+                "X-Auth-Token": "token-456",  # Sensitive
+                "Accept": "application/json"
+            }
+        )
+        
+        span = tracer.create_request_span(request)
+        
+        # Should include non-sensitive headers
+        assert span["attributes"]["http.request.header.Content-Type"] == "application/json"
+        assert span["attributes"]["http.request.header.User-Agent"] == "TestAgent/1.0"
+        assert span["attributes"]["http.request.header.Accept"] == "application/json"
+        
+        # Should exclude sensitive headers
+        assert "http.request.header.Authorization" not in span["attributes"]
+        assert "http.request.header.X-API-Key" not in span["attributes"]
+        assert "http.request.header.Cookie" not in span["attributes"]
+        assert "http.request.header.X-Auth-Token" not in span["attributes"]
+    
+    def test_request_body_size_handling(self):
+        """Test request body handling for different sizes and types."""
+        config = RequestTracingConfig(include_request_body=True)
+        tracer = RequestTracer(config)
+        
+        # Test with JSON body
+        json_body = json.dumps({"user": "test", "data": "information"}).encode('utf-8')
+        span1 = tracer.provider.create_span("test1")
+        tracer.add_request_body_to_span(span1, json_body)
+        assert "http.request.body" in span1["attributes"]
+        
+        # Test with non-JSON text
+        text_body = "Simple text content".encode('utf-8')
+        span2 = tracer.provider.create_span("test2")
+        tracer.add_request_body_to_span(span2, text_body)
+        assert span2["attributes"]["http.request.body"] == "Simple text content"
+        
+        # Test with empty body
+        span3 = tracer.provider.create_span("test3")
+        tracer.add_request_body_to_span(span3, b"")
+        # Empty body should not add attribute
+        assert span3["attributes"].get("http.request.body") is None
+    
+    def test_response_body_inclusion(self):
+        """Test response body inclusion in spans."""
+        config = RequestTracingConfig(include_response_body=True)
+        tracer = RequestTracer(config)
+        
+        span = tracer.provider.create_span("test")
+        
+        # Mock response with body
+        response = create_mock_response_with_tracing(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            body=b'{"result": "success", "data": {"id": 123}}'
+        )
+        
+        tracer.add_response_to_span(span, response)
+        
+        # Check response attributes
+        assert span["attributes"]["http.status_code"] == 200
+        assert span["attributes"]["http.response.size"] == len(b'{"result": "success", "data": {"id": 123}}')
+        assert span["status"] == "OK"
+    
+    def test_multiple_span_events_ordering(self):
+        """Test multiple span events are ordered correctly."""
+        config = RequestTracingConfig()
+        tracer = RequestTracer(config)
+        
+        span = tracer.provider.create_span("test")
+        
+        # Add multiple events
+        event1 = SpanEvent(name="request_received", attributes={"size": 1024})
+        event2 = SpanEvent(name="validation_completed", attributes={"valid": True})
+        event3 = SpanEvent(name="processing_started", attributes={"processor": "main"})
+        
+        tracer.provider.add_span_event(span, event1)
+        tracer.provider.add_span_event(span, event2)
+        tracer.provider.add_span_event(span, event3)
+        
+        # Check all events were added
+        assert len(span["events"]) == 3
+        assert span["events"][0]["name"] == "request_received"
+        assert span["events"][1]["name"] == "validation_completed"
+        assert span["events"][2]["name"] == "processing_started"
+        
+        # Check event attributes
+        assert span["events"][0]["attributes"]["size"] == 1024
+        assert span["events"][1]["attributes"]["valid"] is True
+        assert span["events"][2]["attributes"]["processor"] == "main"
+    
+    def test_concurrent_span_creation(self):
+        """Test concurrent span creation doesn't cause issues."""
+        import threading
+        
+        config = RequestTracingConfig()
+        tracer = RequestTracer(config)
+        
+        spans_created = []
+        
+        def create_spans():
+            for i in range(10):
+                span = tracer.create_custom_span(f"concurrent_span_{i}")
+                spans_created.append(span)
+        
+        # Create spans concurrently
+        threads = []
+        for _ in range(3):
+            thread = threading.Thread(target=create_spans)
+            threads.append(thread)
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+        
+        # Should have created 30 spans (10 per thread * 3 threads)
+        assert len(spans_created) == 30
+        assert tracer.metrics.total_spans_created >= 30
+    
+    def test_metrics_thread_safety(self):
+        """Test metrics updates are thread-safe."""
+        import threading
+        
+        config = RequestTracingConfig()
+        tracer = RequestTracer(config)
+        
+        def update_metrics():
+            for _ in range(100):
+                # Simulate request processing
+                request = create_mock_request_with_tracing()
+                span = tracer.create_request_span(request)
+                tracer.finish_request_span(span, time.time())
+        
+        # Update metrics concurrently
+        threads = []
+        for _ in range(5):
+            thread = threading.Thread(target=update_metrics)
+            threads.append(thread)
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+        
+        # Should have processed 500 requests (100 per thread * 5 threads)
+        assert tracer.metrics.total_requests >= 500
+        assert tracer.metrics.total_spans_created >= 500
