@@ -78,6 +78,19 @@ from fastapi_shield.ip_geolocation import (
     ip_whitelist_shield,
     proxy_detection_shield,
 )
+from fastapi_shield.cache_control import (
+    CacheControlShield,
+    CacheConfig,
+    CachePolicy,
+    CacheDirective,
+    cache_control_shield,
+    no_cache_shield,
+    private_cache_shield,
+    public_cache_shield,
+    static_cache_shield,
+    dynamic_cache_shield,
+    conditional_cache_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -124,4 +137,15 @@ __all__ = [
     "country_blocking_shield",
     "ip_whitelist_shield",
     "proxy_detection_shield",
+    "CacheControlShield",
+    "CacheConfig",
+    "CachePolicy",
+    "CacheDirective",
+    "cache_control_shield",
+    "no_cache_shield",
+    "private_cache_shield",
+    "public_cache_shield",
+    "static_cache_shield",
+    "dynamic_cache_shield",
+    "conditional_cache_shield",
 ]
