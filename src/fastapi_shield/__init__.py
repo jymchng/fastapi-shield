@@ -180,6 +180,22 @@ from fastapi_shield.content_type_validation import (
     form_content_type_shield,
     api_content_type_shield,
 )
+from fastapi_shield.request_size_limit import (
+    RequestSizeLimitShield,
+    RequestSizeLimitConfig,
+    RequestSizeTracker,
+    SizeViolation,
+    SizeUnit,
+    SizeContentTypeCategory,
+    SizeCheckMode,
+    convert_size_to_bytes,
+    format_bytes,
+    request_size_limit_shield,
+    json_size_limit_shield,
+    file_upload_size_limit_shield,
+    api_size_limit_shield,
+    strict_size_limit_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -316,4 +332,18 @@ __all__ = [
     "file_upload_content_type_shield",
     "form_content_type_shield",
     "api_content_type_shield",
+    "RequestSizeLimitShield",
+    "RequestSizeLimitConfig",
+    "RequestSizeTracker",
+    "SizeViolation",
+    "SizeUnit",
+    "SizeContentTypeCategory",
+    "SizeCheckMode",
+    "convert_size_to_bytes",
+    "format_bytes",
+    "request_size_limit_shield",
+    "json_size_limit_shield",
+    "file_upload_size_limit_shield",
+    "api_size_limit_shield",
+    "strict_size_limit_shield",
 ]
