@@ -882,6 +882,45 @@ from fastapi_shield.response_postprocessing import (
     create_compression_processor,
     create_content_filter,
 )
+from fastapi_shield.conditional_execution import (
+    # Core classes
+    ConditionEngine,
+    ConditionalShield,
+    ShieldChain,
+    ABTestManager,
+    
+    # Condition types
+    SimpleCondition,
+    CompositeCondition,
+    FeatureFlagCondition,
+    TimeBasedCondition,
+    CustomCondition,
+    
+    # Supporting classes
+    ConditionContext,
+    ConditionResult,
+    ShieldExecutionRule,
+    ABTestVariant,
+    ABTestExperiment,
+    ConditionCache,
+    
+    # Enums
+    ConditionType,
+    LogicalOperator,
+    ComparisonOperator,
+    ExecutionStrategy,
+    CacheStrategy,
+    
+    # Convenience functions
+    create_simple_condition,
+    create_user_attribute_condition,
+    create_request_property_condition,
+    create_feature_flag_condition,
+    create_time_based_condition,
+    create_composite_condition,
+    create_custom_condition,
+    conditional_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -1666,4 +1705,33 @@ __all__ = [
     "create_security_headers_processor",
     "create_compression_processor",
     "create_content_filter",
+    # Conditional Execution System
+    "ConditionEngine",
+    "ConditionalShield",
+    "ShieldChain",
+    "ABTestManager",
+    "SimpleCondition",
+    "CompositeCondition",
+    "FeatureFlagCondition",
+    "TimeBasedCondition",
+    "CustomCondition",
+    "ConditionContext",
+    "ConditionResult",
+    "ShieldExecutionRule",
+    "ABTestVariant",
+    "ABTestExperiment",
+    "ConditionCache",
+    "ConditionType",
+    "LogicalOperator",
+    "ComparisonOperator",
+    "ExecutionStrategy",
+    "CacheStrategy",
+    "create_simple_condition",
+    "create_user_attribute_condition",
+    "create_request_property_condition",
+    "create_feature_flag_condition",
+    "create_time_based_condition",
+    "create_composite_condition",
+    "create_custom_condition",
+    "conditional_shield",
 ]
