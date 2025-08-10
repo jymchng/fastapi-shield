@@ -595,6 +595,22 @@ from fastapi_shield.dashboard import (
     create_alert_rule,
     integrate_with_shield_manager,
 )
+from fastapi_shield.documentation import (
+    DocumentationGenerator,
+    DocumentationConfig,
+    ShieldIntrospector,
+    ExampleExtractor,
+    DocumentationRenderer,
+    ShieldDocumentation,
+    ParameterInfo,
+    ExampleCode,
+    DocFormat,
+    DocSection,
+    ExampleType,
+    generate_shield_documentation,
+    create_mkdocs_site,
+    create_sphinx_site,
+)
 
 __version__ = "0.1.1"
 
@@ -1106,4 +1122,18 @@ __all__ = [
     "create_dashboard",
     "create_alert_rule",
     "integrate_with_shield_manager",
+    "DocumentationGenerator",
+    "DocumentationConfig",
+    "ShieldIntrospector",
+    "ExampleExtractor",
+    "DocumentationRenderer",
+    "ShieldDocumentation",
+    "ParameterInfo",
+    "ExampleCode",
+    "DocFormat",
+    "DocSection",
+    "ExampleType",
+    "generate_shield_documentation",
+    "create_mkdocs_site",
+    "create_sphinx_site",
 ]
