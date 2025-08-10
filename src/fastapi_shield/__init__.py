@@ -213,6 +213,21 @@ from fastapi_shield.bot_detection import (
     strict_bot_detection_shield,
     search_engine_friendly_shield,
 )
+from fastapi_shield.session_management import (
+    SessionShield,
+    SessionConfig,
+    SessionData,
+    SessionManager,
+    SessionStorage,
+    MemorySessionStorage,
+    SessionState,
+    SessionSecurityLevel,
+    SessionStorageType,
+    CSRFProtection,
+    session_management_shield,
+    secure_session_shield,
+    api_session_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -378,4 +393,17 @@ __all__ = [
     "bot_detection_shield",
     "strict_bot_detection_shield",
     "search_engine_friendly_shield",
+    "SessionShield",
+    "SessionConfig",
+    "SessionData",
+    "SessionManager",
+    "SessionStorage",
+    "MemorySessionStorage",
+    "SessionState",
+    "SessionSecurityLevel",
+    "SessionStorageType",
+    "CSRFProtection",
+    "session_management_shield",
+    "secure_session_shield",
+    "api_session_shield",
 ]
