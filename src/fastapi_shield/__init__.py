@@ -862,6 +862,26 @@ from fastapi_shield.request_preprocessing import (
     create_preprocessing_pipeline,
     setup_preprocessing_middleware,
 )
+from fastapi_shield.response_postprocessing import (
+    PostprocessingAction,
+    CompressionMethod,
+    ContentType,
+    PostprocessingResult,
+    SecurityHeaderConfig,
+    CompressionConfig,
+    FilterRule,
+    ResponsePostprocessor,
+    HeaderProcessor,
+    SecurityHeaderProcessor,
+    BodyTransformer as ResponseBodyTransformer,
+    ContentFilter,
+    CompressionProcessor,
+    PostprocessingShield,
+    postprocessing_shield,
+    create_security_headers_processor,
+    create_compression_processor,
+    create_content_filter,
+)
 
 __version__ = "0.1.1"
 
@@ -1627,4 +1647,23 @@ __all__ = [
     "create_api_version_preprocessor",
     "create_preprocessing_pipeline",
     "setup_preprocessing_middleware",
+    # Response Postprocessing System
+    "PostprocessingAction",
+    "CompressionMethod",
+    "ContentType",
+    "PostprocessingResult",
+    "SecurityHeaderConfig",
+    "CompressionConfig",
+    "FilterRule",
+    "ResponsePostprocessor",
+    "HeaderProcessor",
+    "SecurityHeaderProcessor",
+    "ResponseBodyTransformer",
+    "ContentFilter",
+    "CompressionProcessor",
+    "PostprocessingShield",
+    "postprocessing_shield",
+    "create_security_headers_processor",
+    "create_compression_processor",
+    "create_content_filter",
 ]
