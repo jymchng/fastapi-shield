@@ -39,13 +39,6 @@ DEFAULT_CYCLES = int(os.environ.get("CURSOR_AGENT_CYCLES", "0"))  # 0 = infinite
 DEFAULT_OVERALL_GEN_TIMEOUT_S = int(os.environ.get("CURSOR_AGENT_GEN_TIMEOUT_S", "1800"))
 DEFAULT_MAX_PROMPT_CHARS = int(os.environ.get("CURSOR_AGENT_MAX_PROMPT_CHARS", "12000"))
 
-CURSOR_AGENT_IS_DEAD = False
-
-class AppState(Enum):
-    SHOULD_RESTART = auto()
-    SHOULD_SHUTDOWN = auto()
-    INITIALIZED = auto()
-    
 def run_cmd(cmd, check=True, capture_output=False):
     print(f"$ {' '.join(cmd)}")
     return subprocess.run(cmd, check=check, capture_output=capture_output, text=True)
@@ -60,7 +53,6 @@ def drain_output_until_idle(
 
     Also abort if `overall_timeout_s` elapses to avoid infinite waits.
     """
-    global CURSOR_AGENT_IS_DEAD
     last_activity = time.time()
     deadline = last_activity + overall_timeout_s
     while True:
@@ -72,17 +64,14 @@ def drain_output_until_idle(
         except pexpect.TIMEOUT:
             # No new line; check idle
             if time.time() - last_activity >= idle_seconds:
-                CURSOR_AGENT_IS_DEAD = True
                 break
             continue
         except pexpect.EOF:
             print("⚠️ cursor-agent terminated (EOF).")
-            CURSOR_AGENT_IS_DEAD = True
             break
         if line is None:
             # pexpect can return None on timeout in some cases
             if time.time() - last_activity >= idle_seconds:
-                CURSOR_AGENT_IS_DEAD = True
                 break
             continue
         if line.strip():
@@ -320,10 +309,26 @@ def main():
             overall_timeout_s=args.gen_timeout,
             on_line=line_handler,
         )
-        
-        if CURSOR_AGENT_IS_DEAD:
-            print("❌ Cursor-agent terminated; exiting.")
-            return AppState.SHOULD_RESTART
+
+        # Run pytest
+        # print("Running pytest...")
+        # passed, combined_output, rc = run_pytest(args.pytest_cmd)
+        # while not passed:
+        #     print("❌ Tests failed — sending logs to agent to fix...")
+        #     failure_prompt = build_failure_prompt(
+        #         args.pytest_cmd, rc, combined_output, args.max_prompt_chars
+        #     )
+        #     send_prompt(child, failure_prompt, use_slash=args.slash_mode, enter_twice=args.enter_twice)
+        #     print("Waiting for agent response to failure prompt...")
+        #     drain_output_until_idle(
+        #         child,
+        #         idle_seconds=args.idle_seconds,
+        #         overall_timeout_s=args.gen_timeout,
+        #         on_line=line_handler,
+        #     )
+        #     print(f"=== Prompt cycle {cycle_index} ended after failure handling at {datetime.now()} ===\n")
+        #     time.sleep(args.cycle_sleep)
+        #     passed, combined_output, rc = run_pytest(args.pytest_cmd)
 
         if git_has_changes():
             print("📝 Changes detected — committing and pushing.")
@@ -340,16 +345,7 @@ def main():
 
 if __name__ == "__main__":
     try:
-        while True:
-            app_state = main()
-            if app_state == AppState.SHOULD_RESTART:
-                print("🔄 Restarting cursor-agent...")
-            elif app_state == AppState.SHOULD_SHUTDOWN:
-                print("🛑 Shutting down cursor-agent...")
-                break
-            else:
-                print("🛑 Shutting down cursor-agent...")
-                break
+        main()
     except (pexpect.EOF, pexpect.TIMEOUT) as e:
         print(f"❌ Cursor-agent session error: {e}")
         sys.exit(1)
