@@ -242,34 +242,12 @@ class MFAProvider(ABC):
         pass
 
 
-class MockMFAProvider(MFAProvider):
-    """Mock MFA provider for testing."""
-    
-    def __init__(self):
-        self.sent_sms: List[Dict[str, str]] = []
-        self.sent_emails: List[Dict[str, str]] = []
-    
-    async def send_sms_code(self, phone_number: str, code: str) -> bool:
-        """Mock SMS sending."""
-        self.sent_sms.append({'phone': phone_number, 'code': code})
-        return True
-    
-    async def send_email_code(self, email: str, code: str) -> bool:
-        """Mock email sending."""
-        self.sent_emails.append({'email': email, 'code': code})
-        return True
-    
-    async def validate_provider_config(self) -> bool:
-        """Mock validation."""
-        return True
-
-
 class MFAManager:
     """Multi-factor authentication manager."""
     
     def __init__(self, config: MFAConfig, provider: Optional[MFAProvider] = None):
         self.config = config
-        self.provider = provider or MockMFAProvider()
+        self.provider = provider
         self.totp_generator = TOTPGenerator(config.totp_config)
         self.users: Dict[str, MFAUser] = {}
         self.challenges: Dict[str, MFAChallenge] = {}

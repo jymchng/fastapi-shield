@@ -24,12 +24,11 @@ from fastapi_shield.multi_factor_auth import (
     MFAMethod,
     MFAProvider,
     MFAStatus,
-    MockMFAProvider,
     multi_factor_auth_shield,
     enterprise_mfa_shield,
     flexible_mfa_shield,
 )
-from tests.mocks.mfa_mocks import MockSMSProvider, MockEmailProvider
+from tests.mocks.mfa_mocks import MockSMSProvider, MockEmailProvider, MockMFAProvider
 
 
 class TestTOTPGenerator:

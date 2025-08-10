@@ -52,6 +52,28 @@ class MockSMSProvider(MFAProvider):
         self.sent_messages.clear()
 
 
+class MockMFAProvider(MFAProvider):
+    """Mock MFA provider for testing."""
+    
+    def __init__(self):
+        self.sent_sms: List[Dict[str, str]] = []
+        self.sent_emails: List[Dict[str, str]] = []
+    
+    async def send_sms_code(self, phone_number: str, code: str) -> bool:
+        """Mock SMS sending."""
+        self.sent_sms.append({'phone': phone_number, 'code': code})
+        return True
+    
+    async def send_email_code(self, email: str, code: str) -> bool:
+        """Mock email sending."""
+        self.sent_emails.append({'email': email, 'code': code})
+        return True
+    
+    async def validate_provider_config(self) -> bool:
+        """Mock validation."""
+        return True
+
+
 class MockEmailProvider(MFAProvider):
     """Mock email provider for testing."""
     
