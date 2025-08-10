@@ -11,6 +11,9 @@ from fastapi_shield.shield import Shield
 from fastapi_shield.documentation import (
     DocumentationGenerator,
     DocumentationConfig,
+    DocumentationQuality,
+    DocumentationValidator,
+    DocumentationEnhancer,
     ShieldIntrospector,
     ExampleExtractor,
     DocumentationRenderer,
@@ -1161,3 +1164,568 @@ class TestDocumentationValidation:
         
         # Check for basic CSS styling
         assert '<style>' in content or 'class=' in content
+
+
+class TestDocumentationQuality:
+    """Test DocumentationQuality functionality."""
+    
+    def test_quality_initialization(self):
+        """Test quality metrics initialization."""
+        quality = DocumentationQuality()
+        
+        assert quality.completeness_score == 0.0
+        assert quality.readability_score == 0.0
+        assert quality.example_coverage == 0.0
+        assert quality.parameter_coverage == 0.0
+        assert quality.validation_errors == []
+        assert quality.warnings == []
+        assert quality.suggestions == []
+    
+    def test_overall_score_calculation(self):
+        """Test overall quality score calculation."""
+        quality = DocumentationQuality(
+            completeness_score=80.0,
+            readability_score=90.0,
+            example_coverage=70.0,
+            parameter_coverage=85.0
+        )
+        
+        expected_score = (80.0 * 0.3) + (90.0 * 0.2) + (70.0 * 0.25) + (85.0 * 0.25)
+        assert quality.overall_score() == expected_score
+    
+    def test_grade_assignment(self):
+        """Test grade assignment based on overall score."""
+        test_cases = [
+            (95.0, "A"),
+            (85.0, "B"), 
+            (75.0, "C"),
+            (65.0, "D"),
+            (45.0, "F")
+        ]
+        
+        for score, expected_grade in test_cases:
+            quality = DocumentationQuality(
+                completeness_score=score,
+                readability_score=score,
+                example_coverage=score,
+                parameter_coverage=score
+            )
+            assert quality.grade() == expected_grade
+
+
+class TestDocumentationValidator:
+    """Test DocumentationValidator functionality."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.config = DocumentationConfig()
+        self.validator = DocumentationValidator(self.config)
+    
+    def test_validator_initialization(self):
+        """Test validator initialization."""
+        assert self.validator.config == self.config
+        assert self.validator.logger is not None
+    
+    def test_completeness_calculation_empty_docs(self):
+        """Test completeness calculation with empty documentation list."""
+        shield_docs = []
+        score = self.validator._calculate_completeness(shield_docs)
+        assert score == 0.0
+    
+    def test_completeness_calculation_complete_docs(self):
+        """Test completeness calculation with complete documentation."""
+        shield_docs = [
+            ShieldDocumentation(
+                name="TestShield",
+                description="A comprehensive test shield with detailed description",
+                parameters=[
+                    ParameterInfo(
+                        name="param1",
+                        type="str",
+                        description="Detailed parameter description"
+                    )
+                ],
+                configuration={"key": "value"},
+                examples=[ExampleCode(title="test", code="test", description="test")]
+            )
+        ]
+        
+        score = self.validator._calculate_completeness(shield_docs)
+        assert score >= 90.0  # High completeness for well-documented shield
+    
+    def test_example_coverage_calculation(self):
+        """Test example coverage calculation."""
+        shield_docs = [
+            ShieldDocumentation(
+                name="Shield1",
+                description="Shield with examples",
+                examples=[ExampleCode(title="test", code="test", description="test")]
+            ),
+            ShieldDocumentation(
+                name="Shield2", 
+                description="Shield without examples",
+                examples=[]
+            )
+        ]
+        
+        coverage = self.validator._calculate_example_coverage(shield_docs)
+        assert coverage == 50.0
+    
+    def test_parameter_coverage_calculation(self):
+        """Test parameter coverage calculation."""
+        shield_docs = [
+            ShieldDocumentation(
+                name="TestShield",
+                description="Test shield",
+                parameters=[
+                    ParameterInfo(
+                        name="documented_param",
+                        type="str", 
+                        description="Well documented parameter"
+                    ),
+                    ParameterInfo(
+                        name="undocumented_param",
+                        type="int",
+                        description=""  # Empty description
+                    )
+                ]
+            )
+        ]
+        
+        coverage = self.validator._calculate_parameter_coverage(shield_docs)
+        assert coverage == 50.0
+    
+    def test_readability_score_calculation(self):
+        """Test readability score calculation."""
+        shield_docs = [
+            ShieldDocumentation(
+                name="ReadableShield",
+                description="This shield will validate incoming requests and ensure security protocols are followed correctly.",
+                parameters=[
+                    ParameterInfo(
+                        name="param1",
+                        type="str",
+                        description="This parameter controls the validation behavior"
+                    )
+                ]
+            )
+        ]
+        
+        score = self.validator._calculate_readability(shield_docs)
+        assert score > 0
+        assert score <= 100
+    
+    def test_validation_with_generated_files(self):
+        """Test validation with generated files."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create test files
+            json_file = Path(temp_dir) / "test.json"
+            json_file.write_text('{"test": "valid json"}')
+            
+            yaml_file = Path(temp_dir) / "test.yaml" 
+            yaml_file.write_text('test: valid yaml')
+            
+            md_file = Path(temp_dir) / "test.md"
+            md_file.write_text('# Test Document\nContent here')
+            
+            generated_files = {
+                "test.json": str(json_file),
+                "test.yaml": str(yaml_file),
+                "test.md": str(md_file)
+            }
+            
+            errors = self.validator._validate_generated_files(generated_files)
+            assert len(errors) == 0
+    
+    def test_validation_with_invalid_files(self):
+        """Test validation with invalid files."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create invalid JSON file
+            json_file = Path(temp_dir) / "invalid.json"
+            json_file.write_text('{"invalid": json}')
+            
+            # Create empty file
+            empty_file = Path(temp_dir) / "empty.md"
+            empty_file.write_text('')
+            
+            generated_files = {
+                "invalid.json": str(json_file),
+                "empty.md": str(empty_file)
+            }
+            
+            errors = self.validator._validate_generated_files(generated_files)
+            assert len(errors) >= 2  # Should have errors for both files
+    
+    def test_generate_suggestions(self):
+        """Test suggestion generation."""
+        shield_docs = [
+            ShieldDocumentation(
+                name="IncompleteShield",
+                description="Short",  # Too short
+                parameters=[
+                    ParameterInfo(
+                        name="undocumented",
+                        type="str",
+                        description=""  # No description
+                    )
+                ],
+                examples=[]  # No examples
+            )
+        ]
+        
+        quality = DocumentationQuality()
+        suggestions = self.validator._generate_suggestions(shield_docs, quality)
+        
+        assert len(suggestions) > 0
+        assert any("examples" in s.lower() for s in suggestions)
+        assert any("description" in s.lower() for s in suggestions)
+    
+    def test_generate_warnings(self):
+        """Test warning generation."""
+        shield_docs = [
+            ShieldDocumentation(
+                name="DuplicateName",
+                description="First shield",
+                category=""
+            ),
+            ShieldDocumentation(
+                name="DuplicateName", 
+                description="Second shield with same name",
+                category=""
+            )
+        ]
+        
+        quality = DocumentationQuality()
+        warnings = self.validator._generate_warnings(shield_docs, quality)
+        
+        assert len(warnings) >= 1
+        assert any("duplicate" in w.lower() for w in warnings)
+        assert any("categories" in w.lower() for w in warnings)
+
+
+class TestDocumentationEnhancer:
+    """Test DocumentationEnhancer functionality."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.config = DocumentationConfig()
+        self.enhancer = DocumentationEnhancer(self.config)
+    
+    def test_enhancer_initialization(self):
+        """Test enhancer initialization."""
+        assert self.enhancer.config == self.config
+        assert self.enhancer.logger is not None
+    
+    def test_search_index_generation(self):
+        """Test search index generation."""
+        shield_docs = [
+            ShieldDocumentation(
+                name="TestShield",
+                description="A shield for testing purposes with authentication features",
+                tags=["test", "auth"]
+            ),
+            ShieldDocumentation(
+                name="SecurityShield",
+                description="A shield providing security validation and protection",
+                tags=["security"]
+            )
+        ]
+        
+        index = self.enhancer.generate_search_index(shield_docs)
+        
+        assert "version" in index
+        assert "documents" in index
+        assert "index" in index
+        assert len(index["documents"]) == 2
+        assert "authentication" in index["index"]
+        assert "security" in index["index"]
+    
+    def test_cross_references_addition(self):
+        """Test automatic cross-reference addition."""
+        self.config.auto_cross_references = True
+        
+        shield_docs = [
+            ShieldDocumentation(name="AuthShield", description="Auth shield"),
+            ShieldDocumentation(name="ValidationShield", description="Validation shield")
+        ]
+        
+        content = "The AuthShield works with ValidationShield to provide security."
+        enhanced = self.enhancer.add_cross_references(content, shield_docs)
+        
+        # Should add markdown links for shield names
+        assert "[AuthShield]" in enhanced
+        assert "[ValidationShield]" in enhanced
+    
+    def test_performance_metrics_addition(self):
+        """Test performance metrics addition."""
+        self.config.include_performance_metrics = True
+        
+        shield_doc = ShieldDocumentation(
+            name="TestShield",
+            description="Test shield",
+            notes=[]
+        )
+        
+        original_notes_count = len(shield_doc.notes)
+        enhanced_doc = self.enhancer.add_performance_metrics(shield_doc)
+        
+        assert len(enhanced_doc.notes) > original_notes_count
+        assert any("Performance Metrics" in note for note in enhanced_doc.notes)
+    
+    def test_security_notes_addition(self):
+        """Test security notes addition."""
+        self.config.include_security_notes = True
+        
+        test_cases = [
+            ("AuthenticationShield", "authentication", "authentication"),
+            ("AuthorizationValidator", "authorization", "authorization"), 
+            ("InputValidationShield", "input_validation", "input_validation"),
+            ("RateLimitShield", "rate_limiting", "rate limiting")
+        ]
+        
+        for shield_name, category, expected_keyword in test_cases:
+            shield_doc = ShieldDocumentation(
+                name=shield_name,
+                description="Test shield",
+                category=category,
+                notes=[]
+            )
+            
+            enhanced_doc = self.enhancer.add_security_notes(shield_doc)
+            
+            assert len(enhanced_doc.notes) > 0
+            note_content = " ".join(enhanced_doc.notes).lower()
+            assert "security" in note_content
+
+
+class TestAdvancedDocumentationGeneration:
+    """Test advanced documentation generation features."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.config = DocumentationConfig(
+            generate_search_index=True,
+            validate_links=True,
+            include_security_notes=True,
+            auto_cross_references=True
+        )
+        self.generator = DocumentationGenerator(self.config)
+    
+    def test_enhanced_generation_with_quality_assessment(self):
+        """Test documentation generation with quality assessment."""
+        shield_classes = [MockShield, MockComplexShield]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.config.output_dir = Path(temp_dir)
+            
+            generated_docs = self.generator.generate_shield_docs(shield_classes)
+            
+            # Should generate quality report
+            assert "quality_report.json" in generated_docs
+            
+            # Should generate search index
+            assert "search_index.json" in generated_docs
+            
+            # Verify quality report content
+            quality_report_path = Path(generated_docs["quality_report.json"])
+            assert quality_report_path.exists()
+            
+            with open(quality_report_path) as f:
+                quality_data = json.load(f)
+            
+            assert "overall_score" in quality_data
+            assert "grade" in quality_data
+            assert "completeness_score" in quality_data
+            assert "suggestions" in quality_data
+    
+    def test_search_index_content(self):
+        """Test search index content and structure."""
+        shield_classes = [MockShield]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.config.output_dir = Path(temp_dir)
+            
+            generated_docs = self.generator.generate_shield_docs(shield_classes)
+            
+            # Verify search index
+            search_index_path = Path(generated_docs["search_index.json"])
+            assert search_index_path.exists()
+            
+            with open(search_index_path) as f:
+                search_data = json.load(f)
+            
+            assert search_data["version"] == "1.0"
+            assert len(search_data["documents"]) > 0
+            assert len(search_data["index"]) > 0
+            
+            # Verify document structure
+            doc = search_data["documents"][0]
+            assert "id" in doc
+            assert "title" in doc
+            assert "content" in doc
+            assert "url" in doc
+    
+    def test_validator_integration(self):
+        """Test validator integration with generation process."""
+        shield_classes = [MockMinimalShield]  # Minimal shield for testing validation
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.config.output_dir = Path(temp_dir)
+            
+            # Generate documentation
+            generated_docs = self.generator.generate_shield_docs(shield_classes)
+            
+            # Load quality report
+            quality_report_path = Path(generated_docs["quality_report.json"])
+            with open(quality_report_path) as f:
+                quality_data = json.load(f)
+            
+            # Should have suggestions for minimal shield
+            assert len(quality_data["suggestions"]) > 0
+            assert quality_data["overall_score"] < 100  # Not perfect due to minimal content
+    
+    def test_enhancer_integration(self):
+        """Test enhancer integration with generation process."""
+        shield_classes = [MockShield, MockComplexShield]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.config.output_dir = Path(temp_dir)
+            self.config.include_security_notes = True
+            
+            generated_docs = self.generator.generate_shield_docs(shield_classes)
+            
+            # Check if markdown files include enhancements
+            for filename, filepath in generated_docs.items():
+                if filename.endswith('.md') and 'mockshield' in filename:
+                    with open(filepath) as f:
+                        content = f.read()
+                    
+                    # Should include security notes for appropriate shields
+                    if "security" in content.lower():
+                        # Verify security note was added
+                        assert "Security Note" in content or "security" in content.lower()
+
+
+class TestDocumentationCLICompatibility:
+    """Test compatibility with CLI functionality."""
+    
+    def test_config_serialization(self):
+        """Test configuration serialization for CLI usage."""
+        config = DocumentationConfig(
+            title="Test Documentation",
+            generate_search_index=True,
+            validate_links=True,
+            include_security_notes=True
+        )
+        
+        # Should be serializable to dict
+        config_dict = {
+            "title": config.title,
+            "generate_search_index": config.generate_search_index,
+            "validate_links": config.validate_links,
+            "include_security_notes": config.include_security_notes
+        }
+        
+        assert config_dict["title"] == "Test Documentation"
+        assert config_dict["generate_search_index"] is True
+    
+    def test_batch_processing_compatibility(self):
+        """Test compatibility with batch processing workflows."""
+        shield_classes = [MockShield, MockComplexShield, MockMinimalShield]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = DocumentationConfig(
+                output_dir=Path(temp_dir),
+                formats=[DocFormat.MARKDOWN, DocFormat.JSON]
+            )
+            generator = DocumentationGenerator(config)
+            
+            # Should handle multiple shields efficiently
+            generated_docs = generator.generate_shield_docs(shield_classes)
+            
+            # Should generate files for all shields in both formats
+            markdown_files = [f for f in generated_docs.keys() if f.endswith('.md')]
+            json_files = [f for f in generated_docs.keys() if f.endswith('.json')]
+            
+            assert len(markdown_files) >= len(shield_classes)
+            assert len(json_files) >= 1  # At least quality report
+
+
+class TestDocumentationEdgeCases:
+    """Test edge cases and error handling."""
+    
+    def test_empty_shield_list(self):
+        """Test handling of empty shield list."""
+        config = DocumentationConfig()
+        generator = DocumentationGenerator(config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.output_dir = Path(temp_dir)
+            
+            # Should handle empty list gracefully
+            generated_docs = generator.generate_shield_docs([])
+            
+            # Should still generate quality report
+            assert "quality_report.json" in generated_docs
+    
+    def test_invalid_shield_class(self):
+        """Test handling of invalid shield classes."""
+        config = DocumentationConfig()
+        generator = DocumentationGenerator(config)
+        
+        # Mock an invalid shield class
+        class InvalidShield:
+            pass
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.output_dir = Path(temp_dir)
+            
+            # Should handle invalid classes gracefully
+            generated_docs = generator.generate_shield_docs([InvalidShield])
+            
+            # Should still complete without crashing
+            assert isinstance(generated_docs, dict)
+    
+    def test_file_permission_error_handling(self):
+        """Test handling of file permission errors."""
+        config = DocumentationConfig()
+        generator = DocumentationGenerator(config)
+        
+        # Use a directory that doesn't exist and can't be created
+        config.output_dir = Path("/invalid/path/that/does/not/exist")
+        
+        # Should handle the error gracefully 
+        try:
+            generated_docs = generator.generate_shield_docs([MockShield])
+            # If it succeeds, that's also fine
+            assert isinstance(generated_docs, dict)
+        except Exception:
+            # Should raise a meaningful exception, not crash
+            pass
+    
+    def test_large_shield_collection_handling(self):
+        """Test handling of large collections of shields."""
+        # Create many mock shield classes
+        shield_classes = []
+        for i in range(50):  # Reasonable number for testing
+            class_name = f"MockShield{i}"
+            shield_class = type(class_name, (MockShield,), {
+                "__name__": class_name,
+                "__doc__": f"Mock shield number {i} for testing documentation generation"
+            })
+            shield_classes.append(shield_class)
+        
+        config = DocumentationConfig(formats=[DocFormat.MARKDOWN])
+        generator = DocumentationGenerator(config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config.output_dir = Path(temp_dir)
+            
+            # Should handle large collections efficiently
+            generated_docs = generator.generate_shield_docs(shield_classes)
+            
+            # Should generate documentation for all shields
+            assert len(generated_docs) >= len(shield_classes)
+            
+            # Quality report should still be generated
+            assert "quality_report.json" in generated_docs

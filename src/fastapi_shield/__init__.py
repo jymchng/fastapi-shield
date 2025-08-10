@@ -660,6 +660,11 @@ from fastapi_shield.middleware_bridge import (
     create_middleware_chain,
     MiddlewareIntegrator,
 )
+from fastapi_shield.documentation import (
+    DocumentationQuality,
+    DocumentationValidator,
+    DocumentationEnhancer,
+)
 
 __version__ = "0.1.1"
 
@@ -1231,4 +1236,8 @@ __all__ = [
     "shield_to_middleware",
     "create_middleware_chain",
     "MiddlewareIntegrator",
+    # Documentation CLI and Advanced Features
+    "DocumentationQuality",
+    "DocumentationValidator", 
+    "DocumentationEnhancer",
 ]
