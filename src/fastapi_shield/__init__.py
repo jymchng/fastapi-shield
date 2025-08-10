@@ -228,6 +228,20 @@ from fastapi_shield.session_management import (
     secure_session_shield,
     api_session_shield,
 )
+from fastapi_shield.sql_injection_detection import (
+    SQLInjectionShield,
+    SQLInjectionConfig,
+    SQLInjectionDetector,
+    SQLPatternLibrary,
+    InjectionDetection,
+    DetectionLevel,
+    SQLDialect,
+    InjectionType,
+    ActionPolicy,
+    sql_injection_detection_shield,
+    strict_sql_injection_shield,
+    monitoring_sql_injection_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -406,4 +420,16 @@ __all__ = [
     "session_management_shield",
     "secure_session_shield",
     "api_session_shield",
+    "SQLInjectionShield",
+    "SQLInjectionConfig",
+    "SQLInjectionDetector",
+    "SQLPatternLibrary",
+    "InjectionDetection",
+    "DetectionLevel",
+    "SQLDialect",
+    "InjectionType",
+    "ActionPolicy",
+    "sql_injection_detection_shield",
+    "strict_sql_injection_shield",
+    "monitoring_sql_injection_shield",
 ]
