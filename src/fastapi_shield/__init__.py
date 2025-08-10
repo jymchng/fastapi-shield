@@ -643,6 +643,23 @@ from fastapi_shield.benchmark import (
     compare_shield_performance,
     benchmark_optimization_levels,
 )
+from fastapi_shield.middleware_bridge import (
+    MiddlewareConfig,
+    MiddlewareType,
+    ShieldPosition,
+    ProcessingPhase,
+    MiddlewareMetrics,
+    MiddlewareContext,
+    ShieldMiddlewareCache,
+    ASGIShieldMiddleware,
+    StarletteShieldMiddleware,
+    MiddlewareChainOptimizer,
+    create_asgi_shield_middleware,
+    create_starlette_shield_middleware,
+    shield_to_middleware,
+    create_middleware_chain,
+    MiddlewareIntegrator,
+)
 
 __version__ = "0.1.1"
 
@@ -1198,4 +1215,20 @@ __all__ = [
     "quick_benchmark",
     "compare_shield_performance",
     "benchmark_optimization_levels",
+    # Middleware Bridge
+    "MiddlewareConfig",
+    "MiddlewareType",
+    "ShieldPosition", 
+    "ProcessingPhase",
+    "MiddlewareMetrics",
+    "MiddlewareContext",
+    "ShieldMiddlewareCache",
+    "ASGIShieldMiddleware",
+    "StarletteShieldMiddleware", 
+    "MiddlewareChainOptimizer",
+    "create_asgi_shield_middleware",
+    "create_starlette_shield_middleware",
+    "shield_to_middleware",
+    "create_middleware_chain",
+    "MiddlewareIntegrator",
 ]
