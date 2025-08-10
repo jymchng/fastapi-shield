@@ -779,6 +779,24 @@ from fastapi_shield.dependency_injection import (
     cleanup_dependencies,
     ShieldedDepends,
 )
+from fastapi_shield.openapi_integration import (
+    OpenAPIExtensionType,
+    SecuritySchemeType,
+    ParameterLocation,
+    ShieldParameterInfo,
+    ShieldSecurityInfo,
+    ShieldResponseInfo,
+    ShieldMetadata,
+    OpenAPISchemaGenerator,
+    DefaultOpenAPISchemaGenerator,
+    ShieldIntrospector,
+    OpenAPIShieldEnhancer,
+    OpenAPIClientGenerator,
+    create_enhanced_openapi_schema,
+    setup_enhanced_openapi,
+    add_shield_to_openapi,
+    extract_shield_openapi_info,
+)
 
 __version__ = "0.1.1"
 
@@ -1464,4 +1482,21 @@ __all__ = [
     "get_injection_statistics",
     "cleanup_dependencies",
     "ShieldedDepends",
+    # OpenAPI Integration System
+    "OpenAPIExtensionType",
+    "SecuritySchemeType",
+    "ParameterLocation",
+    "ShieldParameterInfo",
+    "ShieldSecurityInfo",
+    "ShieldResponseInfo",
+    "ShieldMetadata",
+    "OpenAPISchemaGenerator",
+    "DefaultOpenAPISchemaGenerator",
+    "ShieldIntrospector",
+    "OpenAPIShieldEnhancer",
+    "OpenAPIClientGenerator",
+    "create_enhanced_openapi_schema",
+    "setup_enhanced_openapi",
+    "add_shield_to_openapi",
+    "extract_shield_openapi_info",
 ]
