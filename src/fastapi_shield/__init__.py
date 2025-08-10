@@ -556,6 +556,25 @@ from fastapi_shield.testing import (
     assert_shield_blocks,
     assert_shield_allows,
 )
+from fastapi_shield.config import (
+    ConfigManager,
+    ConfigValidator,
+    ConfigFormat,
+    ConfigSource,
+    ConfigUpdateStrategy,
+    ConfigValidationRule,
+    ConfigValidationResult,
+    ConfigChangeEvent,
+    ConfigLoader,
+    FileConfigLoader,
+    EnvironmentConfigLoader,
+    ConsulConfigLoader,
+    RedisConfigLoader,
+    create_file_config_manager,
+    create_env_config_manager,
+    create_multi_source_config_manager,
+    create_shield_config_validator,
+)
 
 __version__ = "0.1.1"
 
@@ -1032,4 +1051,21 @@ __all__ = [
     "performance_test_shield",
     "assert_shield_blocks",
     "assert_shield_allows",
+    "ConfigManager",
+    "ConfigValidator",
+    "ConfigFormat",
+    "ConfigSource",
+    "ConfigUpdateStrategy",
+    "ConfigValidationRule",
+    "ConfigValidationResult",
+    "ConfigChangeEvent",
+    "ConfigLoader",
+    "FileConfigLoader",
+    "EnvironmentConfigLoader",
+    "ConsulConfigLoader",
+    "RedisConfigLoader",
+    "create_file_config_manager",
+    "create_env_config_manager",
+    "create_multi_source_config_manager",
+    "create_shield_config_validator",
 ]
