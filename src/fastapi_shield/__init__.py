@@ -91,6 +91,24 @@ from fastapi_shield.cache_control import (
     dynamic_cache_shield,
     conditional_cache_shield,
 )
+from fastapi_shield.audit_logging import (
+    AuditLoggingShield,
+    AuditLogConfig,
+    LogEntry,
+    LogLevel,
+    LogFormat,
+    SensitiveDataMask,
+    AuditLogger,
+    PythonAuditLogger,
+    StructlogAuditLogger,
+    FileAuditLogger,
+    audit_logging_shield,
+    sensitive_audit_shield,
+    compliance_audit_shield,
+    error_audit_shield,
+    performance_audit_shield,
+    debug_audit_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -148,4 +166,20 @@ __all__ = [
     "static_cache_shield",
     "dynamic_cache_shield",
     "conditional_cache_shield",
+    "AuditLoggingShield",
+    "AuditLogConfig",
+    "LogEntry",
+    "LogLevel",
+    "LogFormat",
+    "SensitiveDataMask",
+    "AuditLogger",
+    "PythonAuditLogger",
+    "StructlogAuditLogger",
+    "FileAuditLogger",
+    "audit_logging_shield",
+    "sensitive_audit_shield",
+    "compliance_audit_shield",
+    "error_audit_shield",
+    "performance_audit_shield",
+    "debug_audit_shield",
 ]
