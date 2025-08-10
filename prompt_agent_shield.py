@@ -18,6 +18,8 @@ AGENT_PROMPT = (
     "Write at least 15 comprehensive tests in the /tests directory to verify correctness, stability, and edge cases. "
     "If the ticket involves Python code, place the tests in tests/. "
     "After implementation and successful test execution, move the completed ticket to @PRDs/tickets/Done/. "
+    "All mocked classes should be in /tests/mocks/ directory. "
+    "Do not put the mocked classes in the implementation files. "
     "Confirm that all tests from /tests/ pass before committing the code. "
     "Commit the implementation and tests together."
 )
