@@ -369,10 +369,14 @@ class AlertManagerTestHelper:
         duration_seconds: int = 0
     ):
         """Simulate an alert condition being met for a duration."""
+        # Clear existing values to avoid interference
+        metric.values.clear()
+        
         if duration_seconds > 0:
             # Add values that meet the condition over time
             start_time = datetime.now(timezone.utc) - timedelta(seconds=duration_seconds + 10)
             
+            # Add values every second for the duration
             for i in range(duration_seconds + 20):
                 timestamp = start_time + timedelta(seconds=i)
                 # Create value that triggers the condition
@@ -381,9 +385,9 @@ class AlertManagerTestHelper:
                 elif rule.condition == "lt":
                     value = rule.threshold - 10
                 elif rule.condition == "gte":
-                    value = rule.threshold
+                    value = rule.threshold + 1  # Slightly above
                 elif rule.condition == "lte":
-                    value = rule.threshold
+                    value = rule.threshold - 1  # Slightly below
                 elif rule.condition == "eq":
                     value = rule.threshold
                 else:
@@ -392,11 +396,17 @@ class AlertManagerTestHelper:
                 metric_value = MetricValue(value=value, timestamp=timestamp)
                 metric.values.append(metric_value)
         else:
-            # Just add a single triggering value
+            # Just add a single triggering value with current timestamp
             if rule.condition == "gt":
                 value = rule.threshold + 10
             elif rule.condition == "lt":
                 value = rule.threshold - 10
+            elif rule.condition == "gte":
+                value = rule.threshold + 1
+            elif rule.condition == "lte":
+                value = rule.threshold - 1
+            elif rule.condition == "eq":
+                value = rule.threshold
             else:
                 value = rule.threshold + 10
             

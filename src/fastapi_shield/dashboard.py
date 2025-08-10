@@ -570,6 +570,18 @@ class AlertManager:
         # Condition met, track timing
         now = datetime.now(timezone.utc)
         
+        if rule.duration == 0:
+            # Trigger immediately for zero duration
+            existing_alert = None
+            for alert in self.active_alerts.values():
+                if alert.rule_id == rule.id and alert.status == AlertStatus.ACTIVE:
+                    existing_alert = alert
+                    break
+            
+            if not existing_alert:
+                self._trigger_alert(rule, metric_value)
+            return
+        
         if rule.id not in self._condition_states:
             self._condition_states[rule.id] = {"started": now}
             return
@@ -616,7 +628,12 @@ class AlertManager:
         # Notify callbacks
         for callback in self.callbacks:
             try:
-                callback(alert)
+                if asyncio.iscoroutinefunction(callback):
+                    # For async callbacks, we can't wait here since this is sync context
+                    # Just log a warning for now
+                    self.logger.warning(f"Async callback {callback} cannot be called from sync context")
+                else:
+                    callback(alert)
             except Exception as e:
                 self.logger.error(f"Error in alert callback: {e}")
         
@@ -634,7 +651,12 @@ class AlertManager:
         # Notify callbacks
         for callback in self.callbacks:
             try:
-                callback(alert)
+                if asyncio.iscoroutinefunction(callback):
+                    # For async callbacks, we can't wait here since this is sync context
+                    # Just log a warning for now
+                    self.logger.warning(f"Async callback {callback} cannot be called from sync context")
+                else:
+                    callback(alert)
             except Exception as e:
                 self.logger.error(f"Error in alert callback: {e}")
     
@@ -761,21 +783,25 @@ class MetricsDashboard:
             self.app.mount("/static", StaticFiles(directory=self.config.static_files_path), name="static")
         
         # Authentication dependency
-        async def get_current_user(credentials: HTTPBasicCredentials = Depends(self.security)) if self.config.enable_auth else lambda: None:
+        def get_current_user(credentials: HTTPBasicCredentials = Depends(self.security)):
             if self.config.enable_auth:
                 if credentials.username != self.config.username or credentials.password != self.config.password:
                     raise HTTPException(status_code=401, detail="Invalid credentials")
-            return credentials.username if self.config.enable_auth else "anonymous"
+                return credentials.username
+            return "anonymous"
+        
+        # Create dependency based on auth config
+        auth_dependency = get_current_user if self.config.enable_auth else lambda: "anonymous"
         
         # Main dashboard route
         @self.app.get("/", response_class=HTMLResponse)
-        async def dashboard(request: Request, user = Depends(get_current_user)):
+        async def dashboard(request: Request, user = Depends(auth_dependency)):
             """Serve the main dashboard page."""
             return self._render_dashboard_html()
         
         # API routes
         @self.app.get("/api/metrics")
-        async def get_metrics(user = Depends(get_current_user)):
+        async def get_metrics(user = Depends(auth_dependency)):
             """Get all metrics."""
             metrics_data = []
             for metric in self.metrics.values():
@@ -793,7 +819,7 @@ class MetricsDashboard:
             return {"metrics": metrics_data}
         
         @self.app.get("/api/metrics/{metric_name}")
-        async def get_metric(metric_name: str, since: Optional[str] = None, user = Depends(get_current_user)):
+        async def get_metric(metric_name: str, since: Optional[str] = None, user = Depends(auth_dependency)):
             """Get specific metric data."""
             if metric_name not in self.metrics:
                 raise HTTPException(status_code=404, detail="Metric not found")
@@ -822,7 +848,7 @@ class MetricsDashboard:
             metric_name: str, 
             value: float, 
             labels: Dict[str, str] = None, 
-            user = Depends(get_current_user)
+            user = Depends(auth_dependency)
         ):
             """Add a new metric value."""
             if metric_name not in self.metrics:
@@ -835,7 +861,7 @@ class MetricsDashboard:
         
         # Alert routes
         @self.app.get("/api/alerts")
-        async def get_alerts(user = Depends(get_current_user)):
+        async def get_alerts(user = Depends(auth_dependency)):
             """Get all alerts."""
             return {
                 "active": [alert.to_dict() for alert in self.alert_manager.get_active_alerts()],
@@ -843,7 +869,7 @@ class MetricsDashboard:
             }
         
         @self.app.post("/api/alerts/{alert_id}/acknowledge")
-        async def acknowledge_alert(alert_id: str, user = Depends(get_current_user)):
+        async def acknowledge_alert(alert_id: str, user = Depends(auth_dependency)):
             """Acknowledge an alert."""
             success = self.alert_manager.acknowledge_alert(alert_id, user)
             if not success:
@@ -851,7 +877,7 @@ class MetricsDashboard:
             return {"status": "success"}
         
         @self.app.post("/api/alerts/{alert_id}/silence")
-        async def silence_alert(alert_id: str, user = Depends(get_current_user)):
+        async def silence_alert(alert_id: str, user = Depends(auth_dependency)):
             """Silence an alert."""
             success = self.alert_manager.silence_alert(alert_id)
             if not success:
@@ -860,12 +886,12 @@ class MetricsDashboard:
         
         # Alert rules routes
         @self.app.get("/api/alert-rules")
-        async def get_alert_rules(user = Depends(get_current_user)):
+        async def get_alert_rules(user = Depends(auth_dependency)):
             """Get all alert rules."""
             return {"rules": [rule.to_dict() for rule in self.alert_manager.get_all_rules()]}
         
         @self.app.post("/api/alert-rules")
-        async def create_alert_rule(rule_data: Dict[str, Any], user = Depends(get_current_user)):
+        async def create_alert_rule(rule_data: Dict[str, Any], user = Depends(auth_dependency)):
             """Create a new alert rule."""
             rule = AlertRule(
                 id=rule_data.get("id", str(uuid.uuid4())),
@@ -887,7 +913,7 @@ class MetricsDashboard:
             return rule.to_dict()
         
         @self.app.delete("/api/alert-rules/{rule_id}")
-        async def delete_alert_rule(rule_id: str, user = Depends(get_current_user)):
+        async def delete_alert_rule(rule_id: str, user = Depends(auth_dependency)):
             """Delete an alert rule."""
             success = self.alert_manager.remove_rule(rule_id)
             if not success:
@@ -900,7 +926,7 @@ class MetricsDashboard:
             metric_name: str, 
             chart_type: str = "line",
             time_range: str = "1h",
-            user = Depends(get_current_user)
+            user = Depends(auth_dependency)
         ):
             """Get chart data for a metric."""
             if metric_name not in self.metrics:
