@@ -921,6 +921,38 @@ from fastapi_shield.conditional_execution import (
     create_custom_condition,
     conditional_shield,
 )
+from fastapi_shield.load_balancing import (
+    # Core classes
+    LoadBalancer,
+    Backend,
+    HealthChecker,
+    SessionManager,
+    LoadBalancingShield,
+    
+    # Configuration classes
+    BackendMetrics,
+    HealthCheckConfig,
+    
+    # Algorithm implementations
+    RoundRobinAlgorithm,
+    WeightedRoundRobinAlgorithm,
+    LeastConnectionsAlgorithm,
+    RandomAlgorithm,
+    IPHashAlgorithm,
+    LeastResponseTimeAlgorithm,
+    ResourceBasedAlgorithm,
+    LoadBalancingAlgorithmInterface,
+    
+    # Enums
+    LoadBalancingAlgorithm,
+    BackendStatus,
+    HealthCheckType,
+    StickySessionStrategy,
+    
+    # Convenience functions
+    create_load_balancer,
+    load_balancing_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -1734,4 +1766,26 @@ __all__ = [
     "create_composite_condition",
     "create_custom_condition",
     "conditional_shield",
+    # Load Balancing System
+    "LoadBalancer",
+    "Backend",
+    "HealthChecker",
+    "SessionManager",
+    "LoadBalancingShield",
+    "BackendMetrics",
+    "HealthCheckConfig",
+    "RoundRobinAlgorithm",
+    "WeightedRoundRobinAlgorithm",
+    "LeastConnectionsAlgorithm",
+    "RandomAlgorithm",
+    "IPHashAlgorithm",
+    "LeastResponseTimeAlgorithm",
+    "ResourceBasedAlgorithm",
+    "LoadBalancingAlgorithmInterface",
+    "LoadBalancingAlgorithm",
+    "BackendStatus",
+    "HealthCheckType",
+    "StickySessionStrategy",
+    "create_load_balancer",
+    "load_balancing_shield",
 ]
