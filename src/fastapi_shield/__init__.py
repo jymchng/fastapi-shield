@@ -147,6 +147,25 @@ from fastapi_shield.webhook_verification import (
     slack_webhook_shield,
     custom_webhook_shield,
 )
+from fastapi_shield.circuit_breaker import (
+    CircuitBreakerShield,
+    CircuitBreakerConfig,
+    CircuitMetrics,
+    CircuitState,
+    HealthChecker,
+    HTTPHealthChecker,
+    CallbackHealthChecker,
+    CircuitBreakerMonitor,
+    LoggingMonitor,
+    MetricsCollectorMonitor,
+    get_circuit_breaker,
+    register_circuit_breaker,
+    get_all_circuit_breakers,
+    circuit_breaker_shield,
+    database_circuit_breaker_shield,
+    external_service_circuit_breaker_shield,
+    high_availability_circuit_breaker_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -254,4 +273,21 @@ __all__ = [
     "paypal_webhook_shield",
     "slack_webhook_shield",
     "custom_webhook_shield",
+    "CircuitBreakerShield",
+    "CircuitBreakerConfig",
+    "CircuitMetrics",
+    "CircuitState",
+    "HealthChecker",
+    "HTTPHealthChecker",
+    "CallbackHealthChecker",
+    "CircuitBreakerMonitor",
+    "LoggingMonitor",
+    "MetricsCollectorMonitor",
+    "get_circuit_breaker",
+    "register_circuit_breaker",
+    "get_all_circuit_breakers",
+    "circuit_breaker_shield",
+    "database_circuit_breaker_shield",
+    "external_service_circuit_breaker_shield",
+    "high_availability_circuit_breaker_shield",
 ]
