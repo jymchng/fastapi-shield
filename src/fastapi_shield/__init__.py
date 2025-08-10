@@ -109,6 +109,24 @@ from fastapi_shield.audit_logging import (
     performance_audit_shield,
     debug_audit_shield,
 )
+from fastapi_shield.api_key_rotation import (
+    APIKeyRotationShield,
+    APIKeyRotationConfig,
+    APIKey,
+    KeyStatus,
+    KeyRotationStrategy,
+    NotificationLevel,
+    KeyRotationEvent,
+    KeyStore,
+    MemoryKeyStore,
+    NotificationHandler,
+    LoggingNotificationHandler,
+    WebhookNotificationHandler,
+    api_key_rotation_shield,
+    scoped_api_key_shield,
+    admin_api_key_shield,
+    read_only_api_key_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -182,4 +200,20 @@ __all__ = [
     "error_audit_shield",
     "performance_audit_shield",
     "debug_audit_shield",
+    "APIKeyRotationShield",
+    "APIKeyRotationConfig",
+    "APIKey",
+    "KeyStatus",
+    "KeyRotationStrategy",
+    "NotificationLevel",
+    "KeyRotationEvent",
+    "KeyStore",
+    "MemoryKeyStore",
+    "NotificationHandler",
+    "LoggingNotificationHandler",
+    "WebhookNotificationHandler",
+    "api_key_rotation_shield",
+    "scoped_api_key_shield",
+    "admin_api_key_shield",
+    "read_only_api_key_shield",
 ]
