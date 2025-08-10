@@ -31,7 +31,27 @@ For more information, visit: https://github.com/jymchng/fastapi-shield
 """
 
 from fastapi_shield.shield import Shield, ShieldedDepends, shield
+from fastapi_shield.rate_limit import (
+    RateLimitShield,
+    RateLimitAlgorithm,
+    RateLimitBackend,
+    MemoryRateLimitBackend,
+    rate_limit,
+    per_ip_rate_limit,
+    per_user_rate_limit,
+)
 
 __version__ = "0.1.1"
 
-__all__ = ["Shield", "ShieldedDepends", "shield"]
+__all__ = [
+    "Shield", 
+    "ShieldedDepends", 
+    "shield",
+    "RateLimitShield",
+    "RateLimitAlgorithm",
+    "RateLimitBackend",
+    "MemoryRateLimitBackend",
+    "rate_limit",
+    "per_ip_rate_limit",
+    "per_user_rate_limit",
+]
