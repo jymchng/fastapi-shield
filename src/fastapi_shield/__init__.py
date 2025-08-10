@@ -272,6 +272,25 @@ from fastapi_shield.api_versioning import (
     url_path_versioning_shield,
     accept_header_versioning_shield,
 )
+from fastapi_shield.request_tracing import (
+    RequestTracingShield,
+    RequestTracingConfig,
+    TracingBackend,
+    SpanKind,
+    TracingLevel,
+    SpanAttribute,
+    SpanEvent,
+    TraceContext,
+    TracingMetrics,
+    TracerProvider,
+    OpenTelemetryProvider,
+    MockTracerProvider,
+    RequestTracer,
+    request_tracing_shield,
+    detailed_tracing_shield,
+    performance_tracing_shield,
+    error_tracing_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -490,4 +509,21 @@ __all__ = [
     "semantic_versioning_shield",
     "url_path_versioning_shield",
     "accept_header_versioning_shield",
+    "RequestTracingShield",
+    "RequestTracingConfig",
+    "TracingBackend",
+    "SpanKind",
+    "TracingLevel",
+    "SpanAttribute",
+    "SpanEvent",
+    "TraceContext",
+    "TracingMetrics",
+    "TracerProvider",
+    "OpenTelemetryProvider",
+    "MockTracerProvider",
+    "RequestTracer",
+    "request_tracing_shield",
+    "detailed_tracing_shield",
+    "performance_tracing_shield",
+    "error_tracing_shield",
 ]
