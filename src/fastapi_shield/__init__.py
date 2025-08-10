@@ -53,6 +53,16 @@ from fastapi_shield.input_validation import (
     create_email_validation_shield,
     create_length_validation_shield,
 )
+from fastapi_shield.cors_security import (
+    CORSSecurityShield,
+    CORSConfig,
+    CORSPolicy,
+    cors_shield,
+    strict_cors_shield,
+    public_cors_shield,
+    dynamic_cors_shield,
+    authenticated_cors_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -78,4 +88,12 @@ __all__ = [
     "create_sql_injection_protection_shield",
     "create_email_validation_shield",
     "create_length_validation_shield",
+    "CORSSecurityShield",
+    "CORSConfig",
+    "CORSPolicy",
+    "cors_shield",
+    "strict_cors_shield",
+    "public_cors_shield",
+    "dynamic_cors_shield",
+    "authenticated_cors_shield",
 ]
