@@ -196,6 +196,23 @@ from fastapi_shield.request_size_limit import (
     api_size_limit_shield,
     strict_size_limit_shield,
 )
+from fastapi_shield.bot_detection import (
+    BotDetectionShield,
+    BotDetectionConfig,
+    BotDetectionResult,
+    BotDetector,
+    UserAgentAnalyzer,
+    BehavioralAnalyzer,
+    BehavioralMetrics,
+    RequestFingerprint,
+    BotType,
+    DetectionMethod,
+    BotAction,
+    ChallengeType,
+    bot_detection_shield,
+    strict_bot_detection_shield,
+    search_engine_friendly_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -346,4 +363,19 @@ __all__ = [
     "file_upload_size_limit_shield",
     "api_size_limit_shield",
     "strict_size_limit_shield",
+    "BotDetectionShield",
+    "BotDetectionConfig",
+    "BotDetectionResult",
+    "BotDetector",
+    "UserAgentAnalyzer",
+    "BehavioralAnalyzer",
+    "BehavioralMetrics",
+    "RequestFingerprint",
+    "BotType",
+    "DetectionMethod",
+    "BotAction",
+    "ChallengeType",
+    "bot_detection_shield",
+    "strict_bot_detection_shield",
+    "search_engine_friendly_shield",
 ]
