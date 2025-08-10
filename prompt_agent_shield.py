@@ -15,7 +15,9 @@ from enum import Enum, auto
 AGENT_PROMPT = (
     "Continue working on the next ticket located in @PRDs/tickets/. "
     "Implement the ticket's requirements completely, ensuring the solution is robust and production-ready. "
-    "Write at least 15 comprehensive tests in the /tests directory to verify correctness, stability, and edge cases. "
+    "ALL IMPLEMENTATIONS ARE ROBUST AND PRODUCTION READY! DO NOT HAVE ANY SIMPLIFICATIONS OR SHORTCUTS! "
+    "DO NOT HAVE ANY MOCKS OR STUBS! DO NOT HAVE ANY EXAMPLES IN THE IMPLEMENTATION!S "
+    "Write at least 15 comprehensive tests in the /tests directory to ENSURE CORRECTNESS, STABILITY, CODES ARE PRODUCTION READY AND EDGE CASES ARE COVERED. "
     "If the ticket involves Python code, place the tests in tests/. "
     "After implementation and successful test execution, move the completed ticket to @PRDs/tickets/Done/. "
     "All mocked classes should be in /tests/mocks/ directory. "
