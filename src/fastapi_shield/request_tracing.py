@@ -24,21 +24,9 @@ try:
     from opentelemetry import trace
     from opentelemetry.trace import Status, StatusCode, Span
     from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-    from opentelemetry.baggage.propagation import W3CBaggagePropagator
-    from opentelemetry.propagate import extract, inject
-    from opentelemetry.context import get_current, attach, detach
-    from opentelemetry.util.http import get_excluded_urls
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
-    # Create mock classes for type hints
-    class Span:
-        pass
-    class Status:
-        pass
-    class StatusCode:
-        OK = "OK"
-        ERROR = "ERROR"
 
 
 class TracingBackend(str, Enum):
@@ -241,13 +229,10 @@ class RequestTracer:
         if config.backend == TracingBackend.OPENTELEMETRY and OPENTELEMETRY_AVAILABLE:
             self.provider = OpenTelemetryProvider(config.service_name)
         elif config.backend == TracingBackend.OPENTELEMETRY and not OPENTELEMETRY_AVAILABLE:
-            # Fall back to mock provider when OpenTelemetry is not available
-            from tests.mocks.request_tracing_mocks import MockTracerProvider
-            self.provider = MockTracerProvider(config.service_name)
+            raise ValueError("OpenTelemetry is not available. Install with: pip install opentelemetry-api opentelemetry-sdk")
         else:
-            # For now, other backends are not supported - use mock provider
-            from tests.mocks.request_tracing_mocks import MockTracerProvider
-            self.provider = MockTracerProvider(config.service_name)
+            raise ValueError(f"Tracing backend {config.backend} is not supported")
+
     
     def should_trace_request(self, request: Request) -> bool:
         """Determine if request should be traced."""

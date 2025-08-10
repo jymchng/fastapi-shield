@@ -304,25 +304,25 @@ from fastapi_shield.graphql_query_depth import (
     create_permissive_graphql_shield,
     create_production_graphql_shield,
 )
-# from fastapi_shield.database_connection import (
-#     DatabaseConnectionShield,
-#     DatabaseConnectionConfig,
-#     ConnectionPool,
-#     DatabaseConnection,
-#     GenericDatabaseConnection,
-#     ConnectionMetrics,
-#     QueryResult,
-#     DatabaseType,
-#     ConnectionState,
-#     PoolState,
-#     RetryStrategy,
-#     RetryManager,
-#     database_connection_shield,
-#     postgresql_connection_shield,
-#     mysql_connection_shield,
-#     redis_connection_shield,
-#     high_availability_database_shield,
-# )
+from fastapi_shield.database_connection import (
+    DatabaseConnectionShield,
+    DatabaseConnectionConfig,
+    ConnectionPool,
+    DatabaseConnection,
+    GenericDatabaseConnection,
+    ConnectionMetrics,
+    QueryResult,
+    DatabaseType,
+    ConnectionState,
+    PoolState,
+    RetryStrategy,
+    RetryManager,
+    database_connection_shield,
+    postgresql_connection_shield,
+    mysql_connection_shield,
+    redis_connection_shield,
+    high_availability_database_shield,
+)
 
 __version__ = "0.1.1"
 
