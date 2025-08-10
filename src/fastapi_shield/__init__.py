@@ -953,6 +953,36 @@ from fastapi_shield.load_balancing import (
     create_load_balancer,
     load_balancing_shield,
 )
+from fastapi_shield.microservice_integration import (
+    # Core classes
+    ServiceInstance,
+    ServiceRegistry,
+    ConsulServiceRegistry,
+    EurekaServiceRegistry,
+    CircuitBreaker,
+    DistributedSecurityManager,
+    DistributedTracing,
+    ServiceMeshIntegration,
+    MicroserviceShield,
+    
+    # Data classes
+    ServiceStatus,
+    CircuitBreakerState,
+    CircuitBreakerMetrics,
+    DistributedSecurityPolicy,
+    TraceContext,
+    
+    # Enums
+    AuthenticationMode,
+    TracingProvider,
+    ServiceMeshType,
+    
+    # Convenience functions
+    create_consul_registry,
+    create_eureka_registry,
+    create_microservice_shield,
+    microservice_shield_decorator,
+)
 
 __version__ = "0.1.1"
 
@@ -1788,4 +1818,26 @@ __all__ = [
     "StickySessionStrategy",
     "create_load_balancer",
     "load_balancing_shield",
+    # Microservice Integration System
+    "ServiceInstance",
+    "ServiceRegistry",
+    "ConsulServiceRegistry",
+    "EurekaServiceRegistry",
+    "CircuitBreaker",
+    "DistributedSecurityManager",
+    "DistributedTracing",
+    "ServiceMeshIntegration",
+    "MicroserviceShield",
+    "ServiceStatus",
+    "CircuitBreakerState",
+    "CircuitBreakerMetrics",
+    "DistributedSecurityPolicy",
+    "TraceContext",
+    "AuthenticationMode",
+    "TracingProvider",
+    "ServiceMeshType",
+    "create_consul_registry",
+    "create_eureka_registry",
+    "create_microservice_shield",
+    "microservice_shield_decorator",
 ]
