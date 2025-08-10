@@ -228,6 +228,20 @@ from fastapi_shield.sql_injection_detection import (
     strict_sql_injection_shield,
     monitoring_sql_injection_shield,
 )
+from fastapi_shield.ldap_authentication import (
+    LDAPAuthShield,
+    LDAPConfig,
+    LDAPUser,
+    LDAPAuthenticator,
+    LDAPConnectionPool,
+    LDAPConnection,
+    LDAPProtocol,
+    AuthenticationMethod,
+    LDAPScope,
+    ldap_authentication_shield,
+    active_directory_shield,
+    enterprise_ldap_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -406,4 +420,16 @@ __all__ = [
     "sql_injection_detection_shield",
     "strict_sql_injection_shield",
     "monitoring_sql_injection_shield",
+    "LDAPAuthShield",
+    "LDAPConfig",
+    "LDAPUser",
+    "LDAPAuthenticator",
+    "LDAPConnectionPool",
+    "LDAPConnection",
+    "LDAPProtocol",
+    "AuthenticationMethod",
+    "LDAPScope",
+    "ldap_authentication_shield",
+    "active_directory_shield",
+    "enterprise_ldap_shield",
 ]
