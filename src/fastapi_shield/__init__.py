@@ -63,6 +63,21 @@ from fastapi_shield.cors_security import (
     dynamic_cors_shield,
     authenticated_cors_shield,
 )
+from fastapi_shield.ip_geolocation import (
+    IPGeolocationShield,
+    IPRule,
+    IPAction,
+    IPRuleType,
+    GeoLocation,
+    GeolocationProvider,
+    MockGeolocationProvider,
+    IPApiGeolocationProvider,
+    MaxMindGeolocationProvider,
+    ip_geolocation_shield,
+    country_blocking_shield,
+    ip_whitelist_shield,
+    proxy_detection_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -96,4 +111,17 @@ __all__ = [
     "public_cors_shield",
     "dynamic_cors_shield",
     "authenticated_cors_shield",
+    "IPGeolocationShield",
+    "IPRule",
+    "IPAction",
+    "IPRuleType",
+    "GeoLocation",
+    "GeolocationProvider",
+    "MockGeolocationProvider",
+    "IPApiGeolocationProvider",
+    "MaxMindGeolocationProvider",
+    "ip_geolocation_shield",
+    "country_blocking_shield",
+    "ip_whitelist_shield",
+    "proxy_detection_shield",
 ]
