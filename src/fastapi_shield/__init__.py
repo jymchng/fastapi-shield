@@ -40,6 +40,19 @@ from fastapi_shield.rate_limit import (
     per_ip_rate_limit,
     per_user_rate_limit,
 )
+from fastapi_shield.input_validation import (
+    InputValidationShield,
+    ValidationRule,
+    SanitizationType,
+    ValidationType,
+    InputSanitizer,
+    InputValidator,
+    input_validation_shield,
+    create_xss_protection_shield,
+    create_sql_injection_protection_shield,
+    create_email_validation_shield,
+    create_length_validation_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -54,4 +67,15 @@ __all__ = [
     "rate_limit",
     "per_ip_rate_limit",
     "per_user_rate_limit",
+    "InputValidationShield",
+    "ValidationRule",
+    "SanitizationType",
+    "ValidationType",
+    "InputSanitizer",
+    "InputValidator",
+    "input_validation_shield",
+    "create_xss_protection_shield",
+    "create_sql_injection_protection_shield",
+    "create_email_validation_shield",
+    "create_length_validation_shield",
 ]
