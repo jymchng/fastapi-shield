@@ -608,8 +608,9 @@ class FeatureFlagShield(Shield):
         user_id = (
             request.headers.get("x-user-id") or
             request.headers.get("user-id") or
-            request.headers.get("authorization", "").split(" ")[-1] if 
-            request.headers.get("authorization") else "anonymous"
+            (request.headers.get("authorization", "").split(" ")[-1] if 
+             request.headers.get("authorization") else None) or
+            "anonymous"
         )
         
         if user_id and user_id != "anonymous":
@@ -644,7 +645,7 @@ class FeatureFlagShield(Shield):
     
     async def _evaluate_percentage_rollout(self, user_context: Dict[str, Any]) -> bool:
         """Evaluate percentage-based rollout."""
-        if not self.config.rollout_percentage:
+        if self.config.rollout_percentage is None:
             return True
         
         user_id = user_context.get("user_id", "anonymous")
