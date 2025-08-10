@@ -687,6 +687,23 @@ from fastapi_shield.plugin_system import (
     get_active_shield_plugins,
     get_shields_from_plugins,
 )
+from fastapi_shield.security_audit import (
+    SecurityFinding,
+    AuditConfiguration,
+    AuditResult,
+    SecurityScanner,
+    StaticCodeAnalyzer,
+    DependencyScanner,
+    ConfigurationScanner,
+    SecurityAuditor,
+    SeverityLevel,
+    VulnerabilityType,
+    AuditScope,
+    PenetrationTestingMethod,
+    audit_project,
+    audit_shield,
+    create_audit_config,
+)
 
 __version__ = "0.1.1"
 
@@ -1283,4 +1300,20 @@ __all__ = [
     "discover_plugins",
     "get_active_shield_plugins",
     "get_shields_from_plugins",
+    # Security Audit System
+    "SecurityFinding",
+    "AuditConfiguration",
+    "AuditResult",
+    "SecurityScanner",
+    "StaticCodeAnalyzer",
+    "DependencyScanner",
+    "ConfigurationScanner",
+    "SecurityAuditor",
+    "SeverityLevel",
+    "VulnerabilityType",
+    "AuditScope",
+    "PenetrationTestingMethod",
+    "audit_project",
+    "audit_shield",
+    "create_audit_config",
 ]
