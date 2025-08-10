@@ -380,12 +380,12 @@ class MFAManager:
             challenge.status = MFAStatus.EXPIRED
             raise HTTPException(status.HTTP_410_GONE, "Challenge expired")
         
-        if challenge.attempts >= self.config.max_attempts:
+        challenge.attempts += 1
+        
+        if challenge.attempts > self.config.max_attempts:
             challenge.status = MFAStatus.FAILED
             await self._lock_user(challenge.user_id)
             raise HTTPException(status.HTTP_423_LOCKED, "Too many attempts")
-        
-        challenge.attempts += 1
         user = self.get_user(challenge.user_id)
         
         verified = False
