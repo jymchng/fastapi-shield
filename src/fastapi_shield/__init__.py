@@ -166,6 +166,20 @@ from fastapi_shield.circuit_breaker import (
     external_service_circuit_breaker_shield,
     high_availability_circuit_breaker_shield,
 )
+from fastapi_shield.content_type_validation import (
+    ContentTypeShield,
+    ContentTypeConfig,
+    ContentTypeValidationResult,
+    ContentTypeValidator,
+    ContentTypePolicy,
+    SecurityLevel,
+    MIME_TYPE_GROUPS,
+    content_type_shield,
+    json_content_type_shield,
+    file_upload_content_type_shield,
+    form_content_type_shield,
+    api_content_type_shield,
+)
 
 __version__ = "0.1.1"
 
@@ -290,4 +304,16 @@ __all__ = [
     "database_circuit_breaker_shield",
     "external_service_circuit_breaker_shield",
     "high_availability_circuit_breaker_shield",
+    "ContentTypeShield",
+    "ContentTypeConfig",
+    "ContentTypeValidationResult",
+    "ContentTypeValidator",
+    "ContentTypePolicy",
+    "SecurityLevel",
+    "MIME_TYPE_GROUPS",
+    "content_type_shield",
+    "json_content_type_shield",
+    "file_upload_content_type_shield",
+    "form_content_type_shield",
+    "api_content_type_shield",
 ]
