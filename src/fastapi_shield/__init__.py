@@ -1229,6 +1229,32 @@ from fastapi_shield.ml_threat_detection import (
     create_ml_threat_detector,
 )
 
+# Import quantum-resistant cryptographic engine
+from fastapi_shield.quantum_crypto import (
+    # Core quantum crypto classes
+    QuantumCryptoEngine,
+    QuantumCryptoDatabase,
+    LatticeBasedCrypto,
+    HashBasedSignatures,
+    QuantumKeyDistribution,
+    HybridCryptoSystem,
+    
+    # Data classes
+    QuantumKeyPair,
+    QuantumSignature,
+    QuantumEncryptedData,
+    QKDSession,
+    
+    # Enums
+    QuantumAlgorithm,
+    SecurityLevel,
+    CryptoOperation,
+    HybridMode,
+    
+    # Convenience functions
+    create_quantum_crypto_engine,
+)
+
 __version__ = "0.1.1"
 
 __all__ = [
@@ -2252,4 +2278,20 @@ __all__ = [
     "ModelStatus",
     "PredictionConfidence",
     "create_ml_threat_detector",
+    # Quantum-Resistant Cryptographic Engine
+    "QuantumCryptoEngine",
+    "QuantumCryptoDatabase",
+    "LatticeBasedCrypto",
+    "HashBasedSignatures",
+    "QuantumKeyDistribution",
+    "HybridCryptoSystem",
+    "QuantumKeyPair",
+    "QuantumSignature",
+    "QuantumEncryptedData",
+    "QKDSession",
+    "QuantumAlgorithm",
+    "SecurityLevel",
+    "CryptoOperation",
+    "HybridMode",
+    "create_quantum_crypto_engine",
 ]
