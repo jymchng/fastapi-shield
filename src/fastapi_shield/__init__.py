@@ -1255,6 +1255,39 @@ from fastapi_shield.quantum_crypto import (
     create_quantum_crypto_engine,
 )
 
+# Import zero-trust network architecture
+from fastapi_shield.zero_trust_network import (
+    # Core zero-trust classes
+    ZeroTrustShield,
+    ZeroTrustDatabase,
+    IdentityVerificationEngine,
+    NetworkMicroSegmentation,
+    ContinuousAuthorizationEngine,
+    DataClassificationEngine,
+    
+    # Data classes
+    DeviceIdentity,
+    UserIdentity,
+    NetworkContext,
+    AccessRequest,
+    AccessDecisionResult,
+    ZeroTrustPolicy,
+    BehavioralProfile,
+    
+    # Enums
+    TrustLevel,
+    RiskScore,
+    AccessDecision,
+    AuthenticationMethod,
+    DeviceType,
+    NetworkZone,
+    DataClassification,
+    ComplianceFramework,
+    
+    # Convenience functions
+    create_zero_trust_shield,
+)
+
 __version__ = "0.1.1"
 
 __all__ = [
@@ -2294,4 +2327,27 @@ __all__ = [
     "CryptoOperation",
     "HybridMode",
     "create_quantum_crypto_engine",
+    # Zero-Trust Network Architecture
+    "ZeroTrustShield",
+    "ZeroTrustDatabase",
+    "IdentityVerificationEngine",
+    "NetworkMicroSegmentation",
+    "ContinuousAuthorizationEngine",
+    "DataClassificationEngine",
+    "DeviceIdentity",
+    "UserIdentity",
+    "NetworkContext",
+    "AccessRequest",
+    "AccessDecisionResult",
+    "ZeroTrustPolicy",
+    "BehavioralProfile",
+    "TrustLevel",
+    "RiskScore",
+    "AccessDecision",
+    "AuthenticationMethod",
+    "DeviceType",
+    "NetworkZone",
+    "DataClassification",
+    "ComplianceFramework",
+    "create_zero_trust_shield",
 ]
