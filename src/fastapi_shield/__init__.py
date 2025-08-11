@@ -1317,6 +1317,33 @@ from fastapi_shield.threat_hunting_soar import (
     create_threat_hunting_platform,
 )
 
+# Import advanced security compliance and governance framework
+from fastapi_shield.compliance_governance import (
+    # Core compliance and governance classes
+    ComplianceGovernanceFramework,
+    ComplianceGovernanceDatabase,
+    ComplianceEngine,
+    PolicyManagementSystem,
+    
+    # Data classes
+    SecurityControl,
+    GovernancePolicy,
+    RiskAssessment,
+    AuditEvent,
+    ComplianceAssessment,
+    
+    # Enums
+    ComplianceFramework,
+    ControlStatus,
+    RiskLevel,
+    PolicyType,
+    AuditEventType,
+    ComplianceStatus,
+    
+    # Convenience functions
+    create_compliance_governance_framework,
+)
+
 __version__ = "0.1.1"
 
 __all__ = [
@@ -2398,4 +2425,21 @@ __all__ = [
     "IntegrationType",
     "EvidenceType",
     "create_threat_hunting_platform",
+    # Advanced Security Compliance and Governance Framework
+    "ComplianceGovernanceFramework",
+    "ComplianceGovernanceDatabase", 
+    "ComplianceEngine",
+    "PolicyManagementSystem",
+    "SecurityControl",
+    "GovernancePolicy",
+    "RiskAssessment",
+    "AuditEvent",
+    "ComplianceAssessment",
+    "ComplianceFramework",
+    "ControlStatus",
+    "RiskLevel",
+    "PolicyType",
+    "AuditEventType",
+    "ComplianceStatus",
+    "create_compliance_governance_framework",
 ]
