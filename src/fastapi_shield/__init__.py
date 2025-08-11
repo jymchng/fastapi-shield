@@ -1288,6 +1288,35 @@ from fastapi_shield.zero_trust_network import (
     create_zero_trust_shield,
 )
 
+# Import threat hunting and security orchestration platform
+from fastapi_shield.threat_hunting_soar import (
+    # Core threat hunting and SOAR classes
+    ThreatHuntingPlatform,
+    ThreatHuntingDatabase,
+    ThreatHuntingEngine,
+    SecurityOrchestrationEngine,
+    
+    # Data classes
+    ThreatIndicator,
+    SecurityIncident,
+    SecurityPlaybook,
+    PlaybookExecution,
+    ThreatHuntingHypothesis,
+    EvidenceArtifact,
+    
+    # Enums
+    ThreatLevel,
+    ThreatType,
+    IncidentStatus,
+    PlaybookStatus,
+    ResponseAction,
+    IntegrationType,
+    EvidenceType,
+    
+    # Convenience functions
+    create_threat_hunting_platform,
+)
+
 __version__ = "0.1.1"
 
 __all__ = [
@@ -2350,4 +2379,23 @@ __all__ = [
     "DataClassification",
     "ComplianceFramework",
     "create_zero_trust_shield",
+    # Threat Hunting and Security Orchestration Platform
+    "ThreatHuntingPlatform",
+    "ThreatHuntingDatabase", 
+    "ThreatHuntingEngine",
+    "SecurityOrchestrationEngine",
+    "ThreatIndicator",
+    "SecurityIncident",
+    "SecurityPlaybook",
+    "PlaybookExecution",
+    "ThreatHuntingHypothesis",
+    "EvidenceArtifact",
+    "ThreatLevel",
+    "ThreatType",
+    "IncidentStatus",
+    "PlaybookStatus",
+    "ResponseAction",
+    "IntegrationType",
+    "EvidenceType",
+    "create_threat_hunting_platform",
 ]
