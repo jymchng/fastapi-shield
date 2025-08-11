@@ -1202,6 +1202,33 @@ from fastapi_shield.enterprise_console import (
     create_console_app,
 )
 
+# Import ML threat detection engine
+from fastapi_shield.ml_threat_detection import (
+    # Core ML classes
+    MLThreatDetector,
+    FeatureEngineer,
+    AnomalyDetector,
+    ModelManager,
+    PredictiveAnalyzer,
+    MLThreatDatabase,
+    
+    # Data classes
+    ThreatFeatures,
+    ThreatPrediction,
+    MLModel,
+    AnomalyDetectionResult,
+    
+    # Enums
+    ThreatType,
+    ModelType,
+    FeatureType,
+    ModelStatus,
+    PredictionConfidence,
+    
+    # Convenience functions
+    create_ml_threat_detector,
+)
+
 __version__ = "0.1.1"
 
 __all__ = [
@@ -2208,4 +2235,21 @@ __all__ = [
     "NotificationSeverity",
     "create_enterprise_console",
     "create_console_app",
+    # ML Threat Detection Engine
+    "MLThreatDetector",
+    "FeatureEngineer",
+    "AnomalyDetector",
+    "ModelManager",
+    "PredictiveAnalyzer",
+    "MLThreatDatabase",
+    "ThreatFeatures",
+    "ThreatPrediction",
+    "MLModel",
+    "AnomalyDetectionResult",
+    "ThreatType",
+    "ModelType",
+    "FeatureType",
+    "ModelStatus",
+    "PredictionConfidence",
+    "create_ml_threat_detector",
 ]
