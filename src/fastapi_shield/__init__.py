@@ -1172,6 +1172,36 @@ from fastapi_shield.enterprise_soar import (
     create_soar_app,
 )
 
+# Import enterprise management console
+from fastapi_shield.enterprise_console import (
+    # Core management classes
+    WebConsoleManager,
+    UserManager,
+    ConfigurationManager,
+    PolicyManager,
+    NotificationManager,
+    ConsoleDatabase,
+    
+    # Data classes
+    ConsoleUser,
+    ConsoleSession,
+    ConfigurationEntry,
+    SecurityPolicy,
+    AuditLogEntry,
+    ConsoleNotification,
+    
+    # Enums
+    UserRole,
+    PermissionLevel,
+    ConfigurationScope,
+    AuditEventType,
+    NotificationSeverity,
+    
+    # Convenience functions
+    create_enterprise_console,
+    create_console_app,
+)
+
 __version__ = "0.1.1"
 
 __all__ = [
@@ -2158,4 +2188,24 @@ __all__ = [
     "IntegrationType",
     "create_enterprise_soar",
     "create_soar_app",
+    # Enterprise Management Console
+    "WebConsoleManager",
+    "UserManager",
+    "ConfigurationManager",
+    "PolicyManager",
+    "NotificationManager",
+    "ConsoleDatabase",
+    "ConsoleUser",
+    "ConsoleSession",
+    "ConfigurationEntry",
+    "SecurityPolicy",
+    "AuditLogEntry",
+    "ConsoleNotification",
+    "UserRole",
+    "PermissionLevel",
+    "ConfigurationScope",
+    "AuditEventType",
+    "NotificationSeverity",
+    "create_enterprise_console",
+    "create_console_app",
 ]
