@@ -1009,6 +1009,42 @@ from fastapi_shield.ml_security import (
     create_ml_security_shield,
     ml_security_shield_decorator,
 )
+from fastapi_shield.compliance_framework import (
+    # Core Compliance classes
+    ComplianceFramework,
+    AuditTrailManager,
+    PolicyEnforcementEngine,
+    ComplianceDashboard,
+    ComplianceMiddleware,
+    
+    # Validators
+    ComplianceValidator,
+    GDPRValidator,
+    HIPAAValidator,
+    PCIDSSValidator,
+    
+    # Data classes
+    ComplianceRule,
+    AuditEvent,
+    ComplianceViolation,
+    DataPrivacyPolicy,
+    ComplianceMetrics,
+    
+    # Enums
+    ComplianceRegulation,
+    ComplianceStatus,
+    AuditEventType,
+    DataCategory,
+    PrivacyAction,
+    ComplianceSeverity,
+    
+    # Convenience functions and decorators
+    create_compliance_framework,
+    compliance_required,
+    gdpr_compliant,
+    hipaa_compliant,
+    pci_compliant,
+)
 
 __version__ = "0.1.1"
 
@@ -1884,4 +1920,30 @@ __all__ = [
     "FeatureCategory",
     "create_ml_security_shield",
     "ml_security_shield_decorator",
+    # Compliance Framework
+    "ComplianceFramework",
+    "AuditTrailManager",
+    "PolicyEnforcementEngine",
+    "ComplianceDashboard",
+    "ComplianceMiddleware",
+    "ComplianceValidator",
+    "GDPRValidator",
+    "HIPAAValidator",
+    "PCIDSSValidator",
+    "ComplianceRule",
+    "AuditEvent",
+    "ComplianceViolation",
+    "DataPrivacyPolicy",
+    "ComplianceMetrics",
+    "ComplianceRegulation",
+    "ComplianceStatus",
+    "AuditEventType",
+    "DataCategory",
+    "PrivacyAction",
+    "ComplianceSeverity",
+    "create_compliance_framework",
+    "compliance_required",
+    "gdpr_compliant",
+    "hipaa_compliant",
+    "pci_compliant",
 ]
