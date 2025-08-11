@@ -1104,6 +1104,37 @@ from fastapi_shield.security_dashboard import (
     create_security_dashboard,
     create_default_widgets,
 )
+from fastapi_shield.threat_intelligence import (
+    # Core Threat Intelligence classes
+    ThreatIntelligenceEngine,
+    ThreatDatabase,
+    GeolocationService,
+    ThreatSignatureEngine,
+    ThreatResponseManager,
+    IPReputationAnalyzer,
+    
+    # Feed Provider classes
+    ThreatFeedProvider,
+    VirusTotalProvider,
+    AbuseIPDBProvider,
+    
+    # Data classes
+    ThreatIndicator,
+    ThreatAssessment,
+    IPGeolocation,
+    ThreatFeedConfig,
+    ThreatResponse,
+    
+    # Enums
+    ThreatLevel,
+    ThreatType,
+    ThreatSource,
+    ResponseAction,
+    IPReputation,
+    
+    # Convenience functions
+    create_threat_intelligence_engine,
+)
 
 __version__ = "0.1.1"
 
@@ -2046,4 +2077,25 @@ __all__ = [
     "DashboardTheme",
     "create_security_dashboard",
     "create_default_widgets",
+    # Threat Intelligence System
+    "ThreatIntelligenceEngine",
+    "ThreatDatabase",
+    "GeolocationService",
+    "ThreatSignatureEngine",
+    "ThreatResponseManager",
+    "IPReputationAnalyzer",
+    "ThreatFeedProvider",
+    "VirusTotalProvider",
+    "AbuseIPDBProvider",
+    "ThreatIndicator",
+    "ThreatAssessment",
+    "IPGeolocation",
+    "ThreatFeedConfig",
+    "ThreatResponse",
+    "ThreatLevel",
+    "ThreatType",
+    "ThreatSource",
+    "ResponseAction",
+    "IPReputation",
+    "create_threat_intelligence_engine",
 ]
