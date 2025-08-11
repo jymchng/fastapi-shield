@@ -1136,6 +1136,42 @@ from fastapi_shield.threat_intelligence import (
     create_threat_intelligence_engine,
 )
 
+# Import enterprise SOAR platform
+from fastapi_shield.enterprise_soar import (
+    # Core orchestration classes
+    SecurityOrchestrator,
+    IncidentManager,
+    PlaybookEngine,
+    ThreatCorrelationEngine,
+    MultiTenantManager,
+    SOARDatabase,
+    
+    # Integration classes
+    ExternalIntegration,
+    SIEMIntegration,
+    TicketingIntegration,
+    MessagingIntegration,
+    
+    # Data classes
+    SecurityIncident,
+    SecurityPlaybook,
+    ThreatHuntingOperation,
+    ComplianceReport,
+    TenantConfiguration,
+    
+    # Enums
+    IncidentSeverity,
+    IncidentStatus,
+    PlaybookAction,
+    ThreatHuntingStatus,
+    ComplianceStandard,
+    IntegrationType,
+    
+    # Convenience functions
+    create_enterprise_soar,
+    create_soar_app,
+)
+
 __version__ = "0.1.1"
 
 __all__ = [
@@ -2098,4 +2134,28 @@ __all__ = [
     "ResponseAction",
     "IPReputation",
     "create_threat_intelligence_engine",
+    # Enterprise SOAR Platform
+    "SecurityOrchestrator",
+    "IncidentManager",
+    "PlaybookEngine",
+    "ThreatCorrelationEngine",
+    "MultiTenantManager",
+    "SOARDatabase",
+    "ExternalIntegration",
+    "SIEMIntegration",
+    "TicketingIntegration",
+    "MessagingIntegration",
+    "SecurityIncident",
+    "SecurityPlaybook",
+    "ThreatHuntingOperation",
+    "ComplianceReport",
+    "TenantConfiguration",
+    "IncidentSeverity",
+    "IncidentStatus",
+    "PlaybookAction",
+    "ThreatHuntingStatus",
+    "ComplianceStandard",
+    "IntegrationType",
+    "create_enterprise_soar",
+    "create_soar_app",
 ]
