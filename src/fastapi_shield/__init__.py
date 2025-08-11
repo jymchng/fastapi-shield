@@ -983,6 +983,32 @@ from fastapi_shield.microservice_integration import (
     create_microservice_shield,
     microservice_shield_decorator,
 )
+from fastapi_shield.ml_security import (
+    # Core ML Security classes
+    RequestFeatureExtractor,
+    AnomalyDetectionEngine,
+    ThreatIntelligenceManager,
+    AdaptiveSecurityManager,
+    ThreatPredictionEngine,
+    MLSecurityShield,
+    
+    # Data classes
+    RequestFeatures,
+    AnomalyResult,
+    ThreatIntelligence,
+    SecurityMetrics,
+    
+    # Enums
+    ThreatLevel,
+    AnomalyType,
+    MLModelType,
+    SecurityAction,
+    FeatureCategory,
+    
+    # Convenience functions
+    create_ml_security_shield,
+    ml_security_shield_decorator,
+)
 
 __version__ = "0.1.1"
 
@@ -1840,4 +1866,22 @@ __all__ = [
     "create_eureka_registry",
     "create_microservice_shield",
     "microservice_shield_decorator",
+    # ML Security System
+    "RequestFeatureExtractor",
+    "AnomalyDetectionEngine",
+    "ThreatIntelligenceManager", 
+    "AdaptiveSecurityManager",
+    "ThreatPredictionEngine",
+    "MLSecurityShield",
+    "RequestFeatures",
+    "AnomalyResult",
+    "ThreatIntelligence",
+    "SecurityMetrics",
+    "ThreatLevel",
+    "AnomalyType",
+    "MLModelType",
+    "SecurityAction",
+    "FeatureCategory",
+    "create_ml_security_shield",
+    "ml_security_shield_decorator",
 ]

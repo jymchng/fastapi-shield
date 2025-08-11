@@ -14,13 +14,38 @@ from typing import Dict, List, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-import numpy as np
 from unittest.mock import Mock, MagicMock
 from fastapi import Request
 from fastapi.testclient import TestClient
 import uuid
 import re
 from urllib.parse import urlencode, parse_qs
+
+# Handle numpy import gracefully
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    # Create minimal numpy mock
+    class MockNumpy:
+        float32 = float
+        @staticmethod
+        def array(data, dtype=None):
+            if dtype == float:
+                return [float(x) for x in data]
+            return list(data)
+        @staticmethod
+        def mean(data, axis=0):
+            if isinstance(data, list):
+                return [sum(col)/len(col) for col in zip(*data)] if data else []
+            return data
+        @staticmethod  
+        def std(data, axis=0):
+            if isinstance(data, list):
+                return [1.0 for _ in zip(*data)] if data else []
+            return data
+    np = MockNumpy()
 
 from fastapi_shield.ml_security import (
     RequestFeatures, AnomalyResult, ThreatLevel, AnomalyType,
@@ -33,7 +58,7 @@ class MockMLModel:
     """Mock ML model for testing."""
     name: str
     is_trained: bool = False
-    training_data: List[np.ndarray] = field(default_factory=list)
+    training_data: List[Any] = field(default_factory=list)
     training_labels: List[int] = field(default_factory=list)
     prediction_accuracy: float = 0.85
     
@@ -68,7 +93,10 @@ class MockMLModel:
             
             predictions.append(prediction)
         
-        return np.array(predictions)
+        if NUMPY_AVAILABLE:
+            return np.array(predictions)
+        else:
+            return predictions
     
     def decision_function(self, X):
         """Mock decision function."""
@@ -88,22 +116,32 @@ class MockMLModel:
             
             scores.append(score)
         
-        return np.array(scores)
+        if NUMPY_AVAILABLE:
+            return np.array(scores)
+        else:
+            return scores
 
 
 @dataclass
 class MockScaler:
     """Mock StandardScaler for testing."""
-    mean_: Optional[np.ndarray] = None
-    scale_: Optional[np.ndarray] = None
+    mean_: Optional[Any] = None
+    scale_: Optional[Any] = None
     is_fitted: bool = False
     
     def fit(self, X, y=None):
         """Mock scaler fitting."""
-        X_array = np.array(X)
-        self.mean_ = np.mean(X_array, axis=0)
-        self.scale_ = np.std(X_array, axis=0)
-        self.scale_[self.scale_ == 0] = 1.0  # Avoid division by zero
+        if NUMPY_AVAILABLE:
+            X_array = np.array(X)
+            self.mean_ = np.mean(X_array, axis=0)
+            self.scale_ = np.std(X_array, axis=0)
+            # Avoid division by zero
+            if hasattr(self.scale_, '__setitem__'):
+                self.scale_[self.scale_ == 0] = 1.0
+        else:
+            # Simple mock scaling without numpy
+            self.mean_ = [0.0] * len(X[0]) if X else []
+            self.scale_ = [1.0] * len(X[0]) if X else []
         self.is_fitted = True
         return self
     
@@ -112,8 +150,12 @@ class MockScaler:
         if not self.is_fitted:
             raise ValueError("Scaler not fitted")
         
-        X_array = np.array(X)
-        return (X_array - self.mean_) / self.scale_
+        if NUMPY_AVAILABLE:
+            X_array = np.array(X)
+            return (X_array - self.mean_) / self.scale_
+        else:
+            # Simple mock transformation
+            return [[x - m for x, m in zip(row, self.mean_)] for row in X]
     
     def fit_transform(self, X, y=None):
         """Mock fit and transform."""
@@ -153,7 +195,10 @@ class MockIsolationForest:
             prediction = -1 if feature_sum > 50 else 1
             predictions.append(prediction)
         
-        return np.array(predictions)
+        if NUMPY_AVAILABLE:
+            return np.array(predictions)
+        else:
+            return predictions
     
     def decision_function(self, X):
         """Mock decision function."""
@@ -170,7 +215,10 @@ class MockIsolationForest:
             score = (25 - feature_sum) / 25.0  # Higher negative score = more anomalous
             scores.append(score)
         
-        return np.array(scores)
+        if NUMPY_AVAILABLE:
+            return np.array(scores)
+        else:
+            return scores
 
 
 class MockOneClassSVM:
@@ -203,7 +251,10 @@ class MockOneClassSVM:
             prediction = -1 if variance > 100 else 1
             predictions.append(prediction)
         
-        return np.array(predictions)
+        if NUMPY_AVAILABLE:
+            return np.array(predictions)
+        else:
+            return predictions
     
     def decision_function(self, X):
         """Mock decision function."""
@@ -220,7 +271,10 @@ class MockOneClassSVM:
             score = (50 - variance) / 50.0
             scores.append(score)
         
-        return np.array(scores)
+        if NUMPY_AVAILABLE:
+            return np.array(scores)
+        else:
+            return scores
 
 
 class MockDBSCAN:

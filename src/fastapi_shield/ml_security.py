@@ -31,7 +31,6 @@ from typing import (
     NamedTuple, Protocol
 )
 import statistics
-import numpy as np
 from urllib.parse import urlparse, parse_qs
 import re
 import ipaddress
@@ -39,6 +38,22 @@ from threading import RLock, Thread
 import queue
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
+
+# Handle numpy import gracefully
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    # Create minimal numpy mock for basic functionality
+    class MockNumpy:
+        float32 = float
+        @staticmethod
+        def array(data, dtype=None):
+            if dtype == float:
+                return [float(x) for x in data]
+            return list(data)
+    np = MockNumpy()
 
 # ML framework imports
 try:
@@ -158,7 +173,7 @@ class RequestFeatures:
     request_frequency_variance: float = 0.0
     endpoint_diversity: float = 0.0
     
-    def to_vector(self) -> np.ndarray:
+    def to_vector(self):
         """Convert features to numerical vector for ML algorithms."""
         # Convert categorical features to numerical
         method_encoding = {
@@ -166,8 +181,8 @@ class RequestFeatures:
             'PATCH': 5, 'HEAD': 6, 'OPTIONS': 7
         }.get(self.method.upper(), 0)
         
-        vector = np.array([
-            # Request metadata (7 features)
+        vector_data = [
+            # Request metadata (6 features)
             method_encoding,
             self.path_length,
             self.query_param_count,
@@ -205,9 +220,12 @@ class RequestFeatures:
             self.avg_request_size,
             self.request_frequency_variance,
             self.endpoint_diversity
-        ], dtype=np.float32)
+        ]
         
-        return vector
+        if NUMPY_AVAILABLE:
+            return np.array(vector_data, dtype=np.float32)
+        else:
+            return vector_data
 
 
 @dataclass 
@@ -362,7 +380,7 @@ class RequestFeatureExtractor:
         """Generate session identifier."""
         session_cookie = request.cookies.get('session_id')
         if session_cookie:
-            return hashlib.md5(session_cookie.encode()).hexdigest()
+            return hashlib.md5(str(session_cookie).encode()).hexdigest()
         
         user_agent = request.headers.get('user-agent', '')
         return hashlib.md5(f"{client_ip}-{user_agent}".encode()).hexdigest()
@@ -416,7 +434,8 @@ class RequestFeatureExtractor:
         for count in char_counts.values():
             probability = count / text_len
             if probability > 0:
-                entropy -= probability * np.log2(probability)
+                import math
+                entropy -= probability * math.log2(probability)
         
         return entropy
     
@@ -494,7 +513,7 @@ class AnomalyDetectionEngine:
         self.models: Dict[str, Any] = {}
         self.scalers: Dict[str, StandardScaler] = {}
         self.is_trained = False
-        self.training_data: List[np.ndarray] = []
+        self.training_data: List[Any] = []
         self.training_labels: List[int] = []
         self._lock = RLock()
         
@@ -511,27 +530,30 @@ class AnomalyDetectionEngine:
         
         with self._lock:
             if self.model_type in [MLModelType.ISOLATION_FOREST, MLModelType.ENSEMBLE]:
-                self.models['isolation_forest'] = IsolationForest(
-                    contamination=0.1,
-                    random_state=42,
-                    n_estimators=100
-                )
-                self.scalers['isolation_forest'] = StandardScaler()
-            
+                if SKLEARN_AVAILABLE:
+                    self.models['isolation_forest'] = IsolationForest(
+                        contamination=0.1,
+                        random_state=42,
+                        n_estimators=100
+                    )
+                    self.scalers['isolation_forest'] = StandardScaler()
+        
             if self.model_type in [MLModelType.ONE_CLASS_SVM, MLModelType.ENSEMBLE]:
-                self.models['one_class_svm'] = OneClassSVM(
-                    kernel='rbf',
-                    gamma='scale',
-                    nu=0.1
-                )
-                self.scalers['one_class_svm'] = StandardScaler()
+                if SKLEARN_AVAILABLE:
+                    self.models['one_class_svm'] = OneClassSVM(
+                        kernel='rbf',
+                        gamma='scale',
+                        nu=0.1
+                    )
+                    self.scalers['one_class_svm'] = StandardScaler()
             
             if self.model_type in [MLModelType.DBSCAN, MLModelType.ENSEMBLE]:
-                self.models['dbscan'] = DBSCAN(
-                    eps=0.5,
-                    min_samples=5
-                )
-                self.scalers['dbscan'] = StandardScaler()
+                if SKLEARN_AVAILABLE:
+                    self.models['dbscan'] = DBSCAN(
+                        eps=0.5,
+                        min_samples=5
+                    )
+                    self.scalers['dbscan'] = StandardScaler()
     
     def add_training_data(self, features: RequestFeatures, is_anomaly: bool = False):
         """Add training data point."""
@@ -557,11 +579,18 @@ class AnomalyDetectionEngine:
             return
         
         with self._lock:
-            X = np.array(self.training_data)
-            y = np.array(self.training_labels)
+            if NUMPY_AVAILABLE:
+                X = np.array(self.training_data)
+                y = np.array(self.training_labels)
+            else:
+                X = self.training_data
+                y = self.training_labels
             
             # For unsupervised learning, we use only normal data
-            normal_data = X[y == 0]
+            if NUMPY_AVAILABLE:
+                normal_data = X[y == 0]
+            else:
+                normal_data = [X[i] for i, label in enumerate(y) if label == 0]
             
             for model_name, model in self.models.items():
                 try:
@@ -754,7 +783,7 @@ class AnomalyDetectionEngine:
         
         return ". ".join(explanations) or "Anomalous request pattern detected"
     
-    def _get_contributing_features(self, features: RequestFeatures, vector: np.ndarray) -> List[str]:
+    def _get_contributing_features(self, features: RequestFeatures, vector: Any) -> List[str]:
         """Identify features contributing most to anomaly detection."""
         contributing = []
         
