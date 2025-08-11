@@ -1045,6 +1045,40 @@ from fastapi_shield.compliance_framework import (
     hipaa_compliant,
     pci_compliant,
 )
+from fastapi_shield.edge_computing import (
+    # Core Edge Computing classes
+    EdgeShield,
+    EdgeOptimizer,
+    EdgeCache,
+    OfflineAuthCache,
+    PolicySynchronizer,
+    DistributedConsensus,
+    CDNIntegration,
+    EdgeMiddleware,
+    
+    # Monitoring classes
+    MemoryMonitor,
+    CPUMonitor,
+    
+    # Data classes
+    EdgeNode,
+    EdgePolicy,
+    EdgeCacheEntry,
+    EdgeSyncState,
+    
+    # Enums
+    EdgeLocation,
+    EdgeCapability,
+    SyncMode,
+    EdgeResourceLevel,
+    ConsensusAlgorithm,
+    
+    # Convenience functions and decorators
+    create_edge_shield,
+    edge_optimized,
+    ultra_lightweight,
+    iot_gateway_protection,
+)
 
 __version__ = "0.1.1"
 
@@ -1946,4 +1980,28 @@ __all__ = [
     "gdpr_compliant",
     "hipaa_compliant",
     "pci_compliant",
+    # Edge Computing System
+    "EdgeShield",
+    "EdgeOptimizer",
+    "EdgeCache",
+    "OfflineAuthCache",
+    "PolicySynchronizer",
+    "DistributedConsensus",
+    "CDNIntegration",
+    "EdgeMiddleware",
+    "MemoryMonitor",
+    "CPUMonitor",
+    "EdgeNode",
+    "EdgePolicy",
+    "EdgeCacheEntry",
+    "EdgeSyncState",
+    "EdgeLocation",
+    "EdgeCapability",
+    "SyncMode",
+    "EdgeResourceLevel",
+    "ConsensusAlgorithm",
+    "create_edge_shield",
+    "edge_optimized",
+    "ultra_lightweight",
+    "iot_gateway_protection",
 ]
