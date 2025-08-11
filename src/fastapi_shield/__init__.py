@@ -1079,6 +1079,31 @@ from fastapi_shield.edge_computing import (
     ultra_lightweight,
     iot_gateway_protection,
 )
+from fastapi_shield.security_dashboard import (
+    # Core Security Dashboard classes
+    SecurityDashboard,
+    MetricsCollector,
+    AlertManager,
+    WebSocketManager,
+    ReportGenerator,
+    
+    # Data classes
+    SecurityMetric,
+    SecurityAlert,
+    DashboardWidget,
+    DashboardConfig,
+    
+    # Enums
+    MetricType,
+    ChartType,
+    AlertSeverity,
+    ReportFormat,
+    DashboardTheme,
+    
+    # Convenience functions
+    create_security_dashboard,
+    create_default_widgets,
+)
 
 __version__ = "0.1.1"
 
@@ -2004,4 +2029,21 @@ __all__ = [
     "edge_optimized",
     "ultra_lightweight",
     "iot_gateway_protection",
+    # Security Dashboard System
+    "SecurityDashboard",
+    "MetricsCollector",
+    "AlertManager", 
+    "WebSocketManager",
+    "ReportGenerator",
+    "SecurityMetric",
+    "SecurityAlert",
+    "DashboardWidget", 
+    "DashboardConfig",
+    "MetricType",
+    "ChartType",
+    "AlertSeverity",
+    "ReportFormat",
+    "DashboardTheme",
+    "create_security_dashboard",
+    "create_default_widgets",
 ]
