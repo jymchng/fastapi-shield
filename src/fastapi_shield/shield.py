@@ -19,7 +19,16 @@ Key Classes:
 from contextlib import asynccontextmanager
 from functools import cached_property, wraps
 from inspect import Parameter, Signature, signature
-from typing import Annotated, Any, Callable, Generic, Optional, Sequence, Union, overload
+from typing import (
+    Annotated,
+    Any,
+    Callable,
+    Generic,
+    Optional,
+    Sequence,
+    Union,
+    overload,
+)
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi._compat import _normalize_errors
@@ -161,11 +170,9 @@ class ShieldDepends(Generic[U], Security):
         if not params:
             return
         first, *rest = params
-        if first.default is Parameter.empty:
-            yield from rest
-        else:
+        if first.default is not Parameter.empty:
             yield first
-            yield from rest
+        yield from rest
 
     def __repr__(self) -> str:
         """Return a string representation of the ShieldDepends instance.
@@ -729,8 +736,7 @@ def shield(
     auto_error: bool = True,
     exception_to_raise_if_fail: Optional[HTTPException] = None,
     default_response_to_return_if_fail: Optional[Response] = None,
-) -> Callable[[U], Shield[U]]:
-    ...
+) -> Callable[[U], Shield[U]]: ...
 
 
 @overload
@@ -741,8 +747,7 @@ def shield(
     auto_error: bool = True,
     exception_to_raise_if_fail: Optional[HTTPException] = None,
     default_response_to_return_if_fail: Optional[Response] = None,
-) -> Shield[U]:
-    ...
+) -> Shield[U]: ...
 
 
 def shield(
