@@ -1277,9 +1277,10 @@ def revert_release(session: AlteredSession):
     session.log("Rolling back version numbers...")
     
     import re
+    import pathlib
     
     # Read and update pyproject.toml
-    pyproject_path = ROOT_DIR / "pyproject.toml"
+    pyproject_path = pathlib.Path("pyproject.toml")
     with open(pyproject_path, "r") as f:
         pyproject_content = f.read()
     
@@ -1310,7 +1311,7 @@ def revert_release(session: AlteredSession):
     session.log(f"Updated pyproject.toml version to {new_version}")
     
     # Read and update __init__.py
-    init_path = ROOT_DIR / "src" / "fastapi_shield" / "__init__.py"
+    init_path = pathlib.Path("src") / "fastapi_shield" / "__init__.py"
     with open(init_path, "r") as f:
         init_content = f.read()
     
