@@ -369,6 +369,16 @@ uv tool run nox -s test
 nox -s test -- tests/test_basics.py
 ```
 
+### Release
+
+Run the following commands:
+
+1. `nox -s release-check` - this checks if the library is fit for release.
+2. `nox -s release` - this builds the library, update the tag and commits it.
+3. `git push origin main` - this pushes the repository to GitHub on branch `main`.
+4. `git push origin <tag-name>` - this pushes the tag with `<tag-name>` to GitHub.
+5. `nox -s publish` - this publishes the library to PYPI.
+
 ## Contributing
 
 We welcome contributions! Please see our Contributing Guide for details.
