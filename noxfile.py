@@ -285,8 +285,9 @@ def alter_session(
     dependency_group="dev",
 )
 def clean(session: Session):
-    session.run("uv", "clean")
+    # Try to clean uv cache, but don't fail if it's locked by other processes
     session.run("rm", "-rf", BUILD_DIR, DIST_DIR, "*.egg-info")
+    
     import glob
     import os
     import shutil
