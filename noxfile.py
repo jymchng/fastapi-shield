@@ -286,11 +286,6 @@ def alter_session(
 )
 def clean(session: Session):
     # Try to clean uv cache, but don't fail if it's locked by other processes
-    try:
-        session.run("uv", "clean")
-    except Exception as e:
-        session.log(f"Warning: Could not clean uv cache (likely in use by other processes): {e}")
-        
     session.run("rm", "-rf", BUILD_DIR, DIST_DIR, "*.egg-info")
     
     import glob
