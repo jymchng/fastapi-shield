@@ -1250,15 +1250,15 @@ def revert_release(session: AlteredSession):
     
     # Verify the tag exists locally
     try:
-        session.run("git", "tag", "-l", tag_name, external=True, silent=True)
+        session.session.run("git", "tag", "-l", tag_name, external=True, silent=True)
     except Exception:
         session.error(f"Tag '{tag_name}' does not exist locally")
         return
     
     # Check if we're in a clean git state
     try:
-        session.run("git", "diff", "--quiet", external=True, silent=True)
-        session.run("git", "diff", "--cached", "--quiet", external=True, silent=True)
+        session.session.run("git", "diff", "--quiet", external=True, silent=True)
+        session.session.run("git", "diff", "--cached", "--quiet", external=True, silent=True)
     except Exception:
         session.error("Git repository has uncommitted changes. Please commit or stash them first.")
         return
@@ -1267,11 +1267,11 @@ def revert_release(session: AlteredSession):
     
     # Delete the tag locally
     session.log(f"Deleting local tag: {tag_name}")
-    session.run("git", "tag", "-d", tag_name, external=True)
+    session.session.run("git", "tag", "-d", tag_name, external=True)
     
     # Delete the tag from remote
     session.log(f"Deleting remote tag: {tag_name}")
-    session.run("git", "push", "origin", f":refs/tags/{tag_name}", external=True)
+    session.session.run("git", "push", "origin", f":refs/tags/{tag_name}", external=True)
     
     # Revert version in pyproject.toml and __init__.py
     session.log("Rolling back version numbers...")
