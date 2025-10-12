@@ -32,6 +32,6 @@ For more information, visit: https://github.com/jymchng/fastapi-shield
 
 from fastapi_shield.shield import Shield, ShieldedDepends, shield
 
-__version__ = "0.1.2"
+__version__ = "0.1.1"
 
 __all__ = ["Shield", "ShieldedDepends", "shield"]
