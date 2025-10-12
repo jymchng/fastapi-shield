@@ -19,7 +19,7 @@ Key Classes:
 from contextlib import asynccontextmanager
 from functools import cached_property, wraps
 from inspect import Parameter, Signature, signature
-from typing import Annotated, Any, Callable, Generic, Optional, Sequence
+from typing import Annotated, Any, Callable, Generic, Optional, Sequence, Union, overload
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi._compat import _normalize_errors
@@ -721,14 +721,38 @@ async def inject_authenticated_entities_into_args_kwargs(
     return kwargs
 
 
+@overload
 def shield(
-    shield_func: Optional[U] = None,
+    shield_func: None = None,
     /,
-    name: str = None,
+    name: Optional[str] = None,
+    auto_error: bool = True,
+    exception_to_raise_if_fail: Optional[HTTPException] = None,
+    default_response_to_return_if_fail: Optional[Response] = None,
+) -> Callable[[U], Shield[U]]:
+    ...
+
+
+@overload
+def shield(
+    shield_func: U,
+    /,
+    name: Optional[str] = None,
     auto_error: bool = True,
     exception_to_raise_if_fail: Optional[HTTPException] = None,
     default_response_to_return_if_fail: Optional[Response] = None,
 ) -> Shield[U]:
+    ...
+
+
+def shield(
+    shield_func: Optional[U] = None,
+    /,
+    name: Optional[str] = None,
+    auto_error: bool = True,
+    exception_to_raise_if_fail: Optional[HTTPException] = None,
+    default_response_to_return_if_fail: Optional[Response] = None,
+) -> Union[Callable[[U], Shield[U]], Shield[U]]:
     """Factory function and decorator for creating `Shield` instances.
 
     This is the main entry point for creating shields. It can be used as a
