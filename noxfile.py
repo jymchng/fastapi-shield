@@ -894,7 +894,7 @@ def publish(session: Session):
         session.error("Publication cancelled")
 
     # Publish using uv
-    session.run("uv", "publish", "dist/*")
+    session.run("twine", "upload", "dist/*")
     session.log("SUCCESS: Published to PyPI!")
 
 
