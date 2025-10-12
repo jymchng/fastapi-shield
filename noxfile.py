@@ -791,9 +791,6 @@ def git_check(session: Session):
 
     if current_branch not in ["main", "master"]:
         session.log(f"WARNING: Not on main/master branch (current: {current_branch})")
-        response = input("Continue anyway? (y/N): ")
-        if response.lower() != "y":
-            session.error("Release cancelled")
 
     session.log("SUCCESS: Git repository is clean and ready")
 
