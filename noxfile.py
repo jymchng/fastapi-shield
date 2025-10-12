@@ -1229,3 +1229,101 @@ def serve_docs(session: Session):
     # Install the package in editable mode so mkdocstrings can import it
     session.run("uv", "pip", "install", "-e", ".")
     session.run("mkdocs", "serve", "-a", "localhost:8001")
+
+
+@session(dependency_group="dev")
+def revert_release(session: AlteredSession):
+    """Revert a release by deleting the git tag locally and remotely, and rolling back the version.
+    
+    This function will:
+    1. Delete the specified git tag locally and remotely
+    2. Decrement the patch version by 1 in pyproject.toml and __init__.py
+    
+    Usage: nox -s revert-release -- <tag_name>
+    Example: nox -s revert-release -- v1.2.3
+    """
+    if not session.posargs:
+        session.error("Please provide a tag name to revert. Usage: nox -s revert-release -- <tag_name>")
+        return
+    
+    tag_name = session.posargs[0]
+    
+    # Verify the tag exists locally
+    try:
+        session.run("git", "tag", "-l", tag_name, external=True, silent=True)
+    except Exception:
+        session.error(f"Tag '{tag_name}' does not exist locally")
+        return
+    
+    # Check if we're in a clean git state
+    try:
+        session.run("git", "diff", "--quiet", external=True, silent=True)
+        session.run("git", "diff", "--cached", "--quiet", external=True, silent=True)
+    except Exception:
+        session.error("Git repository has uncommitted changes. Please commit or stash them first.")
+        return
+    
+    session.log(f"Reverting release tag: {tag_name}")
+    
+    # Delete the tag locally
+    session.log(f"Deleting local tag: {tag_name}")
+    session.run("git", "tag", "-d", tag_name, external=True)
+    
+    # Delete the tag from remote
+    session.log(f"Deleting remote tag: {tag_name}")
+    session.run("git", "push", "origin", f":refs/tags/{tag_name}", external=True)
+    
+    # Revert version in pyproject.toml and __init__.py
+    session.log("Rolling back version numbers...")
+    
+    import re
+    
+    # Read and update pyproject.toml
+    pyproject_path = ROOT_DIR / "pyproject.toml"
+    with open(pyproject_path, "r") as f:
+        pyproject_content = f.read()
+    
+    # Find current version in pyproject.toml
+    version_match = re.search(r'version = "(\d+)\.(\d+)\.(\d+)"', pyproject_content)
+    if not version_match:
+        session.error("Could not find version in pyproject.toml")
+        return
+    
+    major, minor, patch = map(int, version_match.groups())
+    if patch == 0:
+        session.error("Cannot decrement patch version below 0")
+        return
+    
+    new_patch = patch - 1
+    new_version = f"{major}.{minor}.{new_patch}"
+    
+    # Update pyproject.toml
+    new_pyproject_content = re.sub(
+        r'version = "\d+\.\d+\.\d+"',
+        f'version = "{new_version}"',
+        pyproject_content
+    )
+    
+    with open(pyproject_path, "w") as f:
+        f.write(new_pyproject_content)
+    
+    session.log(f"Updated pyproject.toml version to {new_version}")
+    
+    # Read and update __init__.py
+    init_path = ROOT_DIR / "src" / "fastapi_shield" / "__init__.py"
+    with open(init_path, "r") as f:
+        init_content = f.read()
+    
+    # Update __init__.py
+    new_init_content = re.sub(
+        r'__version__ = "\d+\.\d+\.\d+"',
+        f'__version__ = "{new_version}"',
+        init_content
+    )
+    
+    with open(init_path, "w") as f:
+        f.write(new_init_content)
+    
+    session.log(f"Updated __init__.py version to {new_version}")
+    
+    session.log(f"SUCCESS: Tag '{tag_name}' has been deleted locally and remotely, and version rolled back to {new_version}")
