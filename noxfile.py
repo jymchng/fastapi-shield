@@ -205,9 +205,10 @@ def session(
             default_posargs=default_posargs,
             **kwargs,
         )
+    session_name = kwargs.get("name", f.__name__.replace("_", "-"))
     nox_session_kwargs = {
         **DEFAULT_SESSION_KWARGS,
-        "name": f.__name__.replace("_", "-"),
+        "name": session_name,
         **kwargs,
     }
 
@@ -774,7 +775,7 @@ def git_check(session: Session):
     """Check git status and ensure clean working directory."""
     # Check if git repo
     result = session.run(
-        "git", "status", "--porcelain", silent=True, success_codes=[0, 128]
+        "git", "status", "--porcelain", silent=True, external=True, success_codes=[0, 128]
     )
     if result is False:
         session.error("Not a git repository")
@@ -790,9 +791,6 @@ def git_check(session: Session):
 
     if current_branch not in ["main", "master"]:
         session.log(f"WARNING: Not on main/master branch (current: {current_branch})")
-        response = input("Continue anyway? (y/N): ")
-        if response.lower() != "y":
-            session.error("Release cancelled")
 
     session.log("SUCCESS: Git repository is clean and ready")
 
