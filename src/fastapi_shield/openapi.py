@@ -161,13 +161,8 @@ def patch_get_openapi(app: FastAPI):
     """
     original_schema = app.openapi()
 
-    final_schema = None
-
     @wraps(get_openapi)
     def patch_openapi():
-        nonlocal final_schema
-        if final_schema is not None:
-            return final_schema
         with switch_routes(app) as switched_routes:
             openapi_schema = get_openapi(
                 routes=switched_routes,
@@ -186,9 +181,8 @@ def patch_get_openapi(app: FastAPI):
                 license_info=original_schema.get("license"),
                 separate_input_output_schemas=True,
             )
-            final_schema = openapi_schema
-        app.openapi_schema = final_schema
-        return app.openapi_schema
+        app.openapi_schema = openapi_schema
+        return openapi_schema
 
     return patch_openapi
 
