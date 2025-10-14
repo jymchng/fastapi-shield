@@ -89,7 +89,7 @@ class ShieldDepends(Generic[U], Security):
         ```
     """
 
-    __slots__ = ("dependency", "shielded_dependency", "unblocked")
+    __slots__ = ("dependency", "shielded_dependency", "unblocked", "dependency_cache")
 
     def __init__(
         self,
@@ -126,6 +126,7 @@ class ShieldDepends(Generic[U], Security):
         self.unblocked = False
         self.auto_error = auto_error
         self._shielded_dependency_params = signature(shielded_dependency).parameters
+        self.dependency_cache = {}
 
     @cached_property
     def first_param(self) -> Optional[Parameter]:
@@ -263,7 +264,7 @@ class ShieldDepends(Generic[U], Security):
             request=request,
             path_format=path_format,
             endpoint=self,
-            dependency_cache={},
+            dependency_cache=self.dependency_cache,
         )
 
         return solved_dependencies
