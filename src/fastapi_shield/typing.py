@@ -6,7 +6,7 @@ to provide better type safety and documentation.
 
 from typing import Any, Callable, TypeVar
 
-U = TypeVar("U")
+U = TypeVar("U", bound=Callable[..., Any])
 """Generic type variable for shield function signatures.
 
 This type variable is used to preserve the type signature of shield functions

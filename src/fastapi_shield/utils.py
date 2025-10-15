@@ -11,7 +11,7 @@ import re
 from collections.abc import Iterator
 from contextlib import AsyncExitStack
 from inspect import Parameter, signature
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence, List, Union
 
 from fastapi import HTTPException, Request, params
 from fastapi._compat import ModelField, Undefined
@@ -24,7 +24,8 @@ from fastapi.dependencies.utils import (
     solve_dependencies,
 )
 from fastapi.exceptions import RequestValidationError
-from fastapi.routing import get_name
+
+from starlette.routing import get_name
 
 
 def generate_unique_id_for_fastapi_shield(dependant: Dependant, path_format: str):
@@ -126,7 +127,6 @@ async def get_body_from_request(  # pylint: disable=too-many-nested-blocks,too-m
     is_body_form = body_field and isinstance(body_field.field_info, params.Form)
     async with AsyncExitStack() as file_stack:
         try:  # pylint: disable=too-many-nested-blocks
-            body: Any = None
             if body_field:
                 if is_body_form:
                     body = await request.form()
@@ -378,7 +378,7 @@ def rearrange_params(iter_params: Iterator[Parameter]):
     now_kind = ORDER[kind_idx]
 
     # First pass: process params and create buffer1
-    buffer1 = []
+    buffer1: List[Union[Parameter, None]] = []
     for p in iter_params:
         kind = p.kind
         if kind == POS_KW:
@@ -391,7 +391,7 @@ def rearrange_params(iter_params: Iterator[Parameter]):
             buffer1.append(p)
 
     # Prepare buffer2 with exact size
-    buffer2 = [None] * len(buffer1)
+    buffer2: List[Union[Parameter, None]] = [None] * len(buffer1)
 
     # Process remaining kinds
     while buffer1:
@@ -402,11 +402,11 @@ def rearrange_params(iter_params: Iterator[Parameter]):
 
         # Process elements in buffer1 and fill buffer2
         buffer2_idx = 0
-        for p in buffer1:
+        for p in buffer1:  # type: ignore[assignment]
             kind = p.kind
             if kind == POS_KW:
                 # Special handling for POSITIONAL_OR_KEYWORD
-                kind = 1 if p.default is EMPTY else 2
+                kind = 1 if p.default is EMPTY else 2  # type: ignore[assignment]
 
             if kind == now_kind:
                 yield p
