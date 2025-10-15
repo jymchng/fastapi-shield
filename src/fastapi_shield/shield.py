@@ -28,7 +28,9 @@ from typing import (
     Sequence,
     Union,
     overload,
+    Dict,
 )
+from types import MappingProxyType
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi._compat import _normalize_errors
@@ -89,7 +91,14 @@ class ShieldDepends(Generic[U], Security):
         ```
     """
 
-    __slots__ = ("dependency", "shielded_dependency", "unblocked", "dependency_cache")
+    __slots__ = (
+        "dependency",
+        "shielded_dependency",
+        "unblocked",
+        "dependency_cache",
+        "auto_error",
+        "_shielded_dependency_params",
+    )
 
     def __init__(
         self,
@@ -125,8 +134,13 @@ class ShieldDepends(Generic[U], Security):
         self.shielded_dependency = shielded_dependency
         self.unblocked = False
         self.auto_error = auto_error
-        self._shielded_dependency_params = signature(shielded_dependency).parameters
-        self.dependency_cache = {}
+        if shielded_dependency is None:
+            self._shielded_dependency_params: MappingProxyType[str, Parameter] = (
+                MappingProxyType({})
+            )
+        else:
+            self._shielded_dependency_params = signature(shielded_dependency).parameters
+        self.dependency_cache: Dict[str, Any] = {}
 
     @cached_property
     def first_param(self) -> Optional[Parameter]:
@@ -200,13 +214,14 @@ class ShieldDepends(Generic[U], Security):
                  or self if still blocked.
         """
         if self.unblocked:
-            if is_coroutine_callable(self.shielded_dependency):
-                return await self.shielded_dependency(*args, **kwargs)
-            return self.shielded_dependency(*args, **kwargs)
+            if self.shielded_dependency is not None:
+                if is_coroutine_callable(self.shielded_dependency):
+                    return await self.shielded_dependency(*args, **kwargs)
+                return self.shielded_dependency(*args, **kwargs)
         return self
 
     @property
-    def __dict__(self):
+    def __dict__(self):  # type: ignore[override]
         """Custom __dict__ implementation to exclude signature parameters from serialization.
 
         This prevents the signature parameters from being included when the object
@@ -419,7 +434,7 @@ class Shield(Generic[U]):
         self,
         shield_func: U,
         *,
-        name: str = None,
+        name: Optional[str] = None,
         auto_error: bool = True,
         exception_to_raise_if_fail: Optional[HTTPException] = None,
         default_response_to_return_if_fail: Optional[Response] = None,
@@ -568,7 +583,7 @@ class Shield(Generic[U]):
             if isinstance(param.default, ShieldDepends)
         }
 
-        dependency_cache = {}
+        dependency_cache: Dict[str, Any] = {}
 
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
@@ -585,7 +600,7 @@ class Shield(Generic[U]):
                     raise HTTPException(
                         status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail=f"Shield with name `{self.name}` failed: {e}",
-                    )
+                    ) from e
                 raise e
             if obj:
                 # from here onwards, the shield's job is done
@@ -634,14 +649,14 @@ class Shield(Generic[U]):
 
             return self._raise_or_return_default_response()
 
-        wrapper.__signature__ = Signature(
+        wrapper.__signature__ = Signature(  # type:ignore[attr-defined]
             rearrange_params(
                 merge_dedup_seq_params(
                     prepend_request_to_signature_params_of_function(self._guard_func),
                 )
             )
         )
-        _ = getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or setattr(
+        _ = getattr(endpoint, IS_SHIELDED_ENDPOINT_KEY, False) or setattr(  # type: ignore[func-returns-value]
             endpoint,
             IS_SHIELDED_ENDPOINT_KEY,
             True,
@@ -721,6 +736,7 @@ async def inject_authenticated_entities_into_args_kwargs(
                 )
             if (
                 new_arg_kwargs is None
+                and arg_kwargs.first_param is not None
                 and arg_kwargs.first_param.annotation is not Optional
             ):
                 return kwargs

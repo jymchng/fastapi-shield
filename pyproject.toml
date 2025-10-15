@@ -103,12 +103,19 @@ ignore-patterns = ["^\\.#"]
 ignore-paths = ["tests/", "examples/", "docs/", "scripts/"]
 
 
+[tool.mypy]
+mypy_path = "src"
+disable_error_code = [
+    "import-not-found",
+]
+
 [dependency-groups]
 dev = [
     "bcrypt==4.3.0",
     "fastapi[standard]>=0.100.1",
     "httpx>=0.24.0",
     "isort>=6.0.1",
+    "mypy>=1.18.2",
     "nox>=2023.0.0",
     "passlib>=1.7.0",
     "pre-commit>=4.2.0",
@@ -116,6 +123,7 @@ dev = [
     "pydantic-settings>=2.9.1",
     "pyjwt>=2.0.0",
     "pylint>=3.3.6",
+    "pyright>=1.1.406",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-xdist>=3.7.0",

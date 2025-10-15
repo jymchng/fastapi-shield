@@ -566,7 +566,7 @@ def list_dist_files(session: Session):
 @session(
     dependency_group="dev", default_posargs=[PROJECT_CODES_DIR, "--check-untyped-defs"]
 )
-def type_check(session: Session):
+def check_mypy(session: Session):
     session.run("uv", "tool", "run", "mypy")
 
 
@@ -575,6 +575,7 @@ def dev(session: Session):
     clean(session)
     format(session)
     check(session)
+    check_mypy(session)
     build(session)
     list_dist_files(session)
     test(session)

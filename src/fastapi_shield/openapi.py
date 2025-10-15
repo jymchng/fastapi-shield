@@ -17,7 +17,9 @@ from typing import Callable, Optional, Union
 from fastapi import FastAPI
 from fastapi.dependencies.utils import get_dependant
 from fastapi.openapi.utils import get_openapi
-from fastapi.routing import APIRoute, compile_path
+from fastapi.routing import APIRoute
+
+from starlette.routing import BaseRoute, compile_path
 
 from fastapi_shield.shield import IS_SHIELDED_ENDPOINT_KEY
 from fastapi_shield.typing import EndPointFunc
@@ -66,6 +68,7 @@ def switch_routes(app: FastAPI):
     shielded_dependants = {}
     shielded_body_fields = {}
 
+    route: Union[BaseRoute, APIRoute]
     try:
         # Switch all routes to their original endpoints
         for route in app.routes:
@@ -92,7 +95,7 @@ def switch_routes(app: FastAPI):
                     if hasattr(shielded_endpoint, IS_SHIELDED_ENDPOINT_KEY)
                     else signature(shielded_endpoint)
                 )
-                mocked_endpoint_signature.__signature__ = mocked_signature
+                mocked_endpoint_signature.__signature__ = mocked_signature  # type:ignore[attr-defined]
                 shielded_dependant = route.dependant
                 shielded_body_field = route.body_field
 
@@ -116,18 +119,18 @@ def switch_routes(app: FastAPI):
     finally:
         # Restore the shielded endpoints
         for route in app.routes:
-            route: APIRoute
-            route.endpoint = shielded_endpoints.get(
-                getattr(route, "unique_id", ""), route.endpoint
-            )
-            route.dependant = shielded_dependants.get(
-                getattr(route, "unique_id", ""),
-                hasattr(route, "dependant") and route.dependant or None,
-            )
-            route.body_field = shielded_body_fields.get(
-                getattr(route, "unique_id", ""),
-                hasattr(route, "body_field") and route.body_field or None,
-            )
+            if isinstance(route, APIRoute):
+                route.endpoint = shielded_endpoints.get(
+                    getattr(route, "unique_id", ""), route.endpoint
+                )
+                route.dependant = shielded_dependants.get(
+                    getattr(route, "unique_id", ""),
+                    hasattr(route, "dependant") and route.dependant or None,
+                )
+                route.body_field = shielded_body_fields.get(
+                    getattr(route, "unique_id", ""),
+                    hasattr(route, "body_field") and route.body_field or None,
+                )
 
 
 def patch_get_openapi(app: FastAPI):
@@ -296,7 +299,7 @@ def patch_shields_for_openapi(
     ):
         return endpoint
     signature_params = gather_signature_params_across_wrapped_endpoints(endpoint)
-    endpoint.__signature__ = Signature(
+    endpoint.__signature__ = Signature(  # type:ignore[attr-defined]
         rearrange_params(
             merge_dedup_seq_params(
                 signature_params,
