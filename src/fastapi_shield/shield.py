@@ -54,7 +54,7 @@ from fastapi_shield.utils import (
 )
 
 
-class ShieldDepends(Generic[U], Security):
+class ShieldDepends(Security, Generic[U]):
     """A dependency wrapper that integrates shields with FastAPI's dependency injection system.
 
     ShieldDepends allows shield-validated data to be injected into FastAPI endpoints
