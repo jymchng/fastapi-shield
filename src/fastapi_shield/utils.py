@@ -356,6 +356,8 @@ def rearrange_params(iter_params: Iterator[Parameter]):
         parameters are split into required and optional categories for
         proper ordering.
     """
+    p: Parameter
+
     # Pre-compute constants
     POS_ONLY = Parameter.POSITIONAL_ONLY
     POS_KW = Parameter.POSITIONAL_OR_KEYWORD

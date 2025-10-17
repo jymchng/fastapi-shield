@@ -605,7 +605,13 @@ class Shield(Generic[U]):
             if obj:
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong
-                request: Request = kwargs.get("request")
+                request = kwargs.get("request")
+
+                if not request and not isinstance(request, Request):
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        detail="Request is required or `request` is not of type `Request`",
+                    )
 
                 if not hasattr(wrapper, SHIELDED_ENDPOINT_PATH_FORMAT_KEY):
                     path_format = (
@@ -617,11 +623,6 @@ class Shield(Generic[U]):
                     path_format = getattr(wrapper, SHIELDED_ENDPOINT_PATH_FORMAT_KEY)
                 setattr(endpoint, SHIELDED_ENDPOINT_PATH_FORMAT_KEY, path_format)
 
-                if not request:
-                    raise HTTPException(
-                        status.HTTP_400_BAD_REQUEST,
-                        detail="Request is required",
-                    )
                 # because `solve_dependencies` is async, we need to await it
                 # hence no point to split returning `wrapper` into two functions, one sync and one async
                 endpoint_solved_dependencies, body = await get_solved_dependencies(
