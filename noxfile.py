@@ -115,6 +115,8 @@ MANIFEST_FILENAME = "pyproject.toml"
 PROJECT_MANIFEST = load_toml(MANIFEST_FILENAME)
 PROJECT_NAME: str = PROJECT_MANIFEST["project"]["name"]
 PROJECT_NAME_NORMALIZED: str = PROJECT_NAME.replace("-", "_").replace(" ", "_")
+SRC_DIR_NAME = "src"
+SRC_DIR_PATH = pathlib.Path(SRC_DIR_NAME)
 
 _PROJECT_CODES_DIR: str = os.path.join("src", PROJECT_NAME_NORMALIZED)
 PROJECT_CODES_DIR: str = (
@@ -574,6 +576,13 @@ def list_dist_files(session: Session):
 )
 def check_mypy(session: Session):
     session.run("uv", "tool", "run", "mypy")
+
+
+@session(
+    dependency_group="dev", default_posargs=[SRC_DIR_NAME]
+)
+def check_pyright(session: Session):
+    session.run("uv", "tool", "run", "pyright")
 
 
 @session(dependency_group="dev")

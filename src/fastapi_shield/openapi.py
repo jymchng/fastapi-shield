@@ -84,7 +84,7 @@ def switch_routes(app: FastAPI):
 
                 mocked_signature = (
                     Signature(
-                        rearrange_params(
+                        rearrange_params(  # type:ignore[reportArgumentType]
                             merge_dedup_seq_params(
                                 gather_signature_params_across_wrapped_endpoints(
                                     shielded_endpoint
@@ -234,7 +234,7 @@ def gather_signature_params_across_wrapped_endpoints(maybe_wrapped_fn: EndPointF
     yield from signature(maybe_wrapped_fn).parameters.values()
     if hasattr(maybe_wrapped_fn, "__wrapped__"):
         yield from gather_signature_params_across_wrapped_endpoints(
-            maybe_wrapped_fn.__wrapped__
+            maybe_wrapped_fn.__wrapped__  # type:ignore[reportFunctionMemberAccess]
         )
 
 
@@ -300,7 +300,7 @@ def patch_shields_for_openapi(
         return endpoint
     signature_params = gather_signature_params_across_wrapped_endpoints(endpoint)
     endpoint.__signature__ = Signature(  # type:ignore[attr-defined]
-        rearrange_params(
+        rearrange_params(  # type:ignore[reportArgumentType]
             merge_dedup_seq_params(
                 signature_params,
             )

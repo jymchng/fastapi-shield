@@ -257,7 +257,7 @@ class ShieldDepends(Security, Generic[U]):
         Returns:
             Signature: The signature for FastAPI dependency resolution.
         """
-        return Signature(self.rest_params)
+        return Signature(self.rest_params)  # type:ignore[reportArgumentType]
 
     async def resolve_dependencies(self, request: Request, path_format: str):
         """Resolve the dependencies for this shielded dependency.
@@ -651,7 +651,7 @@ class Shield(Generic[U]):
             return self._raise_or_return_default_response()
 
         wrapper.__signature__ = Signature(  # type:ignore[attr-defined]
-            rearrange_params(
+            rearrange_params(  # type:ignore[reportArgumentType]
                 merge_dedup_seq_params(
                     prepend_request_to_signature_params_of_function(self._guard_func),
                 )

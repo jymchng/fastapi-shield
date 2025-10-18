@@ -109,6 +109,10 @@ disable_error_code = [
     "import-not-found",
 ]
 
+
+[tool.pyright]
+reportMissingImports = "none"
+
 [dependency-groups]
 dev = [
     "bcrypt==4.3.0",
