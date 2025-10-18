@@ -54,7 +54,7 @@ from fastapi_shield.utils import (
 )
 
 
-class ShieldDepends(Generic[U], Security):
+class ShieldDepends(Security, Generic[U]):
     """A dependency wrapper that integrates shields with FastAPI's dependency injection system.
 
     ShieldDepends allows shield-validated data to be injected into FastAPI endpoints
@@ -257,7 +257,7 @@ class ShieldDepends(Generic[U], Security):
         Returns:
             Signature: The signature for FastAPI dependency resolution.
         """
-        return Signature(self.rest_params)
+        return Signature(self.rest_params)  # type:ignore[reportArgumentType]
 
     async def resolve_dependencies(self, request: Request, path_format: str):
         """Resolve the dependencies for this shielded dependency.
@@ -605,7 +605,13 @@ class Shield(Generic[U]):
             if obj:
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong
-                request: Request = kwargs.get("request")
+                request = kwargs.get("request")
+
+                if not request and not isinstance(request, Request):
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        detail="Request is required or `request` is not of type `Request`",
+                    )
 
                 if not hasattr(wrapper, SHIELDED_ENDPOINT_PATH_FORMAT_KEY):
                     path_format = (
@@ -617,11 +623,6 @@ class Shield(Generic[U]):
                     path_format = getattr(wrapper, SHIELDED_ENDPOINT_PATH_FORMAT_KEY)
                 setattr(endpoint, SHIELDED_ENDPOINT_PATH_FORMAT_KEY, path_format)
 
-                if not request:
-                    raise HTTPException(
-                        status.HTTP_400_BAD_REQUEST,
-                        detail="Request is required",
-                    )
                 # because `solve_dependencies` is async, we need to await it
                 # hence no point to split returning `wrapper` into two functions, one sync and one async
                 endpoint_solved_dependencies, body = await get_solved_dependencies(
@@ -650,7 +651,7 @@ class Shield(Generic[U]):
             return self._raise_or_return_default_response()
 
         wrapper.__signature__ = Signature(  # type:ignore[attr-defined]
-            rearrange_params(
+            rearrange_params(  # type:ignore[reportArgumentType]
                 merge_dedup_seq_params(
                     prepend_request_to_signature_params_of_function(self._guard_func),
                 )

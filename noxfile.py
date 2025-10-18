@@ -115,6 +115,8 @@ MANIFEST_FILENAME = "pyproject.toml"
 PROJECT_MANIFEST = load_toml(MANIFEST_FILENAME)
 PROJECT_NAME: str = PROJECT_MANIFEST["project"]["name"]
 PROJECT_NAME_NORMALIZED: str = PROJECT_NAME.replace("-", "_").replace(" ", "_")
+SRC_DIR_NAME = "src"
+SRC_DIR_PATH = pathlib.Path(SRC_DIR_NAME)
 
 _PROJECT_CODES_DIR: str = os.path.join("src", PROJECT_NAME_NORMALIZED)
 PROJECT_CODES_DIR: str = (
@@ -287,7 +289,7 @@ def alter_session(
 def clean(session: Session):
     # Try to clean uv cache, but don't fail if it's locked by other processes
     session.run("rm", "-rf", BUILD_DIR, DIST_DIR, "*.egg-info")
-    
+
     import glob
     import os
     import shutil
@@ -467,8 +469,14 @@ def format(session: Session):
     nox_command.run(("uv", "tool", "run", "clang-format", "-i", *c_files))
 
 
-@session(dependency_group="dev", default_posargs=["check", ".", "--fix"])
+@session(dependency_group="dev")
 def check(session: Session):
+    check_ruff(session)
+    check_mypy(session)
+
+
+@session(dependency_group="dev", default_posargs=["check", ".", "--fix"])
+def check_ruff(session: Session):
     session.run("uv", "tool", "run", "ruff")
 
 
@@ -570,12 +578,18 @@ def check_mypy(session: Session):
     session.run("uv", "tool", "run", "mypy")
 
 
+@session(
+    dependency_group="dev", default_posargs=[SRC_DIR_NAME]
+)
+def check_pyright(session: Session):
+    session.run("uv", "tool", "run", "pyright")
+
+
 @session(dependency_group="dev")
 def dev(session: Session):
     clean(session)
     format(session)
     check(session)
-    check_mypy(session)
     build(session)
     list_dist_files(session)
     test(session)
@@ -777,7 +791,12 @@ def git_check(session: Session):
     """Check git status and ensure clean working directory."""
     # Check if git repo
     result = session.run(
-        "git", "status", "--porcelain", silent=True, external=True, success_codes=[0, 128]
+        "git",
+        "status",
+        "--porcelain",
+        silent=True,
+        external=True,
+        success_codes=[0, 128],
     )
     if result is False:
         session.error("Not a git repository")
@@ -1214,16 +1233,16 @@ def test_install_all(session: Session):
 @session(dependency_group="docs")
 def export_docs_reqs(session: Session):
     session.run(*("uv export --only-group docs -o requirements-docs.txt".split(" ")))
-    
-    
+
+
 @session(dependency_group="docs")
 def build_docs(session: Session):
     session.chdir(ROOT_DIR)
     # Install the package in editable mode so mkdocstrings can import it
     session.run("uv", "pip", "install", "-e", ".")
     session.run("mkdocs", "build")
-    
-    
+
+
 @session(dependency_group="docs")
 def serve_docs(session: Session):
     session.chdir(ROOT_DIR)
@@ -1235,97 +1254,103 @@ def serve_docs(session: Session):
 @session(dependency_group="dev")
 def revert_release(session: AlteredSession):
     """Revert a release by deleting the git tag locally and remotely, and rolling back the version.
-    
+
     This function will:
     1. Delete the specified git tag locally and remotely
     2. Decrement the patch version by 1 in pyproject.toml and __init__.py
-    
+
     Usage: nox -s revert-release -- <tag_name>
     Example: nox -s revert-release -- v1.2.3
     """
     if not session.posargs:
-        session.error("Please provide a tag name to revert. Usage: nox -s revert-release -- <tag_name>")
+        session.error(
+            "Please provide a tag name to revert. Usage: nox -s revert-release -- <tag_name>"
+        )
         return
-    
+
     tag_name = session.posargs[0]
-    
+
     # Verify the tag exists locally
     try:
         session.session.run("git", "tag", "-l", tag_name, external=True, silent=True)
     except Exception:
         session.error(f"Tag '{tag_name}' does not exist locally")
         return
-    
+
     # Check if we're in a clean git state
     try:
         session.session.run("git", "diff", "--quiet", external=True, silent=True)
-        session.session.run("git", "diff", "--cached", "--quiet", external=True, silent=True)
+        session.session.run(
+            "git", "diff", "--cached", "--quiet", external=True, silent=True
+        )
     except Exception:
-        session.error("Git repository has uncommitted changes. Please commit or stash them first.")
+        session.error(
+            "Git repository has uncommitted changes. Please commit or stash them first."
+        )
         return
-    
+
     session.log(f"Reverting release tag: {tag_name}")
-    
+
     # Delete the tag locally
     session.log(f"Deleting local tag: {tag_name}")
     session.session.run("git", "tag", "-d", tag_name, external=True)
-    
+
     # Delete the tag from remote
     session.log(f"Deleting remote tag: {tag_name}")
-    session.session.run("git", "push", "origin", f":refs/tags/{tag_name}", external=True)
-    
+    session.session.run(
+        "git", "push", "origin", f":refs/tags/{tag_name}", external=True
+    )
+
     # Revert version in pyproject.toml and __init__.py
     session.log("Rolling back version numbers...")
-    
+
     import re
     import pathlib
-    
+
     # Read and update pyproject.toml
     pyproject_path = pathlib.Path("pyproject.toml")
     with open(pyproject_path, "r") as f:
         pyproject_content = f.read()
-    
+
     # Find current version in pyproject.toml
     version_match = re.search(r'version = "(\d+)\.(\d+)\.(\d+)"', pyproject_content)
     if not version_match:
         session.error("Could not find version in pyproject.toml")
         return
-    
+
     major, minor, patch = map(int, version_match.groups())
     if patch == 0:
         session.error("Cannot decrement patch version below 0")
         return
-    
+
     new_patch = patch - 1
     new_version = f"{major}.{minor}.{new_patch}"
-    
+
     # Update pyproject.toml
     new_pyproject_content = re.sub(
-        r'version = "\d+\.\d+\.\d+"',
-        f'version = "{new_version}"',
-        pyproject_content
+        r'version = "\d+\.\d+\.\d+"', f'version = "{new_version}"', pyproject_content
     )
-    
+
     with open(pyproject_path, "w") as f:
         f.write(new_pyproject_content)
-    
+
     session.log(f"Updated pyproject.toml version to {new_version}")
-    
+
     # Read and update __init__.py
     init_path = pathlib.Path("src") / "fastapi_shield" / "__init__.py"
     with open(init_path, "r") as f:
         init_content = f.read()
-    
+
     # Update __init__.py
     new_init_content = re.sub(
-        r'__version__ = "\d+\.\d+\.\d+"',
-        f'__version__ = "{new_version}"',
-        init_content
+        r'__version__ = "\d+\.\d+\.\d+"', f'__version__ = "{new_version}"', init_content
     )
-    
+
     with open(init_path, "w") as f:
         f.write(new_init_content)
-    
+
     session.log(f"Updated __init__.py version to {new_version}")
-    
-    session.log(f"SUCCESS: Tag '{tag_name}' has been deleted locally and remotely, and version rolled back to {new_version}")
+
+    session.log(
+        f"SUCCESS: Tag '{tag_name}' has been deleted locally and remotely, and version rolled back to {new_version}"
+    )

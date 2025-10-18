@@ -11,7 +11,7 @@ import re
 from collections.abc import Iterator
 from contextlib import AsyncExitStack
 from inspect import Parameter, signature
-from typing import Any, Callable, Optional, Sequence, List, Union
+from typing import Any, Callable, Optional, List, Union
 
 from fastapi import HTTPException, Request, params
 from fastapi._compat import ModelField, Undefined
@@ -260,17 +260,17 @@ async def get_solved_dependencies(
 
 
 def merge_dedup_seq_params(
-    *seqs_of_params: Sequence[Parameter],
+    *seqs_of_params: Iterator[Parameter],
 ):
-    """Merge multiple sequences of Parameters while removing duplicates.
+    """Merge multiple iterator of Parameters while removing duplicates.
 
-    Combines multiple sequences of `inspect.Parameter` objects, keeping only
+    Combines multiple iterator of `inspect.Parameter` objects, keeping only
     the first occurrence of each parameter name. This is used when merging
     parameters from wrapped functions to avoid duplicate parameters in
     the final signature.
 
     Args:
-        *seqs_of_params: Variable number of `Parameter` sequences to merge.
+        *seqs_of_params: Variable number of `Parameter` iterator to merge.
 
     Yields:
         Parameter: Unique parameters in the order they first appear.
@@ -356,6 +356,8 @@ def rearrange_params(iter_params: Iterator[Parameter]):
         parameters are split into required and optional categories for
         proper ordering.
     """
+    p: Parameter
+
     # Pre-compute constants
     POS_ONLY = Parameter.POSITIONAL_ONLY
     POS_KW = Parameter.POSITIONAL_OR_KEYWORD
