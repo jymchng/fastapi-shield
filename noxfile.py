@@ -473,6 +473,7 @@ def format(session: Session):
 def check(session: Session):
     check_ruff(session)
     check_mypy(session)
+    check_pyright(session)
 
 
 @session(dependency_group="dev", default_posargs=["check", ".", "--fix"])
@@ -578,9 +579,7 @@ def check_mypy(session: Session):
     session.run("uv", "tool", "run", "mypy")
 
 
-@session(
-    dependency_group="dev", default_posargs=[SRC_DIR_NAME]
-)
+@session(dependency_group="dev", default_posargs=[SRC_DIR_NAME])
 def check_pyright(session: Session):
     session.run("uv", "tool", "run", "pyright")
 
