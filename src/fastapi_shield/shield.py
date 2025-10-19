@@ -17,7 +17,7 @@ Key Classes:
 """
 
 from contextlib import asynccontextmanager
-from functools import cached_property, wraps
+from functools import wraps
 from inspect import Parameter, Signature, signature
 from typing import (
     Annotated,
@@ -91,16 +91,22 @@ class ShieldDepends(Security, Generic[U]):
         ```
     """
 
+    __signature__: Signature
+    """The rearranged signature for FastAPI dependency resolution, containing only the parameters that should be resolved
+    by FastAPI's dependency injection system (excludes the first parameter
+    if it receives shield data)."""
+
     __slots__ = (
         "dependency",
         "shielded_dependency",
         "unblocked",
         "auto_error",
+        "first_param",
+        "rest_params",
         "_shielded_dependency_params",
         "_dependency_cache",
         "_shield_dependency_is_coroutine_callable",
-        "first_param",
-        "rest_params",
+        "__signature__",
     )
 
     def __init__(
@@ -161,6 +167,7 @@ class ShieldDepends(Security, Generic[U]):
             else:
                 self.first_param = None
                 self.rest_params = params
+        self.__signature__ = Signature(self.rest_params)  # type:ignore[reportArgumentType]
 
     def __repr__(self) -> str:
         """Return a string representation of the ShieldDepends instance.
@@ -218,19 +225,6 @@ class ShieldDepends(Security, Generic[U]):
             bool: True if the dependency is unblocked, False otherwise.
         """
         return self.unblocked
-
-    @cached_property
-    def __signature__(self) -> Signature:
-        """Generate the rearranged signature for FastAPI dependency resolution.
-
-        Creates a signature containing only the parameters that should be resolved
-        by FastAPI's dependency injection system (excludes the first parameter
-        if it receives shield data).
-
-        Returns:
-            Signature: The signature for FastAPI dependency resolution.
-        """
-        return Signature(self.rest_params)  # type:ignore[reportArgumentType]
 
     async def resolve_dependencies(self, request: Request, path_format: str):
         """Resolve the dependencies for this shielded dependency.
