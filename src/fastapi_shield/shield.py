@@ -98,6 +98,9 @@ class ShieldDepends(Security, Generic[U]):
         "dependency_cache",
         "auto_error",
         "_shielded_dependency_params",
+        "_dependency_cache",
+        "_shield_dependency_is_coroutine_callable",
+        "first_param",
     )
 
     def __init__(
@@ -134,38 +137,27 @@ class ShieldDepends(Security, Generic[U]):
         self.shielded_dependency = shielded_dependency
         self.unblocked = False
         self.auto_error = auto_error
+
+        self._dependency_cache: Dict[str, Any] = {}
+        self._shield_dependency_is_coroutine_callable = is_coroutine_callable(
+            self.shielded_dependency
+        )
         if shielded_dependency is None:
             self._shielded_dependency_params: MappingProxyType[str, Parameter] = (
                 MappingProxyType({})
             )
         else:
             self._shielded_dependency_params = signature(shielded_dependency).parameters
-        self.dependency_cache: Dict[str, Any] = {}
 
-    @cached_property
-    def first_param(self) -> Optional[Parameter]:
-        """Get the first parameter of the shielded dependency function.
-
-        The first parameter is special because it receives the shield's returned data.
-        If the first parameter has no default value, it's considered required and
-        will receive the shield data. Otherwise, it's treated as optional.
-
-        Returns:
-            Optional[Parameter]: The first parameter if it has no default value,
-                               None if the dependency has no parameters or the
-                               first parameter has a default value.
-
-        """
-        dep = self.shielded_dependency
-        if not dep:
-            return None
         params = list(self._shielded_dependency_params.values())
         if len(params) == 0:
-            return None
-        first = params[0]
-        if first.default is Parameter.empty:
-            return first
-        return None
+            self.first_param = None
+        else:
+            first = params[0]
+            if first.default is Parameter.empty:
+                self.first_param = first
+            else:
+                self.first_param = None
 
     @cached_property
     def rest_params(self):
@@ -279,7 +271,7 @@ class ShieldDepends(Security, Generic[U]):
             request=request,
             path_format=path_format,
             endpoint=self,
-            dependency_cache=self.dependency_cache,
+            dependency_cache=self._dependency_cache,
         )
 
         return solved_dependencies
