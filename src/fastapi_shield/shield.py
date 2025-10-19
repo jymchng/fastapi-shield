@@ -95,12 +95,12 @@ class ShieldDepends(Security, Generic[U]):
         "dependency",
         "shielded_dependency",
         "unblocked",
-        "dependency_cache",
         "auto_error",
         "_shielded_dependency_params",
         "_dependency_cache",
         "_shield_dependency_is_coroutine_callable",
         "first_param",
+        "rest_params",
     )
 
     def __init__(
@@ -152,34 +152,15 @@ class ShieldDepends(Security, Generic[U]):
         params = list(self._shielded_dependency_params.values())
         if len(params) == 0:
             self.first_param = None
+            self.rest_params = None
         else:
-            first = params[0]
+            first, *rest = params
             if first.default is Parameter.empty:
                 self.first_param = first
+                self.rest_params = rest
             else:
                 self.first_param = None
-
-    @cached_property
-    def rest_params(self):
-        """Get all parameters except the first one (if it has no default).
-
-        These parameters will be resolved using FastAPI's standard dependency
-        injection system, while the first parameter (if it exists and has no
-        default) receives the shield's validated data.
-
-        Yields:
-            Parameter: All parameters that should be resolved via dependency injection.
-        """
-        dep = self.shielded_dependency
-        if not dep:
-            return
-        params = list(self._shielded_dependency_params.values())
-        if not params:
-            return
-        first, *rest = params
-        if first.default is not Parameter.empty:
-            yield first
-        yield from rest
+                self.rest_params = params
 
     def __repr__(self) -> str:
         """Return a string representation of the ShieldDepends instance.
