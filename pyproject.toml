@@ -1,6 +1,6 @@
 [project]
 name = "fastapi-shield"
-version = "0.1.3"
+version = "0.1.4"
 description = "A comprehensive FastAPI decorator library providing request validation, authentication, rate limiting, and security shields for API endpoints"
 readme = "README.md"
 license = { text = "MIT" }
