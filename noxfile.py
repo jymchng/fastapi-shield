@@ -117,6 +117,8 @@ PROJECT_NAME: str = PROJECT_MANIFEST["project"]["name"]
 PROJECT_NAME_NORMALIZED: str = PROJECT_NAME.replace("-", "_").replace(" ", "_")
 SRC_DIR_NAME = "src"
 SRC_DIR_PATH = pathlib.Path(SRC_DIR_NAME)
+NOXFILE_NAME = "noxfile"
+NOXFILE_WITH_EXT_NAME = f"{NOXFILE_NAME}.py"
 
 _PROJECT_CODES_DIR: str = os.path.join("src", PROJECT_NAME_NORMALIZED)
 PROJECT_CODES_DIR: str = (
@@ -437,7 +439,11 @@ def test_development(session: Session):
 
 @session(
     dependency_group="dev",
-    default_posargs=[pathlib.Path(PROJECT_CODES_DIR)],
+    default_posargs=[
+        pathlib.Path(PROJECT_CODES_DIR),
+        pathlib.Path(TEST_DIR),
+        pathlib.Path(NOXFILE_WITH_EXT_NAME),
+    ],
 )
 def format(session: Session):
     # clang-format only c files

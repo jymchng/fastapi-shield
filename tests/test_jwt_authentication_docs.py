@@ -48,12 +48,12 @@ class TestBasicJWTAuthentication:
         @app.get("/protected")
         @jwt_auth_shield
         async def protected_endpoint(
-            payload: dict = ShieldedDepends(lambda payload: payload)
+            payload: dict = ShieldedDepends(lambda payload: payload),
         ):
             return {
                 "message": "Access granted",
                 "user": payload.get("sub"),
-                "roles": payload.get("roles", [])
+                "roles": payload.get("roles", []),
             }
 
         self.app = app
@@ -63,21 +63,17 @@ class TestBasicJWTAuthentication:
 
     def create_test_token(self, sub: str, roles: List[str] = None) -> str:
         """Create a test JWT token"""
-        payload = {
-            "sub": sub,
-            "roles": roles or ["user"]
-        }
+        payload = {"sub": sub, "roles": roles or ["user"]}
         return jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
 
     def test_jwt_authentication_success(self):
         """Test successful JWT authentication"""
         token = self.create_test_token("test_user", ["user", "admin"])
-        
+
         response = self.client.get(
-            "/protected",
-            headers={"Authorization": f"Bearer {token}"}
+            "/protected", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Access granted"
@@ -87,20 +83,18 @@ class TestBasicJWTAuthentication:
     def test_jwt_authentication_invalid_token(self):
         """Test JWT authentication with invalid token"""
         response = self.client.get(
-            "/protected",
-            headers={"Authorization": "Bearer invalid.token.here"}
+            "/protected", headers={"Authorization": "Bearer invalid.token.here"}
         )
-        
+
         assert response.status_code == 401
         assert "Invalid authentication credentials" in response.json()["detail"]
 
     def test_jwt_authentication_malformed_header(self):
         """Test JWT authentication with malformed header"""
         response = self.client.get(
-            "/protected",
-            headers={"Authorization": "InvalidFormat token"}
+            "/protected", headers={"Authorization": "InvalidFormat token"}
         )
-        
+
         assert response.status_code == 401
 
     def test_jwt_authentication_missing_header(self):
@@ -132,21 +126,23 @@ class TestRoleBasedAccessControl:
 
         def role_shield(required_roles: list[str]):
             """Factory function to create a role-checking shield"""
-            
+
             @shield(
                 name=f"Role Check ({', '.join(required_roles)})",
                 exception_to_raise_if_fail=HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied. Required roles: {', '.join(required_roles)}"
-                )
+                    detail=f"Access denied. Required roles: {', '.join(required_roles)}",
+                ),
             )
-            def check_role(user_data: dict = ShieldedDepends(lambda user: user)) -> dict:
+            def check_role(
+                user_data: dict = ShieldedDepends(lambda user: user),
+            ) -> dict:
                 """Check if the user has any of the required roles"""
                 user_roles = user_data.get("roles", [])
                 if any(role in required_roles for role in user_roles):
                     return user_data
                 return None
-            
+
             return check_role
 
         # Create specific role shields
@@ -157,25 +153,19 @@ class TestRoleBasedAccessControl:
         @app.get("/admin")
         @auth_shield
         @admin_shield
-        async def admin_endpoint(
-            user: dict = ShieldedDepends(lambda user: user)
-        ):
+        async def admin_endpoint(user: dict = ShieldedDepends(lambda user: user)):
             return {"message": "Admin endpoint", "user": user["user_id"]}
 
         @app.get("/editor")
         @auth_shield
         @editor_shield
-        async def editor_endpoint(
-            user: dict = ShieldedDepends(lambda user: user)
-        ):
+        async def editor_endpoint(user: dict = ShieldedDepends(lambda user: user)):
             return {"message": "Editor endpoint", "user": user["user_id"]}
 
         @app.get("/user")
         @auth_shield
         @user_shield
-        async def user_endpoint(
-            user: dict = ShieldedDepends(lambda user: user)
-        ):
+        async def user_endpoint(user: dict = ShieldedDepends(lambda user: user)):
             return {"message": "User endpoint", "user": user["user_id"]}
 
         self.app = app
@@ -228,16 +218,16 @@ class TestAdvancedJWTAuthentication:
 
         class AuthData:
             """Class to hold authentication data and provide helper methods"""
-            
+
             def __init__(self, user_id: str, roles: List[str], permissions: List[str]):
                 self.user_id = user_id
                 self.roles = roles
                 self.permissions = permissions
-            
+
             def has_role(self, role: str) -> bool:
                 """Check if user has a specific role"""
                 return role in self.roles
-            
+
             def has_permission(self, permission: str) -> bool:
                 """Check if user has a specific permission"""
                 return permission in self.permissions
@@ -247,8 +237,8 @@ class TestAdvancedJWTAuthentication:
             exception_to_raise_if_fail=HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
+                headers={"WWW-Authenticate": "Bearer"},
+            ),
         )
         async def jwt_auth_shield(authorization: str = Header()) -> Optional[dict]:
             """Validate JWT token and extract payload"""
@@ -267,8 +257,8 @@ class TestAdvancedJWTAuthentication:
             name="User Role Extraction",
             exception_to_raise_if_fail=HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user data in token"
-            )
+                detail="Invalid user data in token",
+            ),
         )
         async def role_extraction_shield(
             payload: dict = ShieldedDepends(lambda payload: payload),
@@ -285,7 +275,7 @@ class TestAdvancedJWTAuthentication:
 
         def require_role(role: str):
             """Create a shield that requires a specific role"""
-            
+
             @shield(
                 name=f"Role Requirement ({role})",
                 exception_to_raise_if_fail=HTTPException(
@@ -304,7 +294,7 @@ class TestAdvancedJWTAuthentication:
 
         def require_permission(permission: str):
             """Create a shield that requires a specific permission"""
-            
+
             @shield(
                 name=f"Permission Requirement ({permission})",
                 exception_to_raise_if_fail=HTTPException(
@@ -361,24 +351,25 @@ class TestAdvancedJWTAuthentication:
         self.jwt_algorithm = JWT_ALGORITHM
         self.AuthData = AuthData
 
-    def create_test_token(self, user_id: str, roles: List[str] = None, permissions: List[str] = None) -> str:
+    def create_test_token(
+        self, user_id: str, roles: List[str] = None, permissions: List[str] = None
+    ) -> str:
         """Create a test JWT token"""
         payload = {
             "user_id": user_id,
             "roles": roles or ["user"],
-            "permissions": permissions or []
+            "permissions": permissions or [],
         }
         return jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
 
     def test_user_profile_success(self):
         """Test user profile with valid JWT token"""
         token = self.create_test_token("test_user", ["user"], ["read"])
-        
+
         response = self.client.get(
-            "/user-profile",
-            headers={"Authorization": f"Bearer {token}"}
+            "/user-profile", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["user_id"] == "test_user"
@@ -388,12 +379,11 @@ class TestAdvancedJWTAuthentication:
     def test_admin_panel_with_admin_role(self):
         """Test admin panel with admin role"""
         token = self.create_test_token("admin_user", ["admin"], ["manage_users"])
-        
+
         response = self.client.get(
-            "/admin-panel",
-            headers={"Authorization": f"Bearer {token}"}
+            "/admin-panel", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Welcome to admin panel"
@@ -402,24 +392,22 @@ class TestAdvancedJWTAuthentication:
     def test_admin_panel_without_admin_role(self):
         """Test admin panel without admin role (should fail)"""
         token = self.create_test_token("regular_user", ["user"], ["read"])
-        
+
         response = self.client.get(
-            "/admin-panel",
-            headers={"Authorization": f"Bearer {token}"}
+            "/admin-panel", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 403
         assert "Requires role: admin" in response.json()["detail"]
 
     def test_user_management_with_permission(self):
         """Test user management with required permission"""
         token = self.create_test_token("manager", ["manager"], ["manage_users"])
-        
+
         response = self.client.post(
-            "/user-management",
-            headers={"Authorization": f"Bearer {token}"}
+            "/user-management", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "User management access granted"
@@ -428,22 +416,20 @@ class TestAdvancedJWTAuthentication:
     def test_user_management_without_permission(self):
         """Test user management without required permission (should fail)"""
         token = self.create_test_token("regular_user", ["user"], ["read"])
-        
+
         response = self.client.post(
-            "/user-management",
-            headers={"Authorization": f"Bearer {token}"}
+            "/user-management", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 403
         assert "Requires permission: manage_users" in response.json()["detail"]
 
     def test_invalid_token_authentication(self):
         """Test authentication with invalid token"""
         response = self.client.get(
-            "/user-profile",
-            headers={"Authorization": "Bearer invalid.token"}
+            "/user-profile", headers={"Authorization": "Bearer invalid.token"}
         )
-        
+
         assert response.status_code == 401
         assert "Authentication required" in response.json()["detail"]
 
@@ -451,12 +437,11 @@ class TestAdvancedJWTAuthentication:
         """Test token without required user_id field"""
         payload = {"roles": ["user"], "permissions": ["read"]}
         token = jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
-        
+
         response = self.client.get(
-            "/user-profile",
-            headers={"Authorization": f"Bearer {token}"}
+            "/user-profile", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 401
         assert "Invalid user data in token" in response.json()["detail"]
 
@@ -494,15 +479,15 @@ class TestOAuth2Integration:
                 "full_name": "John Doe",
                 "email": "johndoe@example.com",
                 "hashed_password": "fakehashedsecret",
-                "roles": ["user"]
+                "roles": ["user"],
             },
             "alice": {
                 "username": "alice",
                 "full_name": "Alice Admin",
                 "email": "alice@example.com",
                 "hashed_password": "fakehashedsecret2",
-                "roles": ["admin", "user"]
-            }
+                "roles": ["admin", "user"],
+            },
         }
 
         def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -527,7 +512,7 @@ class TestOAuth2Integration:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ),
         )
         async def oauth2_jwt_shield(token: str = Depends(oauth2_scheme)) -> User:
             """Validate OAuth2 JWT token and return user"""
@@ -538,16 +523,16 @@ class TestOAuth2Integration:
                     return None
             except PyJWTError:
                 return None
-            
+
             user_dict = fake_users_db.get(username)
             if user_dict is None:
                 return None
-            
+
             return User(**user_dict)
 
         def require_oauth2_role(role: str):
             """Create a shield that requires a specific OAuth2 role"""
-            
+
             @shield(
                 name=f"OAuth2 Role ({role})",
                 exception_to_raise_if_fail=HTTPException(
@@ -555,16 +540,20 @@ class TestOAuth2Integration:
                     detail=f"Role {role} required",
                 ),
             )
-            async def role_check(user: User = ShieldedDepends(lambda user: user)) -> User:
+            async def role_check(
+                user: User = ShieldedDepends(lambda user: user),
+            ) -> User:
                 if role in user.roles:
                     return user
                 return None
-            
+
             return role_check
 
         # Token endpoint
         @app.post("/token", response_model=Token)
-        async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+        async def login_for_access_token(
+            form_data: OAuth2PasswordRequestForm = Depends(),
+        ):
             user = authenticate_user(form_data.username, form_data.password)
             if not user:
                 raise HTTPException(
@@ -572,12 +561,12 @@ class TestOAuth2Integration:
                     detail="Incorrect username or password",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
                 data={"sub": user["username"]}, expires_delta=access_token_expires
             )
-            
+
             return {"access_token": access_token, "token_type": "bearer"}
 
         # Protected endpoints
@@ -604,10 +593,9 @@ class TestOAuth2Integration:
     def test_token_generation_valid_credentials(self):
         """Test token generation with valid credentials"""
         response = self.client.post(
-            "/token",
-            data={"username": "johndoe", "password": "secret"}
+            "/token", data={"username": "johndoe", "password": "secret"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
@@ -616,10 +604,9 @@ class TestOAuth2Integration:
     def test_token_generation_invalid_credentials(self):
         """Test token generation with invalid credentials"""
         response = self.client.post(
-            "/token",
-            data={"username": "johndoe", "password": "wrong"}
+            "/token", data={"username": "johndoe", "password": "wrong"}
         )
-        
+
         assert response.status_code == 401
         assert "Incorrect username or password" in response.json()["detail"]
 
@@ -627,17 +614,15 @@ class TestOAuth2Integration:
         """Test /users/me endpoint with valid token"""
         # First get a token
         token_response = self.client.post(
-            "/token",
-            data={"username": "johndoe", "password": "secret"}
+            "/token", data={"username": "johndoe", "password": "secret"}
         )
         token = token_response.json()["access_token"]
-        
+
         # Use the token
         response = self.client.get(
-            "/users/me",
-            headers={"Authorization": f"Bearer {token}"}
+            "/users/me", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["username"] == "johndoe"
@@ -647,10 +632,9 @@ class TestOAuth2Integration:
     def test_users_me_with_invalid_token(self):
         """Test /users/me endpoint with invalid token"""
         response = self.client.get(
-            "/users/me",
-            headers={"Authorization": "Bearer invalid.token"}
+            "/users/me", headers={"Authorization": "Bearer invalid.token"}
         )
-        
+
         assert response.status_code == 401
         assert "Could not validate credentials" in response.json()["detail"]
 
@@ -658,17 +642,15 @@ class TestOAuth2Integration:
         """Test admin settings endpoint with admin role"""
         # Get admin token
         token_response = self.client.post(
-            "/token",
-            data={"username": "alice", "password": "secret"}
+            "/token", data={"username": "alice", "password": "secret"}
         )
         token = token_response.json()["access_token"]
-        
+
         # Access admin endpoint
         response = self.client.get(
-            "/admin/settings",
-            headers={"Authorization": f"Bearer {token}"}
+            "/admin/settings", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Admin settings"
@@ -678,17 +660,15 @@ class TestOAuth2Integration:
         """Test admin settings endpoint without admin role"""
         # Get user token
         token_response = self.client.post(
-            "/token",
-            data={"username": "johndoe", "password": "secret"}
+            "/token", data={"username": "johndoe", "password": "secret"}
         )
         token = token_response.json()["access_token"]
-        
+
         # Try to access admin endpoint
         response = self.client.get(
-            "/admin/settings",
-            headers={"Authorization": f"Bearer {token}"}
+            "/admin/settings", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 403
         assert "Role admin required" in response.json()["detail"]
 
@@ -706,7 +686,7 @@ class TestJWTTokenCreation:
         user_id: str,
         roles: List[str] = None,
         permissions: List[str] = None,
-        expires_delta: Optional[timedelta] = None
+        expires_delta: Optional[timedelta] = None,
     ) -> str:
         """Create a JWT token with user information"""
         payload = {
@@ -714,14 +694,14 @@ class TestJWTTokenCreation:
             "roles": roles or [],
             "permissions": permissions or [],
         }
-        
+
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(hours=1)
-        
+
         payload["exp"] = expire
-        
+
         return jwt.encode(payload, self.JWT_SECRET, algorithm=self.JWT_ALGORITHM)
 
     def test_create_admin_token(self):
@@ -730,9 +710,9 @@ class TestJWTTokenCreation:
             user_id="admin_user",
             roles=["admin", "user"],
             permissions=["read", "write", "delete"],
-            expires_delta=timedelta(hours=8)
+            expires_delta=timedelta(hours=8),
         )
-        
+
         # Decode and verify
         payload = jwt.decode(token, self.JWT_SECRET, algorithms=[self.JWT_ALGORITHM])
         assert payload["user_id"] == "admin_user"
@@ -746,9 +726,9 @@ class TestJWTTokenCreation:
             user_id="regular_user",
             roles=["user"],
             permissions=["read"],
-            expires_delta=timedelta(hours=1)
+            expires_delta=timedelta(hours=1),
         )
-        
+
         # Decode and verify
         payload = jwt.decode(token, self.JWT_SECRET, algorithms=[self.JWT_ALGORITHM])
         assert payload["user_id"] == "regular_user"
@@ -758,19 +738,17 @@ class TestJWTTokenCreation:
     def test_token_expiration(self):
         """Test token with custom expiration"""
         short_expiry = timedelta(seconds=1)
-        token = self.create_jwt_token(
-            user_id="test_user",
-            expires_delta=short_expiry
-        )
-        
+        token = self.create_jwt_token(user_id="test_user", expires_delta=short_expiry)
+
         # Token should be valid immediately
         payload = jwt.decode(token, self.JWT_SECRET, algorithms=[self.JWT_ALGORITHM])
         assert payload["user_id"] == "test_user"
-        
+
         # Wait for expiration and verify it fails
         import time
+
         time.sleep(2)
-        
+
         with pytest.raises(jwt.ExpiredSignatureError):
             jwt.decode(token, self.JWT_SECRET, algorithms=[self.JWT_ALGORITHM])
 
@@ -791,37 +769,37 @@ class TestSecureJWTAuthentication:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication failed",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ),
         )
         def secure_jwt_shield(authorization: str = Header()) -> Optional[dict]:
             """Secure JWT validation with proper error handling"""
-            
+
             # Check authorization header format
             if not authorization or not authorization.startswith("Bearer "):
                 return None
-            
+
             token = authorization.replace("Bearer ", "")
-            
+
             try:
                 # Decode and validate token
                 payload = jwt.decode(
-                    token, 
-                    JWT_SECRET, 
+                    token,
+                    JWT_SECRET,
                     algorithms=[JWT_ALGORITHM],
-                    options={"verify_exp": True}  # Ensure expiration is checked
+                    options={"verify_exp": True},  # Ensure expiration is checked
                 )
-                
+
                 # Validate required claims
                 if not payload.get("user_id"):
                     return None
-                
+
                 # Check token expiration explicitly
                 exp = payload.get("exp")
                 if exp and datetime.utcnow().timestamp() > exp:
                     return None
-                
+
                 return payload
-                
+
             except jwt.ExpiredSignatureError:
                 # Token has expired
                 return None
@@ -835,7 +813,7 @@ class TestSecureJWTAuthentication:
         @app.get("/secure")
         @secure_jwt_shield
         async def secure_endpoint(
-            payload: dict = ShieldedDepends(lambda payload: payload)
+            payload: dict = ShieldedDepends(lambda payload: payload),
         ):
             return {"message": "Secure access granted", "user_id": payload["user_id"]}
 
@@ -847,23 +825,22 @@ class TestSecureJWTAuthentication:
     def create_test_token(self, user_id: str, expired: bool = False) -> str:
         """Create a test JWT token"""
         payload = {"user_id": user_id}
-        
+
         if expired:
             payload["exp"] = datetime.utcnow() - timedelta(hours=1)
         else:
             payload["exp"] = datetime.utcnow() + timedelta(hours=1)
-        
+
         return jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
 
     def test_secure_jwt_success(self):
         """Test secure JWT authentication with valid token"""
         token = self.create_test_token("test_user")
-        
+
         response = self.client.get(
-            "/secure",
-            headers={"Authorization": f"Bearer {token}"}
+            "/secure", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Secure access granted"
@@ -872,12 +849,11 @@ class TestSecureJWTAuthentication:
     def test_secure_jwt_expired_token(self):
         """Test secure JWT authentication with expired token"""
         token = self.create_test_token("test_user", expired=True)
-        
+
         response = self.client.get(
-            "/secure",
-            headers={"Authorization": f"Bearer {token}"}
+            "/secure", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 401
         assert "Authentication failed" in response.json()["detail"]
 
@@ -885,30 +861,27 @@ class TestSecureJWTAuthentication:
         """Test secure JWT authentication with missing user_id"""
         payload = {"some_field": "value"}
         token = jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
-        
+
         response = self.client.get(
-            "/secure",
-            headers={"Authorization": f"Bearer {token}"}
+            "/secure", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 401
 
     def test_secure_jwt_invalid_token(self):
         """Test secure JWT authentication with invalid token"""
         response = self.client.get(
-            "/secure",
-            headers={"Authorization": "Bearer invalid.token.here"}
+            "/secure", headers={"Authorization": "Bearer invalid.token.here"}
         )
-        
+
         assert response.status_code == 401
 
     def test_secure_jwt_malformed_header(self):
         """Test secure JWT authentication with malformed header"""
         response = self.client.get(
-            "/secure",
-            headers={"Authorization": "NotBearer token"}
+            "/secure", headers={"Authorization": "NotBearer token"}
         )
-        
+
         assert response.status_code == 401
 
 
@@ -917,13 +890,19 @@ class TestEnvironmentConfiguration:
 
     def test_environment_configuration_production(self):
         """Test environment configuration validation in production"""
-        with patch.dict(os.environ, {"ENVIRONMENT": "production", "JWT_SECRET_KEY": ""}):
-            with pytest.raises(ValueError, match="JWT_SECRET_KEY must be set in production"):
+        with patch.dict(
+            os.environ, {"ENVIRONMENT": "production", "JWT_SECRET_KEY": ""}
+        ):
+            with pytest.raises(
+                ValueError, match="JWT_SECRET_KEY must be set in production"
+            ):
                 # Production configuration
                 JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret-for-dev")
                 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-                ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-                
+                ACCESS_TOKEN_EXPIRE_MINUTES = int(
+                    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+                )
+
                 # Validate configuration
                 if not JWT_SECRET or JWT_SECRET == "fallback-secret-for-dev":
                     if os.getenv("ENVIRONMENT") == "production":
@@ -935,8 +914,10 @@ class TestEnvironmentConfiguration:
             # Production configuration
             JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret-for-dev")
             JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-            ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-            
+            ACCESS_TOKEN_EXPIRE_MINUTES = int(
+                os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+            )
+
             # Should not raise in development
             assert JWT_SECRET == "fallback-secret-for-dev"
             assert JWT_ALGORITHM == "HS256"
@@ -944,15 +925,20 @@ class TestEnvironmentConfiguration:
 
     def test_environment_configuration_with_values(self):
         """Test environment configuration with proper values"""
-        with patch.dict(os.environ, {
-            "JWT_SECRET_KEY": "production-secret",
-            "JWT_ALGORITHM": "HS512",
-            "ACCESS_TOKEN_EXPIRE_MINUTES": "60"
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "JWT_SECRET_KEY": "production-secret",
+                "JWT_ALGORITHM": "HS512",
+                "ACCESS_TOKEN_EXPIRE_MINUTES": "60",
+            },
+        ):
             JWT_SECRET = os.getenv("JWT_SECRET_KEY", "fallback-secret-for-dev")
             JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-            ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-            
+            ACCESS_TOKEN_EXPIRE_MINUTES = int(
+                os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+            )
+
             assert JWT_SECRET == "production-secret"
             assert JWT_ALGORITHM == "HS512"
             assert ACCESS_TOKEN_EXPIRE_MINUTES == 60
@@ -968,16 +954,13 @@ class TestJWTTestingHelpers:
 
     def create_test_token(self, user_id: str, roles: List[str] = None) -> str:
         """Create a test JWT token"""
-        payload = {
-            "user_id": user_id,
-            "roles": roles or ["user"]
-        }
+        payload = {"user_id": user_id, "roles": roles or ["user"]}
         return jwt.encode(payload, self.JWT_SECRET, algorithm=self.JWT_ALGORITHM)
 
     def test_create_test_token_helper(self):
         """Test the test token creation helper"""
         token = self.create_test_token("test_user", ["user"])
-        
+
         # Verify token can be decoded
         payload = jwt.decode(token, self.JWT_SECRET, algorithms=[self.JWT_ALGORITHM])
         assert payload["user_id"] == "test_user"
@@ -986,7 +969,7 @@ class TestJWTTestingHelpers:
     def test_create_admin_test_token(self):
         """Test creating admin test token"""
         token = self.create_test_token("admin_user", ["admin"])
-        
+
         # Verify token can be decoded
         payload = jwt.decode(token, self.JWT_SECRET, algorithms=[self.JWT_ALGORITHM])
         assert payload["user_id"] == "admin_user"
@@ -995,7 +978,7 @@ class TestJWTTestingHelpers:
     def test_create_test_token_default_roles(self):
         """Test creating test token with default roles"""
         token = self.create_test_token("default_user")
-        
+
         # Verify token can be decoded
         payload = jwt.decode(token, self.JWT_SECRET, algorithms=[self.JWT_ALGORITHM])
         assert payload["user_id"] == "default_user"
@@ -1019,15 +1002,15 @@ class TestJWTDocumentationIntegration:
             exception_to_raise_if_fail=HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
+                headers={"WWW-Authenticate": "Bearer"},
+            ),
         )
         def jwt_auth_shield(authorization: str = Header()) -> dict:
             if not authorization.startswith("Bearer "):
                 return None
-            
+
             token = authorization.replace("Bearer ", "")
-            
+
             try:
                 payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
                 return payload
@@ -1040,16 +1023,17 @@ class TestJWTDocumentationIntegration:
                 name=f"Role Requirement ({role})",
                 exception_to_raise_if_fail=HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Role {role} required"
-                )
+                    detail=f"Role {role} required",
+                ),
             )
             def role_shield(
-                payload: dict = ShieldedDepends(lambda payload: payload)
+                payload: dict = ShieldedDepends(lambda payload: payload),
             ) -> dict:
                 user_roles = payload.get("roles", [])
                 if role in user_roles:
                     return payload
                 return None
+
             return role_shield
 
         admin_role = require_role("admin")
@@ -1058,12 +1042,12 @@ class TestJWTDocumentationIntegration:
         @jwt_auth_shield
         @admin_role
         async def multi_layer_endpoint(
-            payload: dict = ShieldedDepends(lambda payload: payload)
+            payload: dict = ShieldedDepends(lambda payload: payload),
         ):
             return {
                 "message": "Multi-layer security passed",
                 "user": payload.get("sub"),
-                "roles": payload.get("roles", [])
+                "roles": payload.get("roles", []),
             }
 
         self.app = app
@@ -1073,21 +1057,17 @@ class TestJWTDocumentationIntegration:
 
     def create_test_token(self, sub: str, roles: List[str] = None) -> str:
         """Create a test JWT token"""
-        payload = {
-            "sub": sub,
-            "roles": roles or ["user"]
-        }
+        payload = {"sub": sub, "roles": roles or ["user"]}
         return jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
 
     def test_multi_layer_security_success(self):
         """Test successful access through multiple security layers"""
         token = self.create_test_token("admin_user", ["admin", "user"])
-        
+
         response = self.client.get(
-            "/multi-layer-endpoint",
-            headers={"Authorization": f"Bearer {token}"}
+            "/multi-layer-endpoint", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Multi-layer security passed"
@@ -1097,21 +1077,19 @@ class TestJWTDocumentationIntegration:
     def test_multi_layer_security_auth_failure(self):
         """Test authentication failure in multi-layer security"""
         response = self.client.get(
-            "/multi-layer-endpoint",
-            headers={"Authorization": "Bearer invalid.token"}
+            "/multi-layer-endpoint", headers={"Authorization": "Bearer invalid.token"}
         )
-        
+
         assert response.status_code == 401
         assert "Authentication required" in response.json()["detail"]
 
     def test_multi_layer_security_role_failure(self):
         """Test role authorization failure in multi-layer security"""
         token = self.create_test_token("regular_user", ["user"])
-        
+
         response = self.client.get(
-            "/multi-layer-endpoint",
-            headers={"Authorization": f"Bearer {token}"}
+            "/multi-layer-endpoint", headers={"Authorization": f"Bearer {token}"}
         )
-        
+
         assert response.status_code == 403
-        assert "Role admin required" in response.json()["detail"] 
+        assert "Role admin required" in response.json()["detail"]
