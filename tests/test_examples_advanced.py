@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
-from fastapi import FastAPI, Header, HTTPException, status, Depends
+from fastapi import FastAPI, Header, HTTPException, status, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi_shield import shield, ShieldedDepends
 import jwt
@@ -833,6 +834,13 @@ class TestAdvancedErrorHandling:
                 return {"mode": "valid"}
             else:
                 return None
+
+        @self.app.exception_handler(ValueError)
+        async def value_error_handler(_: Request, exc: ValueError):
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(exc)},
+            )
 
         @self.app.get("/error-test")
         @error_shield

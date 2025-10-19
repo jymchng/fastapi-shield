@@ -384,11 +384,6 @@ class Shield(Generic[U]):
     Attributes:
         auto_error: Whether to raise HTTP exceptions on shield failure
         name: Human-readable name for the shield (used in error messages)
-        _guard_func: The actual shield validation function
-        _guard_func_is_async: Whether the shield function is async
-        _guard_func_params: Parameters of the shield function
-        _exception_to_raise_if_fail: Exception to raise when shield blocks request
-        _default_response_to_return_if_fail: Response to return when not using auto_error
 
     Examples:
         ```python
@@ -486,28 +481,27 @@ class Shield(Generic[U]):
             ```
         """
         assert callable(shield_func), "`shield_func` must be callable"
-        self._guard_func = shield_func
-        self._guard_func_is_async = is_coroutine_callable(shield_func)
-        self._guard_func_params = signature(shield_func).parameters
-        self.name = name or "unknown"
-        self.auto_error = auto_error
-        self._exception_to_raise_if_fail = exception_to_raise_if_fail or HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Shield with name `{self.name}` blocks the request",
+        self._guard_func: U = shield_func
+        self._guard_func_is_async: bool = is_coroutine_callable(shield_func)
+        self._guard_func_params: MappingProxyType[str, Parameter] = signature(
+            shield_func
+        ).parameters
+        self.name: str = name or "unknown"
+        self.auto_error: bool = auto_error
+        self._exception_to_raise_if_fail: Optional[HTTPException] = (
+            exception_to_raise_if_fail
         )
-        assert isinstance(self._exception_to_raise_if_fail, HTTPException), (
-            "`exception_to_raise_if_fail` must be an instance of `HTTPException`"
-        )
-        self._default_response_to_return_if_fail = (
-            default_response_to_return_if_fail
-            or Response(
-                content=f"Shield with name `{self.name}` blocks the request",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        if self._exception_to_raise_if_fail is not None:
+            assert isinstance(self._exception_to_raise_if_fail, HTTPException), (
+                "`exception_to_raise_if_fail` must be an instance of `HTTPException`"
             )
+        self._default_response_to_return_if_fail: Optional[Response] = (
+            default_response_to_return_if_fail
         )
-        assert isinstance(self._default_response_to_return_if_fail, Response), (
-            "`default_response_to_return_if_fail` must be an instance of `Response`"
-        )
+        if self._default_response_to_return_if_fail is not None:
+            assert isinstance(self._default_response_to_return_if_fail, Response), (
+                "`default_response_to_return_if_fail` must be an instance of `Response`"
+            )
 
     def _raise_or_return_default_response(self):
         """Handle shield failure by raising an exception or returning a default response.
@@ -524,7 +518,17 @@ class Shield(Generic[U]):
             HTTPException: The configured exception if auto_error=True
         """
         if self.auto_error:
-            raise self._exception_to_raise_if_fail
+            if self._exception_to_raise_if_fail is None:
+                self._exception_to_raise_if_fail = HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Shield with name `{self.name}` blocks the request",
+                )
+            raise self._exception_to_raise_if_fail  # type: ignore[reportGeneralTypeIssues]
+        if self._default_response_to_return_if_fail is None:
+            self._default_response_to_return_if_fail = Response(
+                content=f"Shield with name `{self.name}` blocks the request",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return self._default_response_to_return_if_fail
 
     def __call__(self, endpoint: EndPointFunc) -> EndPointFunc:
@@ -587,21 +591,14 @@ class Shield(Generic[U]):
 
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
-            guard_func_args = {
+            guard_func_args: Dict[str, Any] = {
                 k: v for k, v in kwargs.items() if k in self._guard_func_params
             }
-            try:
-                if self._guard_func_is_async:
-                    obj = await self._guard_func(**guard_func_args)
-                else:
-                    obj = self._guard_func(**guard_func_args)
-            except Exception as e:
-                if not isinstance(e, HTTPException):
-                    raise HTTPException(
-                        status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=f"Shield with name `{self.name}` failed: {e}",
-                    ) from e
-                raise e
+            if self._guard_func_is_async:
+                obj = await self._guard_func(**guard_func_args)
+            else:
+                obj = self._guard_func(**guard_func_args)
+
             if obj:
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong

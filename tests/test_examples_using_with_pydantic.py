@@ -2,7 +2,14 @@ import pytest
 from fastapi.testclient import TestClient
 from fastapi import FastAPI, Body, Header, Form, HTTPException, status, Depends
 from fastapi_shield import shield, ShieldedDepends
-from pydantic import BaseModel, Field, field_validator, model_validator, conint, confloat
+from pydantic import (
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+    conint,
+    confloat,
+)
 from typing import List, Optional, Dict, Any, Annotated
 from datetime import datetime
 import hashlib
@@ -12,6 +19,7 @@ import re
 # Try to import EmailStr, skip tests if not available
 try:
     from pydantic import EmailStr
+
     EMAIL_VALIDATOR_AVAILABLE = True
 except ImportError:
     EMAIL_VALIDATOR_AVAILABLE = False
@@ -20,9 +28,10 @@ except ImportError:
 # Try to import constr with different patterns for Pydantic v1/v2 compatibility
 try:
     from pydantic import constr
+
     # Test if it's Pydantic v2 style
     try:
-        test_str = constr(pattern=r'^\d+$')
+        test_str = constr(pattern=r"^\d+$")
         PYDANTIC_V2 = True
     except TypeError:
         # Pydantic v1 style
@@ -39,7 +48,7 @@ class TestBasicPydanticIntegration:
         """Setup the FastAPI app for each test"""
         if not EMAIL_VALIDATOR_AVAILABLE:
             pytest.skip("email-validator not available")
-            
+
         app = FastAPI()
 
         # Pydantic models
@@ -50,7 +59,7 @@ class TestBasicPydanticIntegration:
 
         class UserCreate(UserBase):
             password: str = Field(..., min_length=8)
-            
+
             @field_validator("password")
             @classmethod
             def password_strength(cls, v):
@@ -58,7 +67,9 @@ class TestBasicPydanticIntegration:
                 if not any(char.isdigit() for char in v):
                     raise ValueError("Password must contain at least one digit")
                 if not any(char.isupper() for char in v):
-                    raise ValueError("Password must contain at least one uppercase letter")
+                    raise ValueError(
+                        "Password must contain at least one uppercase letter"
+                    )
                 return v
 
         class User(UserBase):
@@ -69,9 +80,8 @@ class TestBasicPydanticIntegration:
         @shield(
             name="User Validator",
             exception_to_raise_if_fail=HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User validation failed"
-            )
+                status_code=status.HTTP_400_BAD_REQUEST, detail="User validation failed"
+            ),
         )
         def validate_user_shield(user: UserCreate = Body()):
             """
@@ -83,24 +93,26 @@ class TestBasicPydanticIntegration:
             reserved_usernames = ["admin", "system", "root"]
             if user.username.lower() in reserved_usernames:
                 return None
-            
+
             # Check for company email domain requirement
             if not user.email.endswith("@company.com"):
                 return None
-            
+
             # Return the validated user
             return user
 
         # Endpoint with Pydantic and Shield validation
         @app.post("/users", response_model=User)
         @validate_user_shield
-        async def create_user(validated_user: UserCreate = ShieldedDepends(lambda user: user)):
+        async def create_user(
+            validated_user: UserCreate = ShieldedDepends(lambda user: user),
+        ):
             """Create a new user with validated data"""
             new_user = User(
                 id=1,
                 username=validated_user.username,
                 email=validated_user.email,
-                full_name=validated_user.full_name
+                full_name=validated_user.full_name,
             )
             return new_user
 
@@ -114,7 +126,7 @@ class TestBasicPydanticIntegration:
             "username": "testuser",
             "email": "test@company.com",
             "password": "Password123",
-            "full_name": "Test User"
+            "full_name": "Test User",
         }
         response = self.client.post("/users", json=user_data)
         assert response.status_code == 200
@@ -129,7 +141,7 @@ class TestBasicPydanticIntegration:
         user_data = {
             "username": "admin",
             "email": "admin@company.com",
-            "password": "Password123"
+            "password": "Password123",
         }
         response = self.client.post("/users", json=user_data)
         assert response.status_code == 400
@@ -140,7 +152,7 @@ class TestBasicPydanticIntegration:
         user_data = {
             "username": "testuser",
             "email": "test@gmail.com",
-            "password": "Password123"
+            "password": "Password123",
         }
         response = self.client.post("/users", json=user_data)
         assert response.status_code == 400
@@ -152,7 +164,7 @@ class TestBasicPydanticIntegration:
         user_data = {
             "username": "testuser",
             "email": "test@company.com",
-            "password": "Password"
+            "password": "Password",
         }
         response = self.client.post("/users", json=user_data)
         assert response.status_code == 422
@@ -162,14 +174,16 @@ class TestBasicPydanticIntegration:
         user_data["password"] = "password123"
         response = self.client.post("/users", json=user_data)
         assert response.status_code == 422
-        assert "Password must contain at least one uppercase letter" in str(response.json())
+        assert "Password must contain at least one uppercase letter" in str(
+            response.json()
+        )
 
     def test_invalid_email_format(self):
         """Test invalid email format"""
         user_data = {
             "username": "testuser",
             "email": "invalid-email",
-            "password": "Password123"
+            "password": "Password123",
         }
         response = self.client.post("/users", json=user_data)
         assert response.status_code == 422
@@ -187,35 +201,37 @@ class TestAdvancedSchemaValidation:
             street: str
             city: str
             state: str
-            zip_code: str = Field(..., pattern=r'^\d{5}(-\d{4})?$')
+            zip_code: str = Field(..., pattern=r"^\d{5}(-\d{4})?$")
             country: str
 
         class PaymentMethod(BaseModel):
             card_type: str
-            last_four: str = Field(..., pattern=r'^\d{4}$')
+            last_four: str = Field(..., pattern=r"^\d{4}$")
             expiry_month: conint(ge=1, le=12)
             expiry_year: conint(ge=2024)
-            
-            @model_validator(mode='after')
+
+            @model_validator(mode="after")
             def check_expiry(self):
                 """Check if card is expired"""
                 month = self.expiry_month
                 year = self.expiry_year
-                
+
                 if month and year:
                     current_year = datetime.now().year
                     current_month = datetime.now().month
-                    
-                    if (year < current_year) or (year == current_year and month < current_month):
+
+                    if (year < current_year) or (
+                        year == current_year and month < current_month
+                    ):
                         raise ValueError("Card has expired")
-                        
+
                 return self
 
         class OrderItem(BaseModel):
             product_id: int
             quantity: conint(gt=0)
             unit_price: confloat(gt=0)
-            
+
             @property
             def total_price(self) -> float:
                 return self.quantity * self.unit_price
@@ -227,16 +243,16 @@ class TestAdvancedSchemaValidation:
             billing_address: Optional[Address] = None
             payment_method: PaymentMethod
             coupon_code: Optional[str] = None
-            
+
             @field_validator("coupon_code")
             @classmethod
             def validate_coupon_format(cls, v):
                 """Validate coupon code format if provided"""
-                if v is not None and not re.match(r'^[A-Z0-9]{8,12}$', v):
+                if v is not None and not re.match(r"^[A-Z0-9]{8,12}$", v):
                     raise ValueError("Invalid coupon code format")
                 return v
-            
-            @model_validator(mode='after')
+
+            @model_validator(mode="after")
             def set_billing_same_as_shipping(self):
                 """If billing address is not provided, use shipping address"""
                 if self.billing_address is None:
@@ -247,9 +263,8 @@ class TestAdvancedSchemaValidation:
         @shield(
             name="Order Validator",
             exception_to_raise_if_fail=HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid order data"
-            )
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order data"
+            ),
         )
         def validate_order_shield(order: Order = Body()):
             """
@@ -259,30 +274,32 @@ class TestAdvancedSchemaValidation:
             # Check if order has more than 10 items
             if len(order.items) > 10:
                 return None
-            
+
             # Calculate total order amount
             total = sum(item.total_price for item in order.items)
-            
+
             # Check for high-value orders (require additional verification)
             if total > 1000:
                 return None
-            
+
             # Return the validated order
             return order
 
         # Endpoint with complex Pydantic validation + Shield
         @app.post("/orders")
         @validate_order_shield
-        async def create_order(validated_order: Order = ShieldedDepends(lambda order: order)):
+        async def create_order(
+            validated_order: Order = ShieldedDepends(lambda order: order),
+        ):
             """Create a new order with validated data"""
             # Calculate total for response
             total = sum(item.total_price for item in validated_order.items)
-            
+
             return {
                 "order_id": 12345,
                 "status": "created",
                 "total_amount": total,
-                "message": "Order created successfully"
+                "message": "Order created successfully",
             }
 
         self.app = app
@@ -294,21 +311,21 @@ class TestAdvancedSchemaValidation:
             "user_id": 1,
             "items": [
                 {"product_id": 1, "quantity": 2, "unit_price": 10.0},
-                {"product_id": 2, "quantity": 1, "unit_price": 15.0}
+                {"product_id": 2, "quantity": 1, "unit_price": 15.0},
             ],
             "shipping_address": {
                 "street": "123 Main St",
                 "city": "Anytown",
                 "state": "CA",
                 "zip_code": "12345",
-                "country": "USA"
+                "country": "USA",
             },
             "payment_method": {
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025
-            }
+                "expiry_year": 2025,
+            },
         }
         response = self.client.post("/orders", json=order_data)
         assert response.status_code == 200
@@ -321,20 +338,22 @@ class TestAdvancedSchemaValidation:
         """Test that orders with too many items are blocked"""
         order_data = {
             "user_id": 1,
-            "items": [{"product_id": i, "quantity": 1, "unit_price": 10.0} for i in range(11)],
+            "items": [
+                {"product_id": i, "quantity": 1, "unit_price": 10.0} for i in range(11)
+            ],
             "shipping_address": {
                 "street": "123 Main St",
                 "city": "Anytown",
                 "state": "CA",
                 "zip_code": "12345",
-                "country": "USA"
+                "country": "USA",
             },
             "payment_method": {
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025
-            }
+                "expiry_year": 2025,
+            },
         }
         response = self.client.post("/orders", json=order_data)
         assert response.status_code == 400
@@ -350,14 +369,14 @@ class TestAdvancedSchemaValidation:
                 "city": "Anytown",
                 "state": "CA",
                 "zip_code": "12345",
-                "country": "USA"
+                "country": "USA",
             },
             "payment_method": {
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025
-            }
+                "expiry_year": 2025,
+            },
         }
         response = self.client.post("/orders", json=order_data)
         assert response.status_code == 400
@@ -373,14 +392,14 @@ class TestAdvancedSchemaValidation:
                 "city": "Anytown",
                 "state": "CA",
                 "zip_code": "invalid",
-                "country": "USA"
+                "country": "USA",
             },
             "payment_method": {
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025
-            }
+                "expiry_year": 2025,
+            },
         }
         response = self.client.post("/orders", json=order_data)
         assert response.status_code == 422
@@ -395,14 +414,14 @@ class TestAdvancedSchemaValidation:
                 "city": "Anytown",
                 "state": "CA",
                 "zip_code": "12345",
-                "country": "USA"
+                "country": "USA",
             },
             "payment_method": {
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 1,
-                "expiry_year": 2020
-            }
+                "expiry_year": 2020,
+            },
         }
         response = self.client.post("/orders", json=order_data)
         assert response.status_code == 422
@@ -442,30 +461,30 @@ class TestModelTransformationAndEnrichment:
             name="Product Enricher",
             exception_to_raise_if_fail=HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Product enrichment failed"
-            )
+                detail="Product enrichment failed",
+            ),
         )
         def enrich_product_shield(product_input: ProductInput = Body()):
             """Transform input into enriched product model"""
-            
+
             # Generate unique ID
             product_id = hashlib.md5(
                 f"{product_input.name}{datetime.now().isoformat()}".encode()
             ).hexdigest()[:12]
-            
+
             # Generate slug
             slug = product_input.name.lower().replace(" ", "-").replace("_", "-")
             slug = "".join(c for c in slug if c.isalnum() or c == "-")
-            
+
             # Generate search keywords
             keywords = [
                 product_input.name.lower(),
                 product_input.category.lower(),
                 *[tag.lower() for tag in product_input.tags],
-                *product_input.description.lower().split()[:5]  # First 5 words
+                *product_input.description.lower().split()[:5],  # First 5 words
             ]
             keywords = list(set(keywords))  # Remove duplicates
-            
+
             # Create enriched product
             enriched_product = Product(
                 id=product_id,
@@ -476,9 +495,9 @@ class TestModelTransformationAndEnrichment:
                 tags=product_input.tags,
                 slug=slug,
                 created_at=datetime.now(),
-                search_keywords=keywords
+                search_keywords=keywords,
             )
-            
+
             return enriched_product
 
         @app.post("/products", response_model=Product)
@@ -497,17 +516,17 @@ class TestModelTransformationAndEnrichment:
             "description": "This is a test product description",
             "price": 29.99,
             "category": "electronics",
-            "tags": ["gadget", "tech"]
+            "tags": ["gadget", "tech"],
         }
         response = self.client.post("/products", json=product_data)
         assert response.status_code == 200
         result = response.json()
-        
+
         # Check basic fields
         assert result["name"] == "Test Product"
         assert result["price"] == 29.99
         assert result["category"] == "electronics"
-        
+
         # Check enriched fields
         assert len(result["id"]) == 12
         assert result["slug"] == "test-product"
@@ -523,7 +542,7 @@ class TestModelTransformationAndEnrichment:
             "description": "This is a test product",
             "price": -10.0,
             "category": "electronics",
-            "tags": []
+            "tags": [],
         }
         response = self.client.post("/products", json=product_data)
         assert response.status_code == 422
@@ -536,7 +555,7 @@ class TestExternalDependencyValidation:
         """Setup the FastAPI app for each test"""
         if not EMAIL_VALIDATOR_AVAILABLE:
             pytest.skip("email-validator not available")
-            
+
         app = FastAPI()
 
         # Mock external services
@@ -546,7 +565,7 @@ class TestExternalDependencyValidation:
                 """Simulate checking if username exists"""
                 await asyncio.sleep(0.01)  # Simulate API call
                 return username in ["admin", "test", "user"]
-            
+
             @staticmethod
             async def check_email_exists(email: str) -> bool:
                 """Simulate checking if email exists"""
@@ -562,7 +581,7 @@ class TestExternalDependencyValidation:
             email: EmailStr
             password: str = Field(..., min_length=8)
             full_name: Optional[str] = None
-            
+
             @field_validator("username")
             @classmethod
             def validate_username_format(cls, v):
@@ -576,35 +595,35 @@ class TestExternalDependencyValidation:
             name="Registration Validator",
             exception_to_raise_if_fail=HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Registration validation failed"
-            )
+                detail="Registration validation failed",
+            ),
         )
         async def validate_registration_shield(
             registration: UserRegistration = Body(),
-            user_service: UserService = Depends(get_user_service)
+            user_service: UserService = Depends(get_user_service),
         ):
             """Validate registration with external checks"""
-            
+
             # Check if username already exists
             if await user_service.check_username_exists(registration.username):
                 return None
-            
+
             # Check if email already exists
             if await user_service.check_email_exists(registration.email):
                 return None
-            
+
             return registration
 
         @app.post("/register")
         @validate_registration_shield
         async def register_user(
-            validated_registration: UserRegistration = ShieldedDepends(lambda r: r)
+            validated_registration: UserRegistration = ShieldedDepends(lambda r: r),
         ):
             """Register a new user"""
             return {
                 "message": "User registered successfully",
                 "username": validated_registration.username,
-                "email": validated_registration.email
+                "email": validated_registration.email,
             }
 
         self.app = app
@@ -616,7 +635,7 @@ class TestExternalDependencyValidation:
             "username": "newuser",
             "email": "newuser@example.com",
             "password": "password123",
-            "full_name": "New User"
+            "full_name": "New User",
         }
         response = self.client.post("/register", json=registration_data)
         assert response.status_code == 200
@@ -629,7 +648,7 @@ class TestExternalDependencyValidation:
         registration_data = {
             "username": "admin",
             "email": "newuser@example.com",
-            "password": "password123"
+            "password": "password123",
         }
         response = self.client.post("/register", json=registration_data)
         assert response.status_code == 400
@@ -640,7 +659,7 @@ class TestExternalDependencyValidation:
         registration_data = {
             "username": "newuser",
             "email": "admin@example.com",
-            "password": "password123"
+            "password": "password123",
         }
         response = self.client.post("/register", json=registration_data)
         assert response.status_code == 400
@@ -651,7 +670,7 @@ class TestExternalDependencyValidation:
         registration_data = {
             "username": "new-user",  # Contains hyphen
             "email": "newuser@example.com",
-            "password": "password123"
+            "password": "password123",
         }
         response = self.client.post("/register", json=registration_data)
         assert response.status_code == 422
@@ -682,21 +701,19 @@ class TestMultipleShieldComposition:
             name="Auth Shield",
             exception_to_raise_if_fail=HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required"
-            )
+                detail="Authentication required",
+            ),
         )
         def auth_shield(authorization: str = Header(None)):
             """Validate authorization header"""
             if not authorization or not authorization.startswith("Bearer "):
                 return None
-            
+
             # Mock token validation
             token = authorization.replace("Bearer ", "")
             if token == "valid_token":
                 return AuthData(
-                    user_id=1,
-                    username="testuser",
-                    roles=["user", "content_creator"]
+                    user_id=1, username="testuser", roles=["user", "content_creator"]
                 )
             return None
 
@@ -705,33 +722,35 @@ class TestMultipleShieldComposition:
             name="Content Validator",
             exception_to_raise_if_fail=HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Content validation failed"
-            )
+                detail="Content validation failed",
+            ),
         )
-        def validate_content_shield(content: ContentInput = Body(), auth_data: AuthData = ShieldedDepends(lambda auth: auth)):
+        def validate_content_shield(
+            content: ContentInput = Body(),
+            auth_data: AuthData = ShieldedDepends(lambda auth: auth),
+        ):
             """Validate content input"""
-            
+
             # Check for prohibited content
             prohibited_words = ["spam", "scam", "fake"]
             content_text = f"{content.title} {content.body}".lower()
-            
+
             if any(word in content_text for word in prohibited_words):
                 return None
-            
+
             # Validate category
             allowed_categories = ["tech", "science", "news", "entertainment"]
             if content.category not in allowed_categories:
                 return None
-            
+
             return content, auth_data
 
         # Permission shield
         @shield(
             name="Permission Shield",
             exception_to_raise_if_fail=HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions"
-            )
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            ),
         )
         def permission_shield(
             auth_data: AuthData = ShieldedDepends(lambda auth: auth),
@@ -748,14 +767,14 @@ class TestMultipleShieldComposition:
         @validate_content_shield
         async def create_content(
             content: ContentInput = Body(),
-            user: AuthData = ShieldedDepends(lambda data: data[1])
+            user: AuthData = ShieldedDepends(lambda data: data[1]),
         ):
             """Create new content with full validation"""
             return {
                 "message": "Content created successfully",
                 "content_id": 12345,
                 "title": content.title,
-                "author": user.username
+                "author": user.username,
             }
 
         self.app = app
@@ -767,7 +786,7 @@ class TestMultipleShieldComposition:
             "title": "Test Article",
             "body": "This is a test article about technology",
             "tags": ["test", "tech"],
-            "category": "tech"
+            "category": "tech",
         }
         headers = {"Authorization": "Bearer valid_token"}
         response = self.client.post("/content", json=content_data, headers=headers)
@@ -782,7 +801,7 @@ class TestMultipleShieldComposition:
         content_data = {
             "title": "Test Article",
             "body": "This is a test article",
-            "category": "tech"
+            "category": "tech",
         }
         response = self.client.post("/content", json=content_data)
         assert response.status_code == 401
@@ -793,7 +812,7 @@ class TestMultipleShieldComposition:
         content_data = {
             "title": "Spam Article",
             "body": "This is spam content",
-            "category": "tech"
+            "category": "tech",
         }
         headers = {"Authorization": "Bearer valid_token"}
         response = self.client.post("/content", json=content_data, headers=headers)
@@ -805,7 +824,7 @@ class TestMultipleShieldComposition:
         content_data = {
             "title": "Test Article",
             "body": "This is a test article",
-            "category": "invalid"
+            "category": "invalid",
         }
         headers = {"Authorization": "Bearer valid_token"}
         response = self.client.post("/content", json=content_data, headers=headers)
@@ -820,7 +839,7 @@ class TestFormDataValidation:
         """Setup the FastAPI app for each test"""
         if not EMAIL_VALIDATOR_AVAILABLE:
             pytest.skip("email-validator not available")
-            
+
         app = FastAPI()
 
         class ContactForm(BaseModel):
@@ -829,7 +848,7 @@ class TestFormDataValidation:
             subject: str
             message: str
             phone: Optional[str] = None
-            
+
             @field_validator("name")
             @classmethod
             def validate_name(cls, v):
@@ -837,7 +856,7 @@ class TestFormDataValidation:
                 if len(v.strip()) < 2:
                     raise ValueError("Name must be at least 2 characters")
                 return v.strip()
-            
+
             @field_validator("message")
             @classmethod
             def validate_message(cls, v):
@@ -850,19 +869,18 @@ class TestFormDataValidation:
         @shield(
             name="Contact Form Validator",
             exception_to_raise_if_fail=HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Form validation failed"
-            )
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Form validation failed"
+            ),
         )
         def validate_contact_form_shield(
             name: str = Form(...),
             email: str = Form(...),
             subject: str = Form(...),
             message: str = Form(...),
-            phone: Optional[str] = Form(None)
+            phone: Optional[str] = Form(None),
         ):
             """Validate contact form data"""
-            
+
             # Create Pydantic model from form data
             try:
                 form_data = ContactForm(
@@ -870,26 +888,26 @@ class TestFormDataValidation:
                     email=email,
                     subject=subject,
                     message=message,
-                    phone=phone
+                    phone=phone,
                 )
             except ValueError:
                 return None
-            
+
             # Additional validation
-            if phone and not re.match(r'^\+?[\d\s\-\(\)]{8,20}$', phone):
+            if phone and not re.match(r"^\+?[\d\s\-\(\)]{8,20}$", phone):
                 return None
-            
+
             return form_data
 
         @app.post("/contact")
         @validate_contact_form_shield
         async def submit_contact_form(
-            form_data: ContactForm = ShieldedDepends(lambda form: form)
+            form_data: ContactForm = ShieldedDepends(lambda form: form),
         ):
             """Submit contact form"""
             return {
                 "message": "Contact form submitted successfully",
-                "reference_id": "CF12345"
+                "reference_id": "CF12345",
             }
 
         self.app = app
@@ -902,7 +920,7 @@ class TestFormDataValidation:
             "email": "john@example.com",
             "subject": "Test Subject",
             "message": "This is a test message with enough content",
-            "phone": "+1-555-123-4567"
+            "phone": "+1-555-123-4567",
         }
         response = self.client.post("/contact", data=form_data)
         assert response.status_code == 200
@@ -916,7 +934,7 @@ class TestFormDataValidation:
             "name": "John Doe",
             "email": "john@example.com",
             "subject": "Test Subject",
-            "message": "This is a test message with enough content"
+            "message": "This is a test message with enough content",
         }
         response = self.client.post("/contact", data=form_data)
         assert response.status_code == 200
@@ -928,7 +946,7 @@ class TestFormDataValidation:
             "email": "john@example.com",
             "subject": "Test Subject",
             "message": "This is a test message with enough content",
-            "phone": "invalid-phone"
+            "phone": "invalid-phone",
         }
         response = self.client.post("/contact", data=form_data)
         assert response.status_code == 400
@@ -940,7 +958,7 @@ class TestFormDataValidation:
             "name": "J",
             "email": "john@example.com",
             "subject": "Test Subject",
-            "message": "This is a test message with enough content"
+            "message": "This is a test message with enough content",
         }
         response = self.client.post("/contact", data=form_data)
         assert response.status_code == 400
@@ -952,7 +970,7 @@ class TestFormDataValidation:
             "name": "John Doe",
             "email": "john@example.com",
             "subject": "Test Subject",
-            "message": "Short"
+            "message": "Short",
         }
         response = self.client.post("/contact", data=form_data)
         assert response.status_code == 400
@@ -964,8 +982,8 @@ class TestFormDataValidation:
             "name": "John Doe",
             "email": "invalid-email",
             "subject": "Test Subject",
-            "message": "This is a test message with enough content"
+            "message": "This is a test message with enough content",
         }
         response = self.client.post("/contact", data=form_data)
         assert response.status_code == 400
-        assert "Form validation failed" in response.json()["detail"] 
+        assert "Form validation failed" in response.json()["detail"]

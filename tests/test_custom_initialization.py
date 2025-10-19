@@ -592,19 +592,20 @@ class TestDynamicShieldConfiguration:
         """Clean up temporary files with Windows-compatible error handling"""
         try:
             # Ensure file is closed if it's still open
-            if hasattr(self, 'config_file') and not self.config_file.closed:
+            if hasattr(self, "config_file") and not self.config_file.closed:
                 self.config_file.close()
         except Exception:
             pass  # Ignore close errors
-        
+
         try:
             # Attempt to delete the file
-            if hasattr(self, 'config_path') and os.path.exists(self.config_path):
+            if hasattr(self, "config_path") and os.path.exists(self.config_path):
                 os.unlink(self.config_path)
         except (PermissionError, OSError) as e:
             # On Windows, sometimes the file is still locked
             # Try a few more times with a small delay
             import time
+
             for attempt in range(3):
                 try:
                     time.sleep(0.1)
