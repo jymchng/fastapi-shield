@@ -147,7 +147,9 @@ class ShieldDepends(Security, Generic[U]):
 
         self._dependency_cache: Final[Dict[str, Any]] = {}
         self._shield_dependency_is_coroutine_callable: Final[bool] = (
-            is_coroutine_callable(self.shielded_dependency)
+            (is_coroutine_callable(self.shielded_dependency))
+            if self.shielded_dependency is not None
+            else False
         )
         if shielded_dependency is None:
             self._shielded_dependency_params: MappingProxyType[str, Parameter] = (
