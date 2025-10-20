@@ -29,6 +29,8 @@ from typing import (
     Union,
     overload,
     Dict,
+    Final,
+    List,
 )
 from types import MappingProxyType
 
@@ -91,13 +93,12 @@ class ShieldDepends(Security, Generic[U]):
         ```
     """
 
-    __signature__: Signature
+    __signature__: Final[Signature]
     """The rearranged signature for FastAPI dependency resolution, containing only the parameters that should be resolved
     by FastAPI's dependency injection system (excludes the first parameter
     if it receives shield data)."""
 
     __slots__ = (
-        "dependency",
         "shielded_dependency",
         "unblocked",
         "auto_error",
@@ -140,13 +141,13 @@ class ShieldDepends(Security, Generic[U]):
             ```
         """
         super().__init__(use_cache=use_cache, scopes=scopes, dependency=lambda: self)
-        self.shielded_dependency = shielded_dependency
-        self.unblocked = False
-        self.auto_error = auto_error
+        self.shielded_dependency: Final[Optional[U]] = shielded_dependency
+        self.unblocked: bool = False
+        self.auto_error: Final[bool] = auto_error
 
-        self._dependency_cache: Dict[str, Any] = {}
-        self._shield_dependency_is_coroutine_callable = is_coroutine_callable(
-            self.shielded_dependency
+        self._dependency_cache: Final[Dict[str, Any]] = {}
+        self._shield_dependency_is_coroutine_callable: Final[bool] = (
+            is_coroutine_callable(self.shielded_dependency)
         )
         if shielded_dependency is None:
             self._shielded_dependency_params: MappingProxyType[str, Parameter] = (
@@ -157,8 +158,8 @@ class ShieldDepends(Security, Generic[U]):
 
         params = list(self._shielded_dependency_params.values())
         if len(params) == 0:
-            self.first_param = None
-            self.rest_params = None
+            self.first_param: Optional[Parameter] = None
+            self.rest_params: Optional[List[Parameter]] = None
         else:
             first, *rest = params
             if first.default is Parameter.empty:
@@ -198,6 +199,10 @@ class ShieldDepends(Security, Generic[U]):
                 if is_coroutine_callable(self.shielded_dependency):
                     return await self.shielded_dependency(*args, **kwargs)
                 return self.shielded_dependency(*args, **kwargs)
+        return self
+
+    async def __call_none__(self, *args, **kwargs):
+        _, _ = args, kwargs
         return self
 
     @property
