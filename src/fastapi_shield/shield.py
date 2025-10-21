@@ -595,7 +595,7 @@ class Shield(Generic[U]):
                 # hence we should raise an error from now on if anything goes wrong
                 request = kwargs.get("request")
 
-                if not request and not isinstance(request, Request):
+                if not request or not isinstance(request, Request):
                     raise HTTPException(
                         status.HTTP_400_BAD_REQUEST,
                         detail="Request is required or `request` is not of type `Request`",
