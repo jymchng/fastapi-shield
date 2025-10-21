@@ -208,7 +208,7 @@ async def get_solved_dependencies(
     request: Request,
     path_format: str,
     endpoint: Callable,
-    dependency_cache: dict,
+    dependency_cache: Optional[dict],
 ):
     """Resolve all dependencies for a FastAPI endpoint.
 
