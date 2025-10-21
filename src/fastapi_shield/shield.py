@@ -26,6 +26,7 @@ from typing import (
     Generic,
     Optional,
     Sequence,
+    Tuple,
     Union,
     overload,
     Dict,
@@ -94,11 +95,43 @@ class ShieldDepends(Security, Generic[U]):
     """
 
     __signature__: Final[Signature]
-    """The rearranged signature for FastAPI dependency resolution, containing only the parameters that should be resolved
+    """The rearranged signature for FastAPI dependency resolution, 
+    containing only the parameters that should be resolved
     by FastAPI's dependency injection system (excludes the first parameter
     if it receives shield data)."""
 
-    __slots__ = (
+    first_param: Optional[Parameter]
+    """Get the first parameter of the shielded dependency function.
+
+    The first parameter is special because it receives the shield's returned data.
+    If the first parameter has no default value, it's considered required and
+    will receive the shield data. Otherwise, it's treated as optional.
+
+    Returns:
+        Optional[Parameter]: The first parameter if it has no default value,
+                            None if the dependency has no parameters or the
+                            first parameter has a default value.
+
+    """
+
+    rest_params: Optional[List[Parameter]]
+    """Get all parameters except the first one (if it has no default).
+
+    These parameters will be resolved using FastAPI's standard dependency
+    injection system, while the first parameter (if it exists and has no
+    default) receives the shield's validated data.
+
+    Yields:
+        Parameter: All parameters that should be resolved via dependency injection.
+    """
+
+    unblocked: bool
+    """If `True`, the closest decorated shield unblocks this dependency."""
+
+    auto_error: Final[bool]
+    """If `True`, exception is raised if the dependencies on this `ShieldDepends` instance cannot be resolved."""
+
+    __slots__: Final[Tuple[str, ...]] = (
         "shielded_dependency",
         "unblocked",
         "auto_error",
@@ -142,8 +175,8 @@ class ShieldDepends(Security, Generic[U]):
         """
         super().__init__(use_cache=use_cache, scopes=scopes, dependency=lambda: self)
         self.shielded_dependency: Final[Optional[U]] = shielded_dependency
-        self.unblocked: bool = False
-        self.auto_error: Final[bool] = auto_error
+        self.unblocked = False
+        self.auto_error = auto_error
 
         self._dependency_cache: Final[Dict[str, Any]] = {}
         self._shield_dependency_is_coroutine_callable: Final[bool] = (
@@ -160,8 +193,8 @@ class ShieldDepends(Security, Generic[U]):
 
         params = list(self._shielded_dependency_params.values())
         if len(params) == 0:
-            self.first_param: Optional[Parameter] = None
-            self.rest_params: Optional[List[Parameter]] = None
+            self.first_param = None
+            self.rest_params = None
         else:
             first, *rest = params
             if first.default is Parameter.empty:
@@ -181,30 +214,11 @@ class ShieldDepends(Security, Generic[U]):
         return f"{type(self).__name__}(unblocked={self.unblocked}, shielded_dependency={self.shielded_dependency.__name__ if self.shielded_dependency else None})"  # pylint: disable=line-too-long
 
     async def __call__(self, *args, **kwargs):
-        """Execute the shielded dependency if unblocked.
-
-        This method is called by FastAPI's dependency injection system. If the
-        shield has validated the request (unblocked=True), the dependency function
-        is executed with the provided arguments. Otherwise, returns self to
-        indicate the dependency is still blocked.
-
-        Args:
-            *args: Positional arguments for the dependency function
-            **kwargs: Keyword arguments for the dependency function
-
-        Returns:
-            Any: The result of the dependency function if unblocked,
-                 or self if still blocked.
-        """
         if self.unblocked:
             if self.shielded_dependency is not None:
-                if is_coroutine_callable(self.shielded_dependency):
+                if self._shield_dependency_is_coroutine_callable:
                     return await self.shielded_dependency(*args, **kwargs)
                 return self.shielded_dependency(*args, **kwargs)
-        return self
-
-    async def __call_none__(self, *args, **kwargs):
-        _, _ = args, kwargs
         return self
 
     @property
@@ -253,7 +267,7 @@ class ShieldDepends(Security, Generic[U]):
             request=request,
             path_format=path_format,
             endpoint=self,
-            dependency_cache=self._dependency_cache,
+            dependency_cache=self._dependency_cache if self.use_cache else None,
         )
 
         return solved_dependencies
@@ -390,6 +404,7 @@ class Shield(Generic[U]):
 
     __slots__ = (
         "auto_error",
+        "use_cache",
         "name",
         "_guard_func",
         "_guard_func_is_async",
@@ -405,6 +420,7 @@ class Shield(Generic[U]):
         *,
         name: Optional[str] = None,
         auto_error: bool = True,
+        use_cache: bool = True,
         exception_to_raise_if_fail: Optional[HTTPException] = None,
         default_response_to_return_if_fail: Optional[Response] = None,
     ):
@@ -455,13 +471,14 @@ class Shield(Generic[U]):
             ```
         """
         assert callable(shield_func), "`shield_func` must be callable"
-        self._guard_func: U = shield_func
-        self._guard_func_is_async: bool = is_coroutine_callable(shield_func)
-        self._guard_func_params: MappingProxyType[str, Parameter] = signature(
+        self._guard_func: Final[U] = shield_func
+        self._guard_func_is_async: Final[bool] = is_coroutine_callable(shield_func)
+        self._guard_func_params: Final[MappingProxyType[str, Parameter]] = signature(
             shield_func
         ).parameters
         self.name: str = name or "unknown"
-        self.auto_error: bool = auto_error
+        self.auto_error: Final[bool] = auto_error
+        self.use_cache: Final[bool] = use_cache
         self._exception_to_raise_if_fail: Optional[HTTPException] = (
             exception_to_raise_if_fail
         )
@@ -561,7 +578,7 @@ class Shield(Generic[U]):
             if isinstance(param.default, ShieldDepends)
         }
 
-        dependency_cache: Dict[str, Any] = {}
+        dependency_cache: Optional[Dict[str, Any]] = {} if self.use_cache else None
 
         @wraps(endpoint)
         async def wrapper(*args, **kwargs):
