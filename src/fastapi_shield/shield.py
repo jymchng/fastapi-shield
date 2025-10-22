@@ -578,6 +578,15 @@ class Shield(Generic[U]):
             if isinstance(param.default, ShieldDepends)
         }
 
+        request_annotation_in_guard_fn: bool = False
+        request_param_name_in_guard_fn: str = "request"
+
+        for k, v in self._guard_func_params.items():
+            if v.annotation is Request:
+                request_param_name_in_guard_fn = k
+                request_annotation_in_guard_fn = True
+                break
+
         dependency_cache: Optional[Dict[str, Any]] = {} if self.use_cache else None
 
         @wraps(endpoint)
@@ -593,12 +602,12 @@ class Shield(Generic[U]):
             if obj:
                 # from here onwards, the shield's job is done
                 # hence we should raise an error from now on if anything goes wrong
-                request = kwargs.get("request")
+                request = kwargs.get(request_param_name_in_guard_fn)
 
                 if not request or not isinstance(request, Request):
                     raise HTTPException(
                         status.HTTP_400_BAD_REQUEST,
-                        detail="Request is required or `request` is not of type `Request`",
+                        detail=f"Request is required or `{request_param_name_in_guard_fn}` is not of type `Request`",
                     )
 
                 if not hasattr(wrapper, SHIELDED_ENDPOINT_PATH_FORMAT_KEY):
@@ -640,8 +649,10 @@ class Shield(Generic[U]):
 
         wrapper.__signature__ = Signature(  # type:ignore[attr-defined]
             rearrange_params(  # type:ignore[reportArgumentType]
-                merge_dedup_seq_params(
-                    prepend_request_to_signature_params_of_function(self._guard_func),
+                merge_dedup_seq_params(  # type:ignore[arg-type]
+                    prepend_request_to_signature_params_of_function(self._guard_func)  # type:ignore[arg-type]
+                    if not request_annotation_in_guard_fn
+                    else self._guard_func_params.values(),
                 )
             )
         )
