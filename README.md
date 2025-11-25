@@ -1,32 +1,38 @@
 <div align="center">
-
-<img src="./assets/logos/logo_hori_one.jpg" width=80% height=20%></img>
-
-# FastAPI Shield
-
-## Documentation
-<a href="https://docs.fastapi-shield.asyncmove.com">
-  <img src="https://img.shields.io/badge/docs-passing-brightgreen.svg" width="100" alt="docs passing">
+<p>
+<a href="https://fastapi-shield.asyncmove.com">
+<img src="https://github.com/jymchng/fastapi-shield/raw/main/assets/logos/logo_hori_one.jpg" width=80% height=20%></img>
 </a>
+</p>
+
+
+<i>Write super simple decorators to <b>shield</b> your FastAPI endpoints.</i>
+
+<hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;">
+
+<div align="left">
+Documentation: <a href="https://docs-fastapi-shield.asyncmove.com">
+https://docs-fastapi-shield.asyncmove.com
+</a><br>
+Source Code: <a href="https://github.com/jymchng/fastapi-shield">
+https://github.com/jymchng/fastapi-shield
+</a>
+</div>
+<hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;">
 
 ### Compatibility and Version
-<img src="https://img.shields.io/badge/%3E=python-3.9-blue.svg" alt="Python compat">
+<img src="https://img.shields.io/pypi/pyversions/fastapi-shield?color=green" alt="Python compat">
 <a href="https://pypi.python.org/pypi/fastapi-shield"><img src="https://img.shields.io/pypi/v/fastapi-shield.svg" alt="PyPi"></a>
 
-### CI/CD
-<a href="https://codecov.io/github/jymchng/fastapi-shield?branch=main"><img src="https://codecov.io/github/jymchng/fastapi-shield/coverage.svg?branch=main" alt="Coverage"></a>
+<!-- <a href="https://codecov.io/github/jymchng/fastapi-shield?branch=main"><img src="https://codecov.io/github/jymchng/fastapi-shield/coverage.svg?branch=main" alt="Coverage"></a> -->
 
-### License and Issues
-<a href="https://github.com/jymchng/fastapi-shield/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jymchng/fastapi-shield" alt="License"></a>
-<a href="https://github.com/jymchng/fastapi-shield/issues"><img src="https://img.shields.io/github/issues/jymchng/fastapi-shield" alt="Issues"></a>
-<a href="https://github.com/jymchng/fastapi-shield/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/jymchng/fastapi-shield" alt="Closed Issues"></a>
-<a href="https://github.com/jymchng/fastapi-shield/issues?q=is%3Aissue+is%3Aopen"><img src="https://img.shields.io/github/issues/jymchng/fastapi-shield" alt="Open Issues"></a>
-
-### Development and Quality
-<a href="https://github.com/jymchng/fastapi-shield/network/members"><img src="https://img.shields.io/github/forks/jymchng/fastapi-shield" alt="Forks"></a>
+### Statistics
 <a href="https://github.com/jymchng/fastapi-shield/stargazers"><img src="https://img.shields.io/github/stars/jymchng/fastapi-shield" alt="Stars"></a>
+<a href="https://github.com/jymchng/fastapi-shield/network/members"><img src="https://img.shields.io/github/forks/jymchng/fastapi-shield" alt="Forks"></a>
 <a href="https://pypi.python.org/pypi/fastapi-shield"><img src="https://img.shields.io/pypi/dm/fastapi-shield" alt="Downloads"></a>
 <a href="https://github.com/jymchng/fastapi-shield/graphs/contributors"><img src="https://img.shields.io/github/contributors/jymchng/fastapi-shield" alt="Contributors"></a>
+
+### Development and Quality
 <a href="https://github.com/jymchng/fastapi-shield/commits/main"><img src="https://img.shields.io/github/commit-activity/m/jymchng/fastapi-shield" alt="Commits"></a>
 <a href="https://github.com/jymchng/fastapi-shield/commits/main"><img src="https://img.shields.io/github/last-commit/jymchng/fastapi-shield" alt="Last Commit"></a>
 <a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/languages/code-size/jymchng/fastapi-shield" alt="Code Size"></a>
@@ -36,6 +42,8 @@
 <a href="https://github.com/jymchng/fastapi-shield/pulls"><img src="https://img.shields.io/github/issues-pr/jymchng/fastapi-shield" alt="PRs"></a>
 <a href="https://github.com/jymchng/fastapi-shield/pulls?q=is%3Apr+is%3Aclosed"><img src="https://img.shields.io/github/issues-pr-closed/jymchng/fastapi-shield" alt="Merged PRs"></a>
 <a href="https://github.com/jymchng/fastapi-shield/pulls?q=is%3Apr+is%3Aopen"><img src="https://img.shields.io/github/issues-pr/open/jymchng/fastapi-shield" alt="Open PRs"></a>
+<a href="https://github.com/jymchng/fastapi-shield/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/jymchng/fastapi-shield" alt="Closed Issues"></a>
+<a href="https://github.com/jymchng/fastapi-shield/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jymchng/fastapi-shield" alt="License"></a>
 
 </div>
 
@@ -144,7 +152,7 @@ def test_protected_unauthorized():
 From the above, we can see how the shield works in practice. The `auth_shield` decorator is applied to our endpoint, checking the API token in the request headers before allowing access to the protected endpoint. When a valid token is provided, the request proceeds normally and returns a friendly greeting. However, when an invalid token is sent, the shield blocks the request, returning a 500 error with a message indicating that the shield has prevented access. This demonstrates the power of shields as a clean, declarative way to implement authentication in FastAPI applications without cluttering your endpoint logic with authorization checks.
 
 <div align="center">
-  <img src="./assets/pictures/IMG_20250423_003431_018.jpg" alt="Shield Congratulations" width="40%">
+  <img src="https://github.com/jymchng/fastapi-shield/raw/main/assets/pictures/IMG_20250423_003431_018.jpg" alt="Shield Congratulations" width="40%">
   
   ### 🎉 Congratulations! You've made your First Wonderful Shield! 🎉
 </div>
