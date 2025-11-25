@@ -11,8 +11,8 @@
 <hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;">
 
 <div align="left">
-Documentation: <a href="https://docs-fastapi-shield.asyncmove.com">
-https://docs-fastapi-shield.asyncmove.com
+Documentation: <a href="https://docs.fastapi-shield.asyncmove.com">
+https://docs.fastapi-shield.asyncmove.com
 </a><br>
 Source Code: <a href="https://github.com/jymchng/fastapi-shield">
 https://github.com/jymchng/fastapi-shield
