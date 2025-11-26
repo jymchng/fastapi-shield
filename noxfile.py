@@ -382,7 +382,6 @@ def test(session: AlteredSession):
 @session(
     dependency_group=None,
     default_posargs=[TEST_DIR, "-s", "-vv", "-n", "auto", "--dist", "worksteal"],
-    name="test-compat-fastapi",
 )
 @nox.parametrize("fastapi_version", FASTAPI_MINOR_MATRIX)
 def test_compat_fastapi(session: AlteredSession, fastapi_version: str):

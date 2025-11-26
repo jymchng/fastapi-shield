@@ -17,15 +17,38 @@ from fastapi import HTTPException, Request, params
 from fastapi._compat import ModelField, Undefined
 from fastapi.dependencies.models import Dependant
 from fastapi.dependencies.utils import (
-    _should_embed_body_fields,
     get_body_field,
     get_dependant,
     get_flat_dependant,
     solve_dependencies,
 )
+from pydantic import BaseModel
+from pydantic._internal._utils import lenient_issubclass
 from fastapi.exceptions import RequestValidationError
 
 from starlette.routing import get_name
+
+
+def _should_embed_body_fields(fields: List["ModelField"]) -> bool:
+    if not fields:
+        return False
+    # More than one dependency could have the same field, it would show up as multiple
+    # fields but it's the same one, so count them by name
+    body_param_names_set = {field.name for field in fields}
+    # A top level field has to be a single field, not multiple
+    if len(body_param_names_set) > 1:
+        return True
+    first_field = fields[0]
+    # If it explicitly specifies it is embedded, it has to be embedded
+    if getattr(first_field.field_info, "embed", None):
+        return True
+    # If it's a Form (or File) field, it has to be a BaseModel to be top level
+    # otherwise it has to be embedded, so that the key value pair can be extracted
+    if isinstance(first_field.field_info, params.Form) and not lenient_issubclass(
+        first_field.type_, BaseModel
+    ):
+        return True
+    return False
 
 
 def generate_unique_id_for_fastapi_shield(dependant: Dependant, path_format: str):
