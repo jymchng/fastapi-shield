@@ -41,7 +41,6 @@ https://github.com/jymchng/fastapi-shield
 <a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/commit-activity/y/jymchng/fastapi-shield" alt="Activity"></a>
 <a href="https://github.com/jymchng/fastapi-shield/pulls"><img src="https://img.shields.io/github/issues-pr/jymchng/fastapi-shield" alt="PRs"></a>
 <a href="https://github.com/jymchng/fastapi-shield/pulls?q=is%3Apr+is%3Aclosed"><img src="https://img.shields.io/github/issues-pr-closed/jymchng/fastapi-shield" alt="Merged PRs"></a>
-<a href="https://github.com/jymchng/fastapi-shield/pulls?q=is%3Apr+is%3Aopen"><img src="https://img.shields.io/github/issues-pr/open/jymchng/fastapi-shield" alt="Open PRs"></a>
 <a href="https://github.com/jymchng/fastapi-shield/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed/jymchng/fastapi-shield" alt="Closed Issues"></a>
 <a href="https://github.com/jymchng/fastapi-shield/blob/main/LICENSE"><img src="https://img.shields.io/github/license/jymchng/fastapi-shield" alt="License"></a>
 
