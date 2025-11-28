@@ -37,13 +37,13 @@ from types import MappingProxyType
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi._compat import _normalize_errors
-from fastapi.dependencies.utils import is_coroutine_callable
 from fastapi.exceptions import RequestValidationError
 from fastapi.params import Security
 from typing_extensions import Doc
 
 # Import directly to make patching work correctly in tests
 import fastapi_shield.utils
+from fastapi_shield.utils import is_coroutine_callable
 from fastapi_shield.consts import (
     IS_SHIELDED_ENDPOINT_KEY,
     SHIELDED_ENDPOINT_PATH_FORMAT_KEY,

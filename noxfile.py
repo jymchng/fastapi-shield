@@ -3,6 +3,9 @@ import os
 import shutil
 from functools import wraps
 import pathlib
+import urllib.request
+import json
+import re
 
 import nox
 import nox.command as nox_command
@@ -154,6 +157,126 @@ Session.log(
 )
 
 
+# --- FastAPI compatibility matrix helpers ---
+PYPI_JSON_URL_TEMPLATE = "https://pypi.org/pypi/{package}/json"
+
+
+def _parse_strict_version_tuple(ver_str: str):
+    """Parse a strict semantic version 'X.Y.Z' into a tuple of ints.
+
+    Returns None if version doesn't match strict pattern (filters out pre-releases).
+    """
+    m = re.match(r"^(\d+)\.(\d+)\.(\d+)$", ver_str)
+    if not m:
+        return None
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def _version_tuple_to_str(t):
+    return f"{t[0]}.{t[1]}.{t[2]}"
+
+
+def _cmp_major_minor(a, b):
+    """Compare (major, minor) tuples only."""
+    if a[0] != b[0]:
+        return a[0] - b[0]
+    return a[1] - b[1]
+
+
+def _get_min_supported_version_from_pyproject(
+    package_name: str, manifest: dict = PROJECT_MANIFEST
+):
+    """Extract minimum supported version from pyproject for given package.
+
+    Supports entries like 'fastapi>=0.100.1' and 'fastapi[standard]>=0.100.1'.
+    Returns a version tuple (major, minor, patch) or None if not found.
+    """
+    deps = manifest.get("project", {}).get("dependencies", [])
+    patterns = [
+        rf"^{re.escape(package_name)}>=([0-9]+\.[0-9]+\.[0-9]+)$",
+        rf"^{re.escape(package_name)}\[[^\]]+\]>=([0-9]+\.[0-9]+\.[0-9]+)$",
+    ]
+    for dep in deps:
+        for pat in patterns:
+            m = re.match(pat, dep)
+            if m:
+                vt = _parse_strict_version_tuple(m.group(1))
+                if vt:
+                    return vt
+    return None
+
+
+def _fetch_pypi_latest_and_releases(package_name: str):
+    """Fetch latest version and releases list from PyPI JSON.
+
+    Returns (latest_version_tuple, releases_dict) where releases_dict maps
+    (major, minor) -> max patch available for that minor.
+    """
+    url = PYPI_JSON_URL_TEMPLATE.format(package=package_name)
+    try:
+        with urllib.request.urlopen(url) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None, {}
+
+    latest_str = data.get("info", {}).get("version")
+    latest_tuple = _parse_strict_version_tuple(latest_str) if latest_str else None
+
+    releases = data.get("releases", {})
+    minor_to_max_patch = {}
+    for ver_str in releases.keys():
+        vt = _parse_strict_version_tuple(ver_str)
+        if not vt:
+            # skip pre-release or non-strict versions
+            continue
+        major, minor, patch = vt
+        key = (major, minor)
+        prev = minor_to_max_patch.get(key)
+        if prev is None or patch > prev:
+            minor_to_max_patch[key] = patch
+
+    return latest_tuple, minor_to_max_patch
+
+
+def _build_minor_matrix(min_vt, latest_vt, minor_to_max_patch):
+    """Build a list of version strings representing the highest patch in each minor
+    from min_vt to latest_vt inclusive. Only includes minors that exist in releases.
+    """
+    if not min_vt or not latest_vt:
+        return []
+    result = []
+    # Collect and sort available minor keys
+    available_minors = sorted(minor_to_max_patch.keys(), key=lambda k: (k[0], k[1]))
+    for major, minor in available_minors:
+        # range filter: min <= (major, minor) <= latest
+        if _cmp_major_minor((major, minor), (min_vt[0], min_vt[1])) < 0:
+            continue
+        if _cmp_major_minor((major, minor), (latest_vt[0], latest_vt[1])) > 0:
+            continue
+        patch = minor_to_max_patch[(major, minor)]
+        result.append(_version_tuple_to_str((major, minor, patch)))
+    return result
+
+
+def _compute_fastapi_minor_matrix():
+    package = "fastapi"
+    min_vt = _get_min_supported_version_from_pyproject(package)
+    latest_vt, minor_to_max_patch = _fetch_pypi_latest_and_releases(package)
+    matrix = _build_minor_matrix(min_vt, latest_vt, minor_to_max_patch)
+    # Fallbacks if network fails or parsing issues
+    if not matrix:
+        vals = []
+        if min_vt:
+            vals.append(_version_tuple_to_str(min_vt))
+        if latest_vt and latest_vt != min_vt:
+            vals.append(_version_tuple_to_str(latest_vt))
+        matrix = vals or ["0.100.1"]
+    return matrix
+
+
+FASTAPI_MINOR_MATRIX = _compute_fastapi_minor_matrix()
+
+
 def uv_install_group_dependencies(session: Session, dependency_group: str):
     pyproject = nox.project.load_toml(MANIFEST_FILENAME)
     dependencies = nox.project.dependency_groups(pyproject, dependency_group)
@@ -254,6 +377,42 @@ def test(session: AlteredSession):
         with alter_session(session, dependency_group="build"):
             build(session)
     session.run(*command)
+
+
+@session(
+    dependency_group=None,
+    default_posargs=[TEST_DIR, "-s", "-vv", "-n", "auto", "--dist", "worksteal"],
+    reuse_venv=False,
+)
+@nox.parametrize("fastapi_version", FASTAPI_MINOR_MATRIX)
+def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
+    """Run tests against a matrix of FastAPI minor versions.
+
+    The matrix is computed from pyproject's minimum supported version and
+    PyPI's latest release, selecting the highest patch per minor.
+    """
+    session.log(f"Testing compatibility with FastAPI versions: {FASTAPI_MINOR_MATRIX}")
+    # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
+    # Install dev dependencies excluding FastAPI to avoid overriding the pinned version.
+    pyproject = load_toml(MANIFEST_FILENAME)
+    dev_deps = nox.project.dependency_groups(pyproject, "dev")
+    filtered_dev_deps = [d for d in dev_deps if not d.startswith("fastapi")]
+    if filtered_dev_deps:
+        session.install(*filtered_dev_deps)
+    # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
+    session.install(f"fastapi[standard]=={fastapi_version}")
+    with alter_session(session, dependency_group=None) as session:
+        session.install(f".")
+        session.run(
+            *(
+                "python",
+                "-c",
+                f'from fastapi import __version__; assert __version__ == "{fastapi_version}", __version__',
+            )
+        )
+
+    # Run pytest using the Nox-managed virtualenv (avoid external interpreter).
+    session.run("pytest")
 
 
 @contextlib.contextmanager
@@ -604,6 +763,42 @@ def dev(session: Session):
 def ci(session: Session):
     list_dist_files(session)
     test(session)
+
+
+@session(reuse_venv=False)
+def install_latest_tarball(session: Session):
+    import glob
+    import re
+
+    from packaging import version
+
+    # Get all tarball files
+    tarball_files = glob.glob(f"{DIST_DIR}/{PROJECT_NAME_NORMALIZED}-*.tar.gz")
+
+    if not tarball_files:
+        session.error("No tarball files found in dist/ directory")
+
+    # Extract version numbers using regex
+    version_pattern = re.compile(
+        rf"{PROJECT_NAME_NORMALIZED}-([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?).tar.gz"
+    )
+
+    # Create a list of (file_path, version) tuples
+    versioned_files = []
+    for file_path in tarball_files:
+        match = version_pattern.search(file_path)
+        if match:
+            ver_str = match.group(1)
+            versioned_files.append((file_path, version.parse(ver_str)))
+
+    if not versioned_files:
+        session.error("Could not extract version information from tarball files")
+
+    # Sort by version (highest first) and get the path
+    latest_tarball = sorted(versioned_files, key=lambda x: x[1], reverse=True)[0][0]
+    session.log(f"Installing latest version: {latest_tarball}")
+    session.run("uv", "run", "pip", "uninstall", f"{PROJECT_NAME}", "-y")
+    session.install(latest_tarball)
 
 
 @session(reuse_venv=False)
