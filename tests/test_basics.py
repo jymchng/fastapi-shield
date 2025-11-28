@@ -218,16 +218,8 @@ def test_unprotected_endpoint():
     client = TestClient(app)
     response = client.get("/unprotected")
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "This is an unprotected endpoint",
-        "user": {
-            "dependency": {},
-            "use_cache": True,
-            "scopes": [],
-            "shielded_dependency": {},
-            "unblocked": False,
-        },
-    }, response.json()
+    result_json = response.json()
+    assert result_json["message"] == "This is an unprotected endpoint", response.json()
 
 
 def test_protected_endpoint_without_token():

@@ -382,6 +382,7 @@ def test(session: AlteredSession):
 @session(
     dependency_group=None,
     default_posargs=[TEST_DIR, "-s", "-vv", "-n", "auto", "--dist", "worksteal"],
+    reuse_venv=False,
 )
 @nox.parametrize("fastapi_version", FASTAPI_MINOR_MATRIX)
 def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
@@ -391,6 +392,8 @@ def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
     PyPI's latest release, selecting the highest patch per minor.
     """
     session.log(f"Testing compatibility with FastAPI versions: {FASTAPI_MINOR_MATRIX}")
+    with alter_session(session, dependency_group=None) as session:
+        build(session)
     # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
     # Install dev dependencies excluding FastAPI to avoid overriding the pinned version.
     pyproject = load_toml(MANIFEST_FILENAME)

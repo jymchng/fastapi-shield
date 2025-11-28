@@ -11,6 +11,7 @@ import re
 from collections.abc import Iterator
 from contextlib import AsyncExitStack
 from inspect import Parameter, signature
+import inspect
 from typing import Any, Callable, Optional, List, Union
 
 from fastapi import HTTPException, Request, params
@@ -29,6 +30,17 @@ from fastapi.exceptions import RequestValidationError
 from starlette.routing import get_name
 
 
+# copied from `fastapi.dependencies.utils`
+def is_coroutine_callable(call: Callable[..., Any]) -> bool:
+    if inspect.isroutine(call):
+        return inspect.iscoroutinefunction(call)
+    if inspect.isclass(call):
+        return False
+    dunder_call = getattr(call, "__call__", None)  # noqa: B004
+    return inspect.iscoroutinefunction(dunder_call)
+
+
+# copied from `fastapi.dependencies.utils`
 def _should_embed_body_fields(fields: List["ModelField"]) -> bool:
     if not fields:
         return False
