@@ -102,8 +102,6 @@ jobs:
 
 
       - name: Run fastapi compatibility tests
-        env:
-          PYTHONWARNINGS: ignore
         if: steps.check_test_files.outputs.files_exists == 'true'
         env:
           PYTHONWARNINGS: ignore
