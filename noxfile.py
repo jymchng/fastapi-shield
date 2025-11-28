@@ -402,7 +402,7 @@ def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
     # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
     session.install(f"fastapi[standard]=={fastapi_version}")
     with alter_session(session, dependency_group=None) as session:
-        install_latest(session)
+        session.install(f".")
         session.run(
             *(
                 "python",
@@ -766,7 +766,7 @@ def ci(session: Session):
 
 
 @session(reuse_venv=False)
-def install_latest(session: Session):
+def install_latest_tarball(session: Session):
     import glob
     import re
 
