@@ -21,6 +21,8 @@ https://github.com/jymchng/fastapi-shield
 <hr style="border: none; border-top: 1px solid #ccc; margin: 1em 0;">
 
 ### Compatibility and Version
+<img src="https://github.com/jymchng/fastapi-shield/actions/workflows/tests.yaml/badge.svg">
+<img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjymchng%2Ffastapi-shield%2Frefs%2Fheads%2Fmain%2Fpyproject.toml&query=%24.project.dependencies%5B0%5D&label=compat&labelColor=green">
 <img src="https://img.shields.io/pypi/pyversions/fastapi-shield?color=green" alt="Python compat">
 <a href="https://pypi.python.org/pypi/fastapi-shield"><img src="https://img.shields.io/pypi/v/fastapi-shield.svg" alt="PyPi"></a>
 
