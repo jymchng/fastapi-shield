@@ -392,8 +392,6 @@ def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
     PyPI's latest release, selecting the highest patch per minor.
     """
     session.log(f"Testing compatibility with FastAPI versions: {FASTAPI_MINOR_MATRIX}")
-    with alter_session(session, dependency_group=None) as session:
-        build(session)
     # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
     # Install dev dependencies excluding FastAPI to avoid overriding the pinned version.
     pyproject = load_toml(MANIFEST_FILENAME)
@@ -403,6 +401,16 @@ def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
         session.install(*filtered_dev_deps)
     # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
     session.install(f"fastapi[standard]=={fastapi_version}")
+    with alter_session(session, dependency_group=None) as session:
+        install_latest(session)
+        session.run(
+            *(
+                "python",
+                "-c",
+                f'from fastapi import __version__; assert __version__ == "{fastapi_version}", __version__',
+            )
+        )
+
     # Run pytest using the Nox-managed virtualenv (avoid external interpreter).
     session.run("pytest")
 
@@ -755,6 +763,42 @@ def dev(session: Session):
 def ci(session: Session):
     list_dist_files(session)
     test(session)
+
+
+@session(reuse_venv=False)
+def install_latest(session: Session):
+    import glob
+    import re
+
+    from packaging import version
+
+    # Get all tarball files
+    tarball_files = glob.glob(f"{DIST_DIR}/{PROJECT_NAME_NORMALIZED}-*.tar.gz")
+
+    if not tarball_files:
+        session.error("No tarball files found in dist/ directory")
+
+    # Extract version numbers using regex
+    version_pattern = re.compile(
+        rf"{PROJECT_NAME_NORMALIZED}-([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?).tar.gz"
+    )
+
+    # Create a list of (file_path, version) tuples
+    versioned_files = []
+    for file_path in tarball_files:
+        match = version_pattern.search(file_path)
+        if match:
+            ver_str = match.group(1)
+            versioned_files.append((file_path, version.parse(ver_str)))
+
+    if not versioned_files:
+        session.error("Could not extract version information from tarball files")
+
+    # Sort by version (highest first) and get the path
+    latest_tarball = sorted(versioned_files, key=lambda x: x[1], reverse=True)[0][0]
+    session.log(f"Installing latest version: {latest_tarball}")
+    session.run("uv", "run", "pip", "uninstall", f"{PROJECT_NAME}", "-y")
+    session.install(latest_tarball)
 
 
 @session(reuse_venv=False)

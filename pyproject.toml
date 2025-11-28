@@ -116,6 +116,7 @@ reportMissingImports = "none"
 [dependency-groups]
 dev = [
     "bcrypt==4.3.0",
+    "email-validator>=2.3.0",
     "fastapi>=0.115.2",
     "httpx>=0.24.0",
     "isort>=6.0.1",

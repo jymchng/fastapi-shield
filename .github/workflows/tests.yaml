@@ -100,6 +100,16 @@ jobs:
         run: |
           uv run python -m pytest tests/ -vv -s
 
+
+      - name: Run fastapi compatibility tests
+        env:
+          PYTHONWARNINGS: ignore
+        if: steps.check_test_files.outputs.files_exists == 'true'
+        env:
+          PYTHONWARNINGS: ignore
+        run: |
+          uv run nox -s test-compat-fastapi
+
         #----------------------------------------------
         #            make sure docs build
         #----------------------------------------------
