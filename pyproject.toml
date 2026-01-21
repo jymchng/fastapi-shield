@@ -51,11 +51,11 @@ dependencies = [
 dynamic = []
 
 [project.urls]
-Homepage = "https://github.com/jimchng/fastapi-shield"
-Repository = "https://github.com/jimchng/fastapi-shield.git"
+Homepage = "https://github.com/jymchng/fastapi-shield"
+Repository = "https://github.com/jymchng/fastapi-shield.git"
 Documentation = "https://fastapi-shield.asyncmove.com/"
-"Bug Tracker" = "https://github.com/jimchng/fastapi-shield/issues"
-"Feature Requests" = "https://github.com/jimchng/fastapi-shield/discussions"
+"Bug Tracker" = "https://github.com/jymchng/fastapi-shield/issues"
+"Feature Requests" = "https://github.com/jymchng/fastapi-shield/discussions"
 
 
 [tool.hatch.build.targets.wheel]

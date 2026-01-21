@@ -324,11 +324,11 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2100,
             },
         }
         response = self.client.post("/orders", json=order_data)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.json()
         result = response.json()
         assert result["order_id"] == 12345
         assert result["total_amount"] == 35.0
@@ -352,11 +352,11 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2100,
             },
         }
         response = self.client.post("/orders", json=order_data)
-        assert response.status_code == 400
+        assert response.status_code == 400, response.json()
         assert "Invalid order data" in response.json()["detail"]
 
     def test_high_value_order_blocked(self):
@@ -375,11 +375,11 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2100,
             },
         }
         response = self.client.post("/orders", json=order_data)
-        assert response.status_code == 400
+        assert response.status_code == 400, response.json()
         assert "Invalid order data" in response.json()["detail"]
 
     def test_invalid_zip_code(self):
@@ -398,7 +398,7 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2100,
             },
         }
         response = self.client.post("/orders", json=order_data)

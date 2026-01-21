@@ -260,7 +260,18 @@ def _build_minor_matrix(min_vt, latest_vt, minor_to_max_patch):
 
 def _compute_fastapi_minor_matrix():
     package = "fastapi"
-    min_vt = _get_min_supported_version_from_pyproject(package)
+    # Enforce a minimum FastAPI version for the compatibility matrix.
+    # For now, we start testing from 0.122.1 regardless of lower bounds
+    # declared in pyproject.
+    enforced_min_vt = _parse_strict_version_tuple("0.122.1")
+    pyproject_min_vt = _get_min_supported_version_from_pyproject(package)
+    if pyproject_min_vt and _cmp_major_minor(
+        (pyproject_min_vt[0], pyproject_min_vt[1]),
+        (enforced_min_vt[0], enforced_min_vt[1]),
+    ) >= 0:
+        min_vt = pyproject_min_vt
+    else:
+        min_vt = enforced_min_vt
     latest_vt, minor_to_max_patch = _fetch_pypi_latest_and_releases(package)
     matrix = _build_minor_matrix(min_vt, latest_vt, minor_to_max_patch)
     # Fallbacks if network fails or parsing issues
@@ -270,7 +281,7 @@ def _compute_fastapi_minor_matrix():
             vals.append(_version_tuple_to_str(min_vt))
         if latest_vt and latest_vt != min_vt:
             vals.append(_version_tuple_to_str(latest_vt))
-        matrix = vals or ["0.100.1"]
+        matrix = vals or [_version_tuple_to_str(enforced_min_vt)]
     return matrix
 
 
@@ -382,7 +393,6 @@ def test(session: AlteredSession):
 @session(
     dependency_group=None,
     default_posargs=[TEST_DIR, "-s", "-vv", "-n", "auto", "--dist", "worksteal"],
-    reuse_venv=False,
 )
 @nox.parametrize("fastapi_version", FASTAPI_MINOR_MATRIX)
 def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
