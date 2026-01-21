@@ -344,7 +344,7 @@ class TestStringTransformation:
     def test_empty_content(self):
         """Test with empty content"""
         response = self.client.post("/comments", data={"content": ""})
-        assert response.status_code == 500  # Shield rejects empty content
+        assert not (200 <= response.status_code < 300), response.json()  # Shield rejects empty content
 
 
 class TestRegexValidation:

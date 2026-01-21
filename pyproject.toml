@@ -51,9 +51,9 @@ dependencies = [
 dynamic = []
 
 [project.urls]
-Homepage = "https://github.com/jymchng/fastapi-shield"
+Homepage = "https://fastapi-shield.asyncmove.com/"
 Repository = "https://github.com/jymchng/fastapi-shield.git"
-Documentation = "https://fastapi-shield.asyncmove.com/"
+Documentation = "https://docs.fastapi-shield.asyncmove.com/"
 "Bug Tracker" = "https://github.com/jymchng/fastapi-shield/issues"
 "Feature Requests" = "https://github.com/jymchng/fastapi-shield/discussions"
 
