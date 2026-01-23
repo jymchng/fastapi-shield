@@ -481,7 +481,37 @@ def clean(session: Session):
         f"{BUILD_DIR}/**/*.so",
         f"{BUILD_DIR}/**/*.pyd",
     ]
-
+    
+    # Remove directories meant for cache, e.g. `.mypy_cache`
+    CACHE_DIRS = [
+        cache_dir
+        for cache_dir
+        in os.listdir(ROOT_DIR)
+        if os.path.isdir(cache_dir)
+        and os.path.exists(cache_dir)
+        and cache_dir.startswith('.')
+        and cache_dir.endswith('cache')
+    ]
+    
+    for cache_dir in CACHE_DIRS:
+        shutil.rmtree(cache_dir)
+    session.log(f"Cache directories = {CACHE_DIRS} are removed")
+    
+    # Remove virtual environments related to testing fastapi compatibility.
+    NOX_DIR = os.path.join(ROOT_DIR, '.nox')
+    if os.path.exists(NOX_DIR):
+        REMOVABLE_FASTAPI_CAPABILITY_VENVS = [
+            os.path.join(NOX_DIR, venv)
+            for venv
+            in os.listdir(NOX_DIR)
+            if os.path.isdir(os.path.join(NOX_DIR, venv))
+            and os.path.exists(os.path.join(NOX_DIR, venv))
+            and venv.startswith('test-compat')
+        ]
+        for venv in REMOVABLE_FASTAPI_CAPABILITY_VENVS:
+            shutil.rmtree(venv)
+        session.log(f"VENV directories = {REMOVABLE_FASTAPI_CAPABILITY_VENVS} are removed")
+    
     # Remove dist directory
     if os.path.exists(DIST_DIR):
         shutil.rmtree(DIST_DIR)
