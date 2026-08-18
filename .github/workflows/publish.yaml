@@ -1,0 +1,85 @@
+# Publish to PyPI
+#
+# Uses OIDC trusted publishing (no stored API token required):
+# https://docs.pypi.org/trusted-publishers/
+#
+# Publishing a release:
+#   git tag -a vX.Y.Z -m "Release vX.Y.Z"
+#   git push origin vX.Y.Z
+#
+# Prerequisite (one-time, outside this repo): add this GitHub repository as a
+# trusted publisher for the "fastapi-shield" project on PyPI with the workflow
+# name "publish.yaml" and environment "pypi" (or leave environment unset).
+# See https://docs.pypi.org/trusted-publishers/adding-a-publisher/
+
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:  # Allow manual trigger (e.g. to publish an existing tag)
+
+permissions:
+  id-token: write  # Required for OIDC trusted publishing to PyPI
+  contents: read
+
+jobs:
+  build:
+    name: Build sdist and wheel
+    runs-on: ubuntu-latest
+    outputs:
+      wheel-name: ${{ steps.build.outputs.wheel-name }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Build distributions
+        id: build
+        run: |
+          uv build
+          echo "wheel-name=$(ls dist/*.whl | xargs -n1 basename | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 5
+
+  publish:
+    name: Publish to PyPI (OIDC)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # Required for OIDC trusted publishing to PyPI
+      contents: read
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1
+        with:
+          packages-dir: dist/
+          # OIDC trusted publishing is used (no password/token required).
+          # The GitHub environment name must match the trusted publisher's
+          # "environment" setting on PyPI (defaults to empty when unset).
+          skip-existing: false
