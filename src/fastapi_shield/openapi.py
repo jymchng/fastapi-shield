@@ -9,16 +9,17 @@ is required to generate accurate OpenAPI schemas that reflect the original
 endpoint parameters rather than the wrapped shield parameters.
 """
 
+from __future__ import annotations
+
 from contextlib import contextmanager
 from functools import wraps
 from inspect import Signature, signature
-from typing import Callable, Optional, Union
+from typing import Callable
 
 from fastapi import FastAPI
 from fastapi.dependencies.utils import get_dependant
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
-
 from starlette.routing import BaseRoute, compile_path
 
 from fastapi_shield.shield import IS_SHIELDED_ENDPOINT_KEY
@@ -68,7 +69,7 @@ def switch_routes(app: FastAPI):
     shielded_dependants = {}
     shielded_body_fields = {}
 
-    route: Union[BaseRoute, APIRoute]
+    route: BaseRoute | APIRoute
     try:
         # Switch all routes to their original endpoints
         for route in app.routes:
@@ -233,9 +234,9 @@ def gather_signature_params_across_wrapped_endpoints(maybe_wrapped_fn: EndPointF
 
 
 def patch_shields_for_openapi(
-    endpoint: Optional[EndPointFunc] = None,
+    endpoint: EndPointFunc | None = None,
     /,
-    activated_when: Union[Callable[[], bool], bool] = lambda: True,
+    activated_when: Callable[[], bool] | bool = lambda: True,
 ):
     """Decorator to patch shielded endpoints for proper OpenAPI schema generation.
 
