@@ -324,7 +324,7 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2030,
             },
         }
         response = self.client.post("/orders", json=order_data)
@@ -352,7 +352,7 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2030,
             },
         }
         response = self.client.post("/orders", json=order_data)
@@ -375,7 +375,7 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2030,
             },
         }
         response = self.client.post("/orders", json=order_data)
@@ -398,7 +398,7 @@ class TestAdvancedSchemaValidation:
                 "card_type": "visa",
                 "last_four": "1234",
                 "expiry_month": 12,
-                "expiry_year": 2025,
+                "expiry_year": 2030,
             },
         }
         response = self.client.post("/orders", json=order_data)

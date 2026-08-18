@@ -344,7 +344,11 @@ class TestStringTransformation:
     def test_empty_content(self):
         """Test with empty content"""
         response = self.client.post("/comments", data={"content": ""})
-        assert response.status_code == 500  # Shield rejects empty content
+        # FastAPI 0.137+ treats an empty required Form field as missing and
+        # rejects the request with 422 during request validation, before the
+        # shield runs. (FastAPI < 0.137 passed the empty string through, which
+        # let the shield reject it with 500.)
+        assert response.status_code == 422
 
 
 class TestRegexValidation:

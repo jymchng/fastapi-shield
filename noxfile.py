@@ -258,19 +258,49 @@ def _build_minor_matrix(min_vt, latest_vt, minor_to_max_patch):
     return result
 
 
-def _compute_fastapi_minor_matrix():
+# Number of most recent FastAPI minor versions to test compatibility against.
+LAST_N_FASTAPI_MINORS = 5
+# Static fallback if PyPI is unreachable or parsing fails: the last 5 FastAPI
+# minor versions at their highest patch (0.137.2, 0.138.2, 0.139.2, 0.140.13,
+# 0.141.1), as of 2026-08-18.
+FALLBACK_FASTAPI_MINOR_MATRIX = [
+    "0.137.2",
+    "0.138.2",
+    "0.139.2",
+    "0.140.13",
+    "0.141.1",
+]
+
+
+def _compute_fastapi_minor_matrix(num_minors: int = LAST_N_FASTAPI_MINORS):
+    """Compute the last ``num_minors`` FastAPI minor versions (highest patch each).
+
+    Fetches available releases from PyPI and selects the highest patch for each
+    of the last ``num_minors`` minor versions up to and including the latest
+    release. Falls back to a static list if the network is unavailable or the
+    version data cannot be parsed.
+    """
     package = "fastapi"
-    min_vt = _get_min_supported_version_from_pyproject(package)
     latest_vt, minor_to_max_patch = _fetch_pypi_latest_and_releases(package)
-    matrix = _build_minor_matrix(min_vt, latest_vt, minor_to_max_patch)
-    # Fallbacks if network fails or parsing issues
+    matrix = []
+    if latest_vt and minor_to_max_patch:
+        # Available minors up to and including the latest release.
+        available_minors = sorted(
+            (
+                k
+                for k in minor_to_max_patch.keys()
+                if _cmp_major_minor(k, (latest_vt[0], latest_vt[1])) <= 0
+            ),
+            key=lambda k: (k[0], k[1]),
+        )
+        selected = available_minors[-num_minors:]
+        matrix = [
+            _version_tuple_to_str((major, minor, minor_to_max_patch[(major, minor)]))
+            for major, minor in selected
+        ]
+    # Fallback if network fails or parsing issues
     if not matrix:
-        vals = []
-        if min_vt:
-            vals.append(_version_tuple_to_str(min_vt))
-        if latest_vt and latest_vt != min_vt:
-            vals.append(_version_tuple_to_str(latest_vt))
-        matrix = vals or ["0.100.1"]
+        matrix = list(FALLBACK_FASTAPI_MINOR_MATRIX)
     return matrix
 
 
@@ -388,8 +418,8 @@ def test(session: AlteredSession):
 def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
     """Run tests against a matrix of FastAPI minor versions.
 
-    The matrix is computed from pyproject's minimum supported version and
-    PyPI's latest release, selecting the highest patch per minor.
+    The matrix is the last 5 FastAPI minor versions (highest patch per minor)
+    up to and including PyPI's latest release.
     """
     session.log(f"Testing compatibility with FastAPI versions: {FASTAPI_MINOR_MATRIX}")
     # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
