@@ -5,24 +5,25 @@ for handling dependency injection, request body parsing, signature manipulation,
 and other internal operations.
 """
 
+from __future__ import annotations
+
 import email.message
+import inspect
 import json
 import re
 from collections.abc import Iterator
 from contextlib import AsyncExitStack
 from inspect import Parameter, signature
-import inspect
-from typing import Any, Callable, Optional, List, Union
+from typing import Any, Callable
 
-from fastapi import __version__ as _fastapi_version
 from fastapi import HTTPException, Request, params
+from fastapi import __version__ as _fastapi_version
 from fastapi._compat import ModelField, Undefined
 from fastapi.dependencies.models import Dependant
 from fastapi.dependencies.utils import get_dependant, solve_dependencies
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from pydantic._internal._utils import lenient_issubclass
-from fastapi.exceptions import RequestValidationError
-
 from starlette.routing import get_name
 
 
@@ -41,8 +42,24 @@ _FASTAPI_HAS_LEGACY_BODY_FIELD_API = _fastapi_minor_tuple() < (0, 140)
 if _FASTAPI_HAS_LEGACY_BODY_FIELD_API:
     from fastapi.dependencies.utils import get_body_field, get_flat_dependant
 
-    _get_flat_body_params_impl = get_flat_dependant
-    _get_body_field_impl = get_body_field
+    def _get_flat_body_params_impl(dependant: Dependant):
+        """Return the flattened body params (FastAPI < 0.140)."""
+        return get_flat_dependant(dependant).body_params
+
+    def _get_body_field_impl(*, body_params, name, embed_body_fields):
+        """Build the request body field (FastAPI < 0.140)."""
+        flat_dependant = Dependant(
+            path_params=[],
+            query_params=[],
+            header_params=[],
+            cookie_params=[],
+            body_params=body_params,
+        )
+        return get_body_field(
+            flat_dependant=flat_dependant,
+            name=name,
+            embed_body_fields=embed_body_fields,
+        )
 else:
     # FastAPI >= 0.140 renamed these helpers to private, signature-changed
     # versions: `get_flat_dependant` -> `_get_flat_body_params` (returns only
@@ -75,19 +92,6 @@ def _normalize_errors(errors):
     return errors
 
 
-def _get_flat_dependant(dependant: Dependant) -> Dependant:
-    """Return a flat dependant (FastAPI < 0.140) or the original (>= 0.140).
-
-    FastAPI >= 0.140 removed ``get_flat_dependant``; the body params it used to
-    flatten are now provided by ``_get_flat_body_params``. To keep a single
-    code path, this returns the original dependant and the caller uses
-    ``_get_flat_body_params`` where needed.
-    """
-    if _FASTAPI_HAS_LEGACY_BODY_FIELD_API:
-        return _get_flat_body_params_impl(dependant)
-    return dependant
-
-
 # copied from `fastapi.dependencies.utils`
 def is_coroutine_callable(call: Callable[..., Any]) -> bool:
     if inspect.isroutine(call):
@@ -99,7 +103,7 @@ def is_coroutine_callable(call: Callable[..., Any]) -> bool:
 
 
 # copied from `fastapi.dependencies.utils`
-def _should_embed_body_fields(fields: List["ModelField"]) -> bool:
+def _should_embed_body_fields(fields: list[ModelField]) -> bool:
     if not fields:
         return False
     # More than one dependency could have the same field, it would show up as multiple
@@ -117,11 +121,10 @@ def _should_embed_body_fields(fields: List["ModelField"]) -> bool:
     # key value pair can be extracted. `ModelField.type_` was removed in
     # FastAPI 0.137+ (where `_compat` became a package); use
     # `field_info.annotation` like current FastAPI does.
-    if isinstance(first_field.field_info, params.Form) and not lenient_issubclass(
-        first_field.field_info.annotation, BaseModel
-    ):
-        return True
-    return False
+    return bool(
+        isinstance(first_field.field_info, params.Form)
+        and not lenient_issubclass(first_field.field_info.annotation, BaseModel)
+    )
 
 
 def generate_unique_id_for_fastapi_shield(dependant: Dependant, path_format: str):
@@ -153,7 +156,7 @@ def generate_unique_id_for_fastapi_shield(dependant: Dependant, path_format: str
 
 def get_body_field_from_dependant(
     dependant: Dependant, path_format: str
-) -> tuple[Optional[ModelField], bool]:
+) -> tuple[ModelField | None, bool]:
     """Extract body field information from a FastAPI Dependant.
 
     Analyzes a FastAPI Dependant to determine the appropriate body field
@@ -175,30 +178,18 @@ def get_body_field_from_dependant(
         >>> if body_field:
         ...     print(f"Body field type: {body_field.type_}")
     """
-    flat_dependant = _get_flat_dependant(dependant)
-    if _FASTAPI_HAS_LEGACY_BODY_FIELD_API:
-        embed_body_fields = _should_embed_body_fields(flat_dependant.body_params)
-        body_field = _get_body_field_impl(
-            flat_dependant=flat_dependant,
-            name=generate_unique_id_for_fastapi_shield(dependant, path_format),
-            embed_body_fields=embed_body_fields,
-        )
-    else:
-        # FastAPI >= 0.140: `_get_flat_body_params` returns the flattened body
-        # params and `_get_body_field` takes `body_params` instead of a flat
-        # dependant.
-        body_params = _get_flat_body_params_impl(dependant)
-        embed_body_fields = _should_embed_body_fields(body_params)
-        body_field = _get_body_field_impl(
-            body_params=body_params,
-            name=generate_unique_id_for_fastapi_shield(dependant, path_format),
-            embed_body_fields=embed_body_fields,
-        )
+    body_params = _get_flat_body_params_impl(dependant)
+    embed_body_fields = _should_embed_body_fields(body_params)
+    body_field = _get_body_field_impl(
+        body_params=body_params,
+        name=generate_unique_id_for_fastapi_shield(dependant, path_format),
+        embed_body_fields=embed_body_fields,
+    )
     return body_field, embed_body_fields
 
 
 async def get_body_from_request(  # pylint: disable=too-many-nested-blocks,too-many-branches
-    request: Request, body_field: Optional[ModelField] = None
+    request: Request, body_field: ModelField | None = None
 ):
     """Extract and parse the request body based on content type and field configuration.
 
@@ -316,7 +307,7 @@ async def get_solved_dependencies(
     request: Request,
     path_format: str,
     endpoint: Callable,
-    dependency_cache: Optional[dict],
+    dependency_cache: dict | None,
 ):
     """Resolve all dependencies for a FastAPI endpoint.
 
@@ -488,7 +479,7 @@ def rearrange_params(iter_params: Iterator[Parameter]):
     now_kind = ORDER[kind_idx]
 
     # First pass: process params and create buffer1
-    buffer1: List[Union[Parameter, None]] = []
+    buffer1: list[Parameter | None] = []
     for p in iter_params:
         kind = p.kind
         if kind == POS_KW:
@@ -501,7 +492,7 @@ def rearrange_params(iter_params: Iterator[Parameter]):
             buffer1.append(p)
 
     # Prepare buffer2 with exact size
-    buffer2: List[Union[Parameter, None]] = [None] * len(buffer1)
+    buffer2: list[Parameter | None] = [None] * len(buffer1)
 
     # Process remaining kinds
     while buffer1:

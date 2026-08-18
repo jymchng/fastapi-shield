@@ -1,6 +1,7 @@
 import contextlib
 import os
 import shutil
+import sys
 from functools import wraps
 import pathlib
 import urllib.request
@@ -422,6 +423,15 @@ def test_compat_fastapi(session: AlteredSession, fastapi_version: str):
     up to and including PyPI's latest release.
     """
     session.log(f"Testing compatibility with FastAPI versions: {FASTAPI_MINOR_MATRIX}")
+    # FastAPI 0.137+ requires Python >= 3.10, so the pinned matrix versions
+    # cannot be installed on older interpreters. Skip the session there instead
+    # of failing the whole CI job (the 'test' workflow runs on Python 3.8/3.9
+    # too).
+    if sys.version_info < (3, 10):
+        session.skip(
+            f"FastAPI {fastapi_version} requires Python >= 3.10 "
+            f"(running Python {sys.version_info.major}.{sys.version_info.minor})"
+        )
     # Pin FastAPI (and extras) to the target minor's highest patch before running tests.
     # Install dev dependencies excluding FastAPI to avoid overriding the pinned version.
     pyproject = load_toml(MANIFEST_FILENAME)
