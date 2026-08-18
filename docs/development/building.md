@@ -4,7 +4,7 @@ This guide explains how to build, package, and distribute FastAPI Shield.
 
 ## Prerequisites
 
-- Python 3.9 or higher
+- Python 3.9 - 3.14
 - pip, uv, or poetry
 - Git
 - Node.js (for documentation)
@@ -175,7 +175,7 @@ docker build -t fastapi-shield:latest .
 
 ## Cross-Platform Compatibility
 
-FastAPI Shield aims to be compatible with all platforms supported by Python 3.9+. When building, ensure compatibility with:
+FastAPI Shield aims to be compatible with all platforms supported by Python 3.9 - 3.14. When building, ensure compatibility with:
 
 - Linux (various distributions)
 - macOS (Intel and Apple Silicon)

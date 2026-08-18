@@ -26,7 +26,7 @@ To understand where the project is headed:
 
 ### Prerequisites
 
-- Python 3.9 or higher
+- Python 3.9 - 3.14
 - pip, uv, or poetry
 - Git
 

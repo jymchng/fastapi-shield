@@ -337,8 +337,8 @@ Each shield acts as an independent layer of security that can:
 
 ### Prerequisites
 
-- Python 3.9 or higher
-- FastAPI 0.100.1 or higher
+- Python 3.9 - 3.14
+- FastAPI 0.115.2 or higher
 
 ### Install Development Dependencies
 

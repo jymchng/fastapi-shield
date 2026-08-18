@@ -8,7 +8,7 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 
 ## Prerequisites
 
-- Python 3.9 or higher
+- Python 3.9 - 3.14
 - pip, uv, or poetry
 - Git
 

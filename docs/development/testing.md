@@ -176,7 +176,7 @@ def test_shield_typing():
 
 ## Testing with Different Python Versions
 
-FastAPI Shield supports Python 3.9+ and tests across multiple Python versions:
+FastAPI Shield supports Python 3.9 - 3.14 and tests across multiple Python versions:
 
 ```bash
 # Using nox to test on multiple Python versions

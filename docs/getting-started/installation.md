@@ -4,8 +4,8 @@ FastAPI Shield is a Python library that can be installed using various package m
 
 ## Requirements
 
-- Python 3.9 or higher
-- FastAPI 0.68.0 or higher
+- Python 3.9 - 3.14
+- FastAPI 0.115.2 or higher
 
 ## Using pip
 
