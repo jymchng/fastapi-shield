@@ -132,6 +132,7 @@ dev = [
     "pyright>=1.1.406",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
     "pytest-xdist>=3.7.0",
     "python-multipart>=0.0.5",
     "slowapi>=0.1.9",
@@ -144,3 +145,10 @@ docs = [
     "mkdocs-material>=9.6.12",
     "mkdocstrings[python]>=0.23.0",
 ]
+
+[tool.coverage.run]
+# openapi.py is intentionally excluded from the coverage gate: it is the
+# schema-generation module and is not yet covered by tests. Excluding it lets
+# the `coverage` nox session enforce a meaningful >=89% threshold on the
+# tested modules (see noxfile.py `coverage` session).
+omit = ["*/openapi.py"]

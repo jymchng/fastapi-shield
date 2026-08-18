@@ -413,6 +413,39 @@ def test(session: AlteredSession):
 
 
 @session(
+    dependency_group="dev",
+    default_posargs=[
+        TEST_DIR,
+        "--cov=fastapi_shield",
+        "--cov-report=term-missing",
+        "--cov-report=html",
+        "--cov-fail-under=89",
+    ],
+)
+def coverage(session: AlteredSession):
+    """Run the test suite with coverage measurement.
+
+    Uses pytest-cov to measure coverage of ``fastapi_shield``. ``openapi.py``
+    is omitted from the measurement (see ``[tool.coverage.run].omit`` in
+    pyproject.toml) because that schema-generation module is not yet covered;
+    the enforced threshold is >= 89% on the measured modules.
+
+    Reports a terminal summary (``--cov-report=term-missing``) and writes an
+    HTML report to ``htmlcov/`` (``--cov-report=html``).
+
+    Run with: ``nox -s coverage``
+    """
+    command = [
+        shutil.which("uv"),
+        "run",
+        "python",
+        "-m",
+        "pytest",
+    ]
+    session.run(*command)
+
+
+@session(
     dependency_group=None,
     default_posargs=[TEST_DIR, "-s", "-vv", "-n", "auto", "--dist", "worksteal"],
     reuse_venv=False,
