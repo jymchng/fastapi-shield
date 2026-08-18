@@ -39,14 +39,14 @@ def _fastapi_minor_tuple() -> tuple[int, int]:
 _FASTAPI_HAS_LEGACY_BODY_FIELD_API = _fastapi_minor_tuple() < (0, 140)
 
 
-if _FASTAPI_HAS_LEGACY_BODY_FIELD_API:
+if _FASTAPI_HAS_LEGACY_BODY_FIELD_API:  # pragma: no cover - FastAPI <0.140 only
     from fastapi.dependencies.utils import get_body_field, get_flat_dependant
 
-    def _get_flat_body_params_impl(dependant: Dependant):
+    def _get_flat_body_params_impl(dependant: Dependant):  # pragma: no cover
         """Return the flattened body params (FastAPI < 0.140)."""
         return get_flat_dependant(dependant).body_params
 
-    def _get_body_field_impl(*, body_params, name, embed_body_fields):
+    def _get_body_field_impl(*, body_params, name, embed_body_fields):  # pragma: no cover
         """Build the request body field (FastAPI < 0.140)."""
         flat_dependant = Dependant(
             path_params=[],

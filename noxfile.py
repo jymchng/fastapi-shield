@@ -419,7 +419,7 @@ def test(session: AlteredSession):
         "--cov=fastapi_shield",
         "--cov-report=term-missing",
         "--cov-report=html",
-        "--cov-fail-under=89",
+        "--cov-fail-under=90",
     ],
 )
 def coverage(session: AlteredSession):
