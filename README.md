@@ -29,7 +29,7 @@ https://github.com/jymchng/fastapi-shield
 <!-- <a href="https://codecov.io/github/jymchng/fastapi-shield?branch=main"><img src="https://codecov.io/github/jymchng/fastapi-shield/coverage.svg?branch=main" alt="Coverage"></a> -->
 
 ### Statistics
-<a href="https://github.com/jymchng/fastapi-shield/stargazers"><img src="https://img.shields.io/github/stars/jymchng/fastapi-shield" alt="Stars"></a>
+<img src="https://img.shields.io/github/stars/jymchng/fastapi-shield" alt="Stars">
 <a href="https://github.com/jymchng/fastapi-shield/network/members"><img src="https://img.shields.io/github/forks/jymchng/fastapi-shield" alt="Forks"></a>
 <a href="https://pypi.python.org/pypi/fastapi-shield"><img src="https://img.shields.io/pypi/dm/fastapi-shield" alt="Downloads"></a>
 <a href="https://github.com/jymchng/fastapi-shield/graphs/contributors"><img src="https://img.shields.io/github/contributors/jymchng/fastapi-shield" alt="Contributors"></a>
@@ -39,7 +39,7 @@ https://github.com/jymchng/fastapi-shield
 <a href="https://github.com/jymchng/fastapi-shield/commits/main"><img src="https://img.shields.io/github/last-commit/jymchng/fastapi-shield" alt="Last Commit"></a>
 <a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/languages/code-size/jymchng/fastapi-shield" alt="Code Size"></a>
 <a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/repo-size/jymchng/fastapi-shield" alt="Repo Size"></a>
-<a href="https://github.com/jymchng/fastapi-shield/watchers"><img src="https://img.shields.io/github/watchers/jymchng/fastapi-shield" alt="Watchers"></a>
+<img src="https://img.shields.io/github/watchers/jymchng/fastapi-shield" alt="Watchers">
 <a href="https://github.com/jymchng/fastapi-shield"><img src="https://img.shields.io/github/commit-activity/y/jymchng/fastapi-shield" alt="Activity"></a>
 <a href="https://github.com/jymchng/fastapi-shield/pulls"><img src="https://img.shields.io/github/issues-pr/jymchng/fastapi-shield" alt="PRs"></a>
 <a href="https://github.com/jymchng/fastapi-shield/pulls?q=is%3Apr+is%3Aclosed"><img src="https://img.shields.io/github/issues-pr-closed/jymchng/fastapi-shield" alt="Merged PRs"></a>
@@ -274,7 +274,7 @@ The `ShieldedDepends` ensures that the payload is only retrieved if previous shi
 
 ## Advanced Example
 
-Check out the complete product catalog API example in the [`examples/app`](examples/app) directory, which demonstrates:
+Check out the complete product catalog API example in the [`examples/app`](https://github.com/jymchng/fastapi-shield/tree/main/examples/app) directory, which demonstrates:
 
 - Authentication with token-based shields
 - Role-based access control
@@ -394,7 +394,7 @@ We welcome contributions! Please see our Contributing Guide for details.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/jymchng/fastapi-shield/blob/main/LICENSE) file for details.
 
 ## Acknowledgments
 
