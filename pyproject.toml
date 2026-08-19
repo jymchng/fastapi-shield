@@ -74,9 +74,12 @@ exclude = [
     "LICENSE",
     "README.md",
     ".github/*",
+    ".gitignore",
     ".pre-commit-config.yaml",
     "requirements-dev.txt",
+    "requirements-docs.txt",
     "mkdocs.yaml",
+    "netlify.toml",
 ]
 
 [build-system]
