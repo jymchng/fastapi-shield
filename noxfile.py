@@ -7,6 +7,7 @@ import pathlib
 import urllib.request
 import json
 import re
+import warnings
 
 import nox
 import nox.command as nox_command
@@ -162,6 +163,32 @@ Session.log(
 
 # --- FastAPI compatibility matrix helpers ---
 PYPI_JSON_URL_TEMPLATE = "https://pypi.org/pypi/{package}/json"
+# Bounded timeout (seconds) for the PyPI metadata lookup. ``urlopen`` has no
+# default timeout, so an unresponsive PyPI would hang the session instead of
+# letting it fall back to the pinned matrix.
+PYPI_REQUEST_TIMEOUT_S = 10.0
+
+
+def _warn(message: str) -> None:
+    """Emit a diagnostic that is visible in CI logs.
+
+    The FastAPI compatibility matrix is derived dynamically from PyPI. If that
+    lookup fails, the pinned ``FALLBACK_FASTAPI_MINOR_MATRIX`` is substituted,
+    which can silently make CI test a stale version window and still report
+    green. The fallback therefore has to be loud, so the message is written to
+    stderr with a stable ``noxfile:`` prefix in addition to ``warnings.warn``.
+
+    ``warnings.warn`` is wrapped defensively: this module is imported by every
+    nox session, so a warning filter such as ``-W error`` must not turn a
+    diagnostic into an import-time crash.
+    """
+    line = f"noxfile: WARNING: {message}"
+    try:
+        warnings.warn(message, stacklevel=2)
+    except Exception:
+        # The stderr line below is the primary signal; never fail on the warning.
+        pass
+    print(line, file=sys.stderr, flush=True)
 
 
 def _parse_strict_version_tuple(ver_str: str):
@@ -213,13 +240,19 @@ def _fetch_pypi_latest_and_releases(package_name: str):
     """Fetch latest version and releases list from PyPI JSON.
 
     Returns (latest_version_tuple, releases_dict) where releases_dict maps
-    (major, minor) -> max patch available for that minor.
+    (major, minor) -> max patch available for that minor. Returns ``(None, {})``
+    on any failure, reporting the specific cause so the subsequent fallback can
+    be diagnosed rather than guessed at.
     """
     url = PYPI_JSON_URL_TEMPLATE.format(package=package_name)
     try:
-        with urllib.request.urlopen(url) as resp:
+        with urllib.request.urlopen(url, timeout=PYPI_REQUEST_TIMEOUT_S) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
+    except Exception as exc:
+        _warn(
+            f"could not fetch {package_name} metadata from PyPI ({url}) "
+            f"within {PYPI_REQUEST_TIMEOUT_S}s: {type(exc).__name__}: {exc}"
+        )
         return None, {}
 
     latest_str = data.get("info", {}).get("version")
@@ -281,7 +314,8 @@ def _compute_fastapi_minor_matrix(num_minors: int = LAST_N_FASTAPI_MINORS):
     Fetches available releases from PyPI and selects the highest patch for each
     of the last ``num_minors`` minor versions up to and including the latest
     release. Falls back to a static list if the network is unavailable or the
-    version data cannot be parsed.
+    version data cannot be parsed, emitting a visible warning so a stale matrix
+    is never mistaken for a freshly computed one.
     """
     package = "fastapi"
     latest_vt, minor_to_max_patch = _fetch_pypi_latest_and_releases(package)
@@ -303,7 +337,22 @@ def _compute_fastapi_minor_matrix(num_minors: int = LAST_N_FASTAPI_MINORS):
         ]
     # Fallback if network fails or parsing issues
     if not matrix:
+        if not latest_vt:
+            reason = f"the latest {package} version could not be determined from PyPI"
+        elif not minor_to_max_patch:
+            reason = f"PyPI returned no parseable {package} releases"
+        else:
+            reason = (
+                f"no {package} minor version at or below the latest release "
+                f"({_version_tuple_to_str(latest_vt)}) was selectable"
+            )
         matrix = list(FALLBACK_FASTAPI_MINOR_MATRIX)
+        _warn(
+            f"FastAPI compatibility matrix fell back to the pinned list {matrix} "
+            f"because the dynamically computed list is unavailable ({reason}). "
+            "This list is static and may be stale: CI could be testing an "
+            "outdated version window and still report success."
+        )
     return matrix
 
 
